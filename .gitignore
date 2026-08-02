@@ -1,0 +1,8 @@
+.DS_Store
+**/.DS_Store
+
+# Local reference projects (do not publish)
+/参考/Open-LLM-VTuber-main/
+/参考/Umi-OCR-main/
+/参考/Work-Review-main/
+/参考/deepseek_wechat_bot-main/
