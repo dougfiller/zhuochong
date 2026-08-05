@@ -1,0 +1,6 @@
+{
+  "fixture": "retrieval_failed",
+  "scope": {"kind": "selected_conversations", "ids": ["conversation-a", "conversation-b"]},
+  "expectedError": "KB_RETRIEVAL_FAILED",
+  "modelTransportCalls": 0
+}

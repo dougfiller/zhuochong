@@ -1,0 +1,6 @@
+{
+  "fixture": "unsupported_schema",
+  "schemaVersion": 999,
+  "expectedError": "KB_SOURCE_UNSUPPORTED",
+  "purpose": "do-not-infer-unknown-fields"
+}

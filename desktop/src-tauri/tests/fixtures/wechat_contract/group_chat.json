@@ -1,0 +1,9 @@
+{
+  "fixture": "group_chat",
+  "requestId": "00000000-0000-4000-8000-000000000003",
+  "captureVersion": 3,
+  "stableMessageId": "fixture-message-003",
+  "isSingleChat": false,
+  "ocrText": "群聊中的虚构消息",
+  "expectedError": "WX_GROUP_CHAT_UNSUPPORTED"
+}

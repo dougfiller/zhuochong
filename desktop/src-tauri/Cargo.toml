@@ -93,5 +93,15 @@ tauri-plugin-autostart = "2.5.1"
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+# Release selection is explicit for future WeChat targets. The normal Work Review
+# binary intentionally does not select either feature.
+wechat-m1 = []
+wechat-m2 = []
+# Used only by contract checks so the existing default application build remains valid.
+wechat-contract-check = []
+# Intentionally failing compile probes for the isolated WeChat contract checks.
+wechat-contract-probe-private-constructors = []
+wechat-contract-probe-m1-rag = []
+wechat-contract-probe-m2-m1 = []
 # Compatibility shim for old objc macros that still expand cfg(feature = "cargo-clippy")
 cargo-clippy = []

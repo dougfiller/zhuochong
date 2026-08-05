@@ -44,3 +44,23 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 配置与残留地址扫描 | `node -e "JSON.parse(require('node:fs').readFileSync('desktop/src-tauri/tauri.conf.json'))"`；针对 updater 源码、Tauri 配置和 Release workflow 搜索上游 endpoint/代理 manifest | 通过；JSON 合法，目标范围未发现上游 Release API、代理或 `updater.json`。 |
 | 全量前端测试（环境限制） | `cd desktop && node --test` | 未通过，非本次代码失败：445 通过、5 失败；当前未安装依赖导致缺少 `playwright`、`svelte` 与 `vite`。未执行安装以免改变工作区依赖状态。 |
 | Rust 格式检查（环境限制） | `rustfmt --check desktop/src-tauri/src/commands/updater.rs` | 未运行；当前 `stable-aarch64-apple-darwin` toolchain 未安装 `rustfmt` component。 |
+
+## 冻结微信知识库状态机和验收契约（2026-08-06）
+
+本步骤未新增独立检测脚本，检测资产是 `desktop/src-tauri/src/wechat/` 与 `knowledge/` 的 Rust 单元测试，以及 `tests/fixtures/wechat_contract/` 下的手写脱敏 JSON fixture。测试不会读取、复制、哈希或提交真实聊天数据，也不会创建/打开知识库数据库、发送模型请求或启动应用。
+
+| 验收项 | 命令/方法 | 预期 | 实际 | 结果 |
+| --- | --- | --- | --- | --- |
+| 微信类型、OCR 边界、fixture 与状态机 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat:: --no-default-features` | OCR 仅 `Text` 且单聊可形成 M1 输入；群聊拒绝，非法迁移、序号倒退、旧 request/binding/observation 均拒绝 | 11/11 通过 | 通过 |
+| 知识 scope、检索结果与 token budget | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features` | 三种 scope wire 形状固定、空多选范围拒绝、`no_hit` 为成功封装、命中摘录不超过检索结果携带的 token budget | 3/3 通过 | 通过 |
+| 检索失败零调用与 `no_hit` 放行 | 同上 `wechat::` 定向测试 | `retrieval_failed.json` 驱动 `KB_RETRIEVAL_FAILED` 进入 `Failed` 且 fake transport 为 0；只有 `no_hit` 空命中可进入生成 | 已包含在 11/11 通过 | 通过 |
+| M1 编译门禁 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1'` | 仅 M1 入口可编译 | 编译成功 | 通过 |
+| M2 编译门禁 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'` | 仅 RAG 入口可编译 | 编译成功 | 通过 |
+| 无 release feature（预期失败） | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features wechat-contract-check` | `compile_error!` 指明必须二选一 | 退出码 101，命中预期信息 | 通过 |
+| 双 release feature（预期失败） | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1,wechat-m2'` | `compile_error!` 拒绝双启用 | 退出码 101，命中预期信息且无其他编译错误 | 通过 |
+| 私有构造（预期失败） | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2,wechat-contract-probe-private-constructors'` | 非受信任 sibling module 不能构造 `RetrievedReply` 或 `ModelKnowledgeContext` | 退出码 101，两个类型均因私有字段构造失败 | 通过 |
+| M1 引用 RAG 入口（预期失败） | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1,wechat-contract-probe-m1-rag'` | M1 target 无 RAG 入口 | 退出码 101，`generate_rag_reply` 因 `wechat-m2` 未启用而不可解析 | 通过 |
+| M2 引用 M1 入口（预期失败） | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2,wechat-contract-probe-m2-m1'` | M2 target 无 M1 入口 | 退出码 101，`generate_m1_reply` 因 `wechat-m1` 未启用而不可解析 | 通过 |
+| Rust 格式检查 | `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` | 仅检查格式 | 未运行：当前 `stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component | 环境限制 |
+
+`normal_m1.json`、`empty_ocr.json`、`group_chat.json`、`duplicate_message.json`、`unsupported_schema.json`、`ambiguous_conversations.json`、`no_hit.json` 与 `retrieval_failed.json` 仅为契约样例。后续实现必须保持它们脱敏；群聊 fixture 只可表达用户明确选择的知识范围，不扩展为实时群聊回复承诺。

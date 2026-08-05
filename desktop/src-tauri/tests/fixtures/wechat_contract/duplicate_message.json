@@ -1,0 +1,6 @@
+{
+  "fixture": "duplicate_message",
+  "stableMessageId": "fixture-message-duplicate",
+  "records": ["fixture-message-duplicate", "fixture-message-duplicate"],
+  "purpose": "future-import-deduplication-contract"
+}

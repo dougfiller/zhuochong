@@ -1,0 +1,7 @@
+{
+  "fixture": "no_hit",
+  "scope": {"kind": "conversation", "id": "conversation-stable-id"},
+  "retrievalStatus": "no_hit",
+  "hits": [],
+  "allowsM2Generation": true
+}

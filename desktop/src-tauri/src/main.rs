@@ -35,7 +35,9 @@ mod screenshot;
 mod storage;
 mod telegram_bot;
 mod wecom_bot;
+mod wechat;
 mod work_intelligence;
+mod knowledge;
 
 use config::{config_backup_path, AppConfig, AvatarFollowupItem, ConfigLoadStatus};
 use database::Database;

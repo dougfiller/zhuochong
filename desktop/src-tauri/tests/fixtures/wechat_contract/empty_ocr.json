@@ -1,0 +1,9 @@
+{
+  "fixture": "empty_ocr",
+  "requestId": "00000000-0000-4000-8000-000000000002",
+  "captureVersion": 2,
+  "stableMessageId": "fixture-message-002",
+  "isSingleChat": true,
+  "ocrText": "   ",
+  "expectedError": "WX_OCR_EMPTY"
+}

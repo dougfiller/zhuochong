@@ -1,0 +1,6 @@
+{
+  "fixture": "ambiguous_conversations",
+  "candidates": ["conversation-a", "conversation-b"],
+  "selection": null,
+  "expectedError": "KB_SCOPE_UNRESOLVED"
+}
