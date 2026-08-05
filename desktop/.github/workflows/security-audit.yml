@@ -1,0 +1,56 @@
+name: Security Audit
+
+# 依赖漏洞扫描：每周 + 锁文件变更时。处理截屏/OCR/HTTP 上传/AES 的应用必须盯 CVE。
+on:
+  schedule:
+    - cron: '0 3 * * 1' # 每周一 03:00 UTC
+  push:
+    branches: [main, master]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+# rustsec/audit-check 需要创建 check-run;默认 GITHUB_TOKEN 只读会报
+# "Resource not accessible by integration"。
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  cargo-audit:
+    name: cargo audit（Rust CVE）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # screenshots 0.8 的 Linux-only 代码生成依赖解析依赖自带的
+          # Wayland/XCB XML，不接触用户输入；上游尚无可升级版本。
+          ignore: RUSTSEC-2026-0194,RUSTSEC-2026-0195
+
+  npm-audit:
+    name: npm audit（前端依赖）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: npm audit（仅运行时依赖,高危及以上视为失败）
+        # 门禁只看会进最终产物的运行时依赖;vite/svelte 等构建工具链
+        # (devDependencies) 的漏洞不随应用分发,单独展示不作为失败条件。
+        run: npm audit --omit=dev --audit-level=high
+      - name: npm audit（含构建工具链,仅报告不拦截）
+        run: npm audit || true

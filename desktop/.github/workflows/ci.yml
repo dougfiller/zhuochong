@@ -1,0 +1,57 @@
+name: CI
+
+# 开发期门禁：PR / push 即验证，不再等 tag 发版才暴露破坏。
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: 前端测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: node --test（全量前端测试）
+        run: node --test
+      - name: 生产构建
+        run: npm run build
+
+  backend:
+    name: Rust 检查与测试
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Rust 缓存
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build frontend assets for Rust tests
+        run: npm run build
+      - name: cargo check（0 warning 基线）
+        run: cargo check --workspace --all-targets
+        env:
+          RUSTFLAGS: -D warnings
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace

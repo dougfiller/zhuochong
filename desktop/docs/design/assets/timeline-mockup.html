@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时间线改版 Mockup · Work Review</title>
+<style>
+  /* ── 基底:与概览定稿 mockup 完全同源的 token ── */
+  :root{
+    --surface-page:#f4f6f9; --surface-featured:#ffffff; --surface-subtle:#f8fafc;
+    --ink:#0f172a; --ink-2:#475569; --ink-3:#94a3b8;
+    --line:#e2e8f0; --line-soft:#eef2f7;
+    --primary:#3b82f6; --primary-soft:#dbeafe;
+    --c-dev:#3b82f6; --c-meet:#d97706; --c-doc:#8b5cf6; --c-comm:#059669; --c-ent:#be123c; --c-other:#94a3b8;
+    --r-card:22px; --r-inner:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"SF Pro Display","SF Pro Text","PingFang SC","Hiragino Sans GB","Segoe UI Variable Text","Microsoft YaHei",sans-serif;
+    background:var(--surface-page); color:var(--ink); font-size:15px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; padding:28px 24px 36px;
+  }
+  .shell{max-width:1024px;margin:0 auto}
+  .num{font-variant-numeric:tabular-nums}
+
+  .page-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+  .page-head h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .page-head .date{margin-left:10px;font-size:13px;color:var(--ink-3);font-weight:500}
+  .page-head .live{margin-left:8px;font-size:12px;color:#059669;font-weight:600}
+  .page-head .live i{display:inline-block;width:6px;height:6px;border-radius:99px;background:#10b981;margin-right:4px;vertical-align:1px}
+  .head-tools{display:flex;align-items:center;gap:10px}
+  .seg{display:flex;background:#e9edf3;border-radius:12px;padding:3px;gap:2px}
+  .seg button{border:0;background:transparent;border-radius:9px;padding:5.5px 16px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;font-family:inherit}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(15,23,42,.08)}
+  .ghost{border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;font-size:12.5px;font-weight:600;color:var(--ink-2);font-family:inherit}
+
+  .insight{
+    display:flex;align-items:center;gap:14px;margin-bottom:14px;
+    background:linear-gradient(90deg,#eff6ff 0%,#ffffff 55%);
+    border:1px solid #dbeafe;border-radius:var(--r-card);padding:13px 20px;
+  }
+  .insight .spark{flex-shrink:0;width:34px;height:34px;border-radius:12px;background:#dbeafe;display:flex;align-items:center;justify-content:center}
+  .insight p{font-size:14px;color:var(--ink-2)}
+  .insight p strong{color:var(--ink);font-weight:600}
+  .insight a{margin-left:auto;flex-shrink:0;font-size:13px;font-weight:600;color:var(--primary);text-decoration:none;white-space:nowrap}
+
+  .card{background:var(--surface-featured);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:18px 22px;margin-bottom:14px}
+  .card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .card-head h3{font-size:15px;font-weight:650}
+  .card-head .sub{font-size:12.5px;color:var(--ink-3)}
+
+  /* ── 时刻尺:与概览「今日节奏」同一图形语言,细列 + 2px 间隙 ── */
+  .mini24{width:100%;height:auto;display:block}
+
+  /* ── 会话流 ── */
+  .stream{position:relative;padding:6px 0 2px 0}
+  .stream .rail{position:absolute;left:74px;top:10px;bottom:8px;width:2px;border-radius:99px;background:linear-gradient(180deg,#b9c5d4,#dfe6ee)}
+  .hourband{position:relative;display:grid;grid-template-columns:64px minmax(0,1fr);gap:22px;padding:8px 0 6px}
+  .hourband .hh{font-size:13px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums;text-align:right;padding-top:1px}
+  .hourband .dot{position:absolute;left:69px;top:14px;width:12px;height:12px;border-radius:99px;background:#fff;border:3px solid var(--ink-2)}
+  .hourband .story{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .hourband .story p{font-size:13.5px;color:var(--ink-2)}
+  .hourband .story p b{color:var(--ink);font-weight:600}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:2.5px 9px;border-radius:99px;font-size:11.5px;font-weight:600;line-height:1.5;white-space:nowrap}
+  .chip.deep{background:#0f172a;color:#f8fafc}
+  .chip.steady{background:#e0e7ff;color:#4338ca}
+  .chip.light{background:var(--surface-subtle);color:var(--ink-2);border:1px solid var(--line)}
+  .chip.hsum{background:var(--surface-subtle);color:var(--ink-3);font-weight:500}
+
+  .sess{position:relative;display:grid;grid-template-columns:64px minmax(0,1fr);gap:22px;padding:4px 0 10px}
+  .sess .tt{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums;text-align:right;padding-top:14px;line-height:1.5}
+  .sess .dot{position:absolute;left:70.5px;top:20px;width:9px;height:9px;border-radius:99px;background:var(--c);box-shadow:0 0 0 3px #f4f6f9}
+  .sesscard{background:var(--surface-featured);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:14px 16px}
+  .sesscard.hero{box-shadow:0 8px 26px rgba(15,23,42,.06)}
+  .sess-head{display:flex;align-items:center;gap:11px}
+  .sess-head .ic{width:34px;height:34px;border-radius:10px;background:var(--surface-subtle);border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--ink-2);flex-shrink:0}
+  .sess-head .nm{min-width:0}
+  .sess-head .nm b{display:block;font-size:14.5px;font-weight:650;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sess-head .nm span{font-size:12px;color:var(--ink-3)}
+  .catchip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:600;background:color-mix(in srgb,var(--c) 10%,#fff);color:var(--c);border:1px solid color-mix(in srgb,var(--c) 22%,#fff)}
+  .catchip i{width:7px;height:7px;border-radius:2.5px;background:var(--c)}
+  .sess-head .dur{margin-left:auto;font-size:13.5px;font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums}
+  .sess-head .dur small{display:block;font-size:11px;font-weight:500;color:var(--ink-3);text-align:right}
+
+  .film{display:flex;gap:8px;margin-top:12px}
+  .shot{position:relative;flex:1;aspect-ratio:1.55;border-radius:12px;overflow:hidden;border:1px solid var(--line-soft);background:linear-gradient(150deg,#eef2f7 0%,#e2e8f0 100%)}
+  .shot::before{content:"";position:absolute;left:0;right:0;top:0;height:16px;background:rgba(255,255,255,.85);border-bottom:1px solid var(--line-soft)}
+  .shot::after{content:"";position:absolute;left:6px;top:6px;width:22px;height:4px;border-radius:99px;background:#cbd5e1}
+  .shot .sk{position:absolute;left:10px;right:10px;top:26px;bottom:10px;background:
+    repeating-linear-gradient(180deg,#dbe4ee 0 5px,transparent 5px 13px)}
+  .shot .tag{position:absolute;right:6px;bottom:6px;background:rgba(15,23,42,.72);color:#f1f5f9;font-size:10px;padding:1px 6px;border-radius:6px;font-variant-numeric:tabular-nums}
+  .shot.more{display:flex;align-items:center;justify-content:center;background:var(--surface-subtle)}
+  .shot.more::before,.shot.more::after{display:none}
+  .shot.more span{font-size:12px;font-weight:600;color:var(--ink-2)}
+
+  .members{margin-top:10px;border-top:1px dashed var(--line);padding-top:6px}
+  .mrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:5px 6px;border-radius:10px;font-size:12.5px}
+  .mrow:hover{background:var(--surface-subtle)}
+  .mrow .mt{color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .mrow .mi{color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mrow .mi em{font-style:normal;color:var(--ink-3)}
+  .mrow .md{color:var(--ink-3);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:7px}
+  .mrow .md .cam{width:14px;height:14px;border-radius:4px;background:var(--primary-soft);display:inline-flex;align-items:center;justify-content:center}
+  .expand{margin-top:6px;font-size:12px;font-weight:600;color:var(--primary);background:none;border:0;font-family:inherit;padding:2px 6px}
+
+  .sess-compact .sesscard{padding:11px 16px}
+  .sess-compact .film,.sess-compact .members{display:none}
+
+  .weeknote{display:flex;align-items:center;gap:10px;margin:20px 0 12px;color:var(--ink-3);font-size:12.5px;font-weight:600;letter-spacing:.02em}
+  .weeknote::before,.weeknote::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  /* ── 放映模式示意 ── */
+  .viewer{background:#0f172a;border-radius:var(--r-card);padding:16px;display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;color:#e2e8f0;margin-bottom:14px}
+  .stage{position:relative;border-radius:14px;overflow:hidden;background:linear-gradient(150deg,#1e293b,#334155);min-height:224px;display:flex;align-items:center;justify-content:center}
+  .stage .fakewin{width:78%;height:72%;border-radius:10px;background:#0b1220;border:1px solid rgba(148,163,184,.25);position:relative}
+  .stage .fakewin::before{content:"";position:absolute;left:0;right:0;top:0;height:18px;background:rgba(148,163,184,.16);border-radius:10px 10px 0 0}
+  .stage .fakewin .code{position:absolute;left:14px;right:14px;top:30px;bottom:14px;background:
+    repeating-linear-gradient(180deg,rgba(96,165,250,.4) 0 5px,transparent 5px 14px,rgba(148,163,184,.3) 14px 18px,transparent 18px 28px)}
+  .navbtn{position:absolute;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:99px;background:rgba(15,23,42,.72);border:1px solid rgba(148,163,184,.3);color:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .navbtn.prev{left:10px}.navbtn.next{right:10px}
+  .vmeta{display:flex;flex-direction:column;gap:9px;font-size:12.5px;padding:4px 2px}
+  .vmeta .t{font-size:11px;letter-spacing:.05em;color:#64748b;font-weight:600}
+  .vmeta .v{color:#e2e8f0}
+  .vmeta .v b{font-weight:650;color:#fff}
+  .vmeta .url{color:#93c5fd;word-break:break-all;font-size:12px}
+  .vmeta .manage{margin-top:auto;border-top:1px solid rgba(148,163,184,.18);padding-top:9px;display:flex;gap:7px;flex-wrap:wrap}
+  .vmeta .manage span{border:1px solid rgba(148,163,184,.32);border-radius:8px;padding:3px 9px;font-size:11.5px;color:#cbd5e1}
+  .vfilm{grid-column:1 / -1;display:flex;gap:7px;align-items:center}
+  .vfilm .fr{width:72px;height:42px;border-radius:8px;background:linear-gradient(150deg,#1e293b,#334155);border:1px solid rgba(148,163,184,.2);flex-shrink:0}
+  .vfilm .fr.on{outline:2px solid var(--primary);outline-offset:1px}
+  .vfilm .keys{margin-left:auto;font-size:11.5px;color:#64748b}
+  .vfilm .keys kbd{background:rgba(148,163,184,.16);border-radius:5px;padding:1px 6px;font-family:inherit;color:#cbd5e1;font-size:11px}
+
+  footer{margin-top:20px;text-align:center;font-size:12px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- 页头:标题 + 记录状态 + 视图切换并行一行 -->
+  <div class="page-head">
+    <div style="display:flex;align-items:baseline">
+      <h1>时间线</h1><span class="date num">7月26日 · 周日</span>
+      <span class="live num"><i></i>记录中 22:41</span>
+    </div>
+    <div class="head-tools">
+      <div class="seg">
+        <button class="on">会话视图</button><button>逐条记录</button>
+      </div>
+      <button class="ghost">⋯</button>
+    </div>
+  </div>
+
+  <!-- 洞察条:一天的记录先给一句答案 -->
+  <div class="insight">
+    <div class="spark">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="#3b82f6"><path d="M12 2.5l2 6.4 6.5 2.1-6.5 2.1-2 6.4-2-6.4L3.5 11l6.5-2.1zM19 15.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/></svg>
+    </div>
+    <p>今天共 <strong>14 段会话</strong>(486 条记录);最长一段 <strong>10:12–11:47 · PyCharm 1h35m</strong>,下午被 4 次会议切碎,应用切换比上周日多 6 次。</p>
+    <a href="#">回概览看节奏 →</a>
+  </div>
+
+  <!-- 时刻尺:与概览「今日节奏」同一图形,点击定位 -->
+  <div class="card" style="padding-bottom:12px">
+    <div class="card-head">
+      <h3>时刻尺</h3>
+      <span class="sub">与概览「今日节奏」同源 · 点击任一时段定位到对应会话</span>
+    </div>
+    <svg class="mini24" id="mini24" viewBox="0 0 980 92" role="img" aria-label="24 小时缩览,按分类着色"></svg>
+  </div>
+
+  <!-- 会话流:小时叙事带 + 会话卡 -->
+  <div class="stream">
+    <div class="rail"></div>
+
+    <!-- 小时叙事带(原「时段总结」并入流内) -->
+    <div class="hourband">
+      <div class="hh num">10:00</div><div class="dot"></div>
+      <div class="story">
+        <p><b>重构支付模块的核心一小时</b>,主要在 PyCharm,期间用 Chrome 查 Stripe 文档。</p>
+        <span class="chip deep">深度推进 52m</span>
+      </div>
+    </div>
+
+    <!-- 特写会话卡:一段会话 = 一张卡 -->
+    <div class="sess" style="--c:var(--c-dev)">
+      <div class="tt num">10:12<br>11:47</div><div class="dot"></div>
+      <div class="sesscard hero">
+        <div class="sess-head">
+          <div class="ic">Py</div>
+          <div class="nm"><b>PyCharm · 支付模块重构</b><span>work-review/crates/core</span></div>
+          <span class="catchip"><i></i>开发</span>
+          <div class="dur num">1h35m<small>18 条记录</small></div>
+        </div>
+        <div class="film">
+          <div class="shot"><span class="sk"></span><span class="tag">10:14</span></div>
+          <div class="shot"><span class="sk"></span><span class="tag">10:52</span></div>
+          <div class="shot"><span class="sk"></span><span class="tag">11:31</span></div>
+          <div class="shot more"><span>+15 张</span></div>
+        </div>
+        <div class="members">
+          <div class="mrow"><span class="mt num">10:12</span><span class="mi">billing/service.rs — 抽出 retry 逻辑</span><span class="md num"><span class="cam"><svg width="9" height="9" viewBox="0 0 24 24" fill="#3b82f6"><path d="M4 7h3l2-2h6l2 2h3v13H4z"/></svg></span>26m</span></div>
+          <div class="mrow"><span class="mt num">10:38</span><span class="mi">webhook_handler.rs — 幂等键改造</span><span class="md num"><span class="cam"><svg width="9" height="9" viewBox="0 0 24 24" fill="#3b82f6"><path d="M4 7h3l2-2h6l2 2h3v13H4z"/></svg></span>41m</span></div>
+          <div class="mrow"><span class="mt num">11:19</span><span class="mi">tests/billing.rs — 补回归用例 <em>· 穿插 Chrome 查文档 6m</em></span><span class="md num"><span class="cam"><svg width="9" height="9" viewBox="0 0 24 24" fill="#3b82f6"><path d="M4 7h3l2-2h6l2 2h3v13H4z"/></svg></span>28m</span></div>
+          <button class="expand">展开其余 15 条 ↓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 紧凑会话卡 -->
+    <div class="sess sess-compact" style="--c:var(--c-doc)">
+      <div class="tt num">11:47</div><div class="dot"></div>
+      <div class="sesscard">
+        <div class="sess-head">
+          <div class="ic">D</div>
+          <div class="nm"><b>docs.google.com · 重构方案批注</b><span>Chrome · 3 页</span></div>
+          <span class="catchip"><i></i>文档</span>
+          <div class="dur num">16m<small>4 条 · 2 张</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 下一个小时叙事带 -->
+    <div class="hourband">
+      <div class="hh num">12:00</div><div class="dot"></div>
+      <div class="story">
+        <p><b>午间转入沟通</b>:站会顺延到 12:05,随后在飞书同步重构进展。</p>
+        <span class="chip light">轻量切换 26m</span>
+      </div>
+    </div>
+
+    <div class="sess sess-compact" style="--c:var(--c-meet)">
+      <div class="tt num">12:05</div><div class="dot"></div>
+      <div class="sesscard">
+        <div class="sess-head">
+          <div class="ic">飞</div>
+          <div class="nm"><b>飞书会议 · 支付项目站会</b><span>屏幕共享 8m</span></div>
+          <span class="catchip"><i></i>会议</span>
+          <div class="dur num">22m<small>5 条 · 3 张</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 晚间收尾 -->
+    <div class="hourband">
+      <div class="hh num">21:00</div><div class="dot"></div>
+      <div class="story">
+        <p><b>晚间收尾</b>:补完回归测试后顺手更新了 CHANGELOG。</p>
+        <span class="chip steady">持续推进 32m</span>
+      </div>
+    </div>
+
+    <div class="sess sess-compact" style="--c:var(--c-dev)">
+      <div class="tt num">21:04</div><div class="dot"></div>
+      <div class="sesscard">
+        <div class="sess-head">
+          <div class="ic">Py</div>
+          <div class="nm"><b>PyCharm · 测试收尾与 CHANGELOG</b><span>work-review/crates/core</span></div>
+          <span class="catchip"><i></i>开发</span>
+          <div class="dur num">32m<small>6 条 · 4 张</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 截图动线示意 -->
+  <div class="weeknote">点击任意缩略图 → 放映模式:沿会话左右翻阅,元信息随图切换,管理动作收进侧栏 —— 替代「点一条开一个弹窗」</div>
+  <div class="viewer">
+    <div class="stage">
+      <div class="fakewin"><div class="code"></div></div>
+      <div class="navbtn prev">‹</div><div class="navbtn next">›</div>
+    </div>
+    <div class="vmeta">
+      <div><div class="t">时间</div><div class="v num"><b>10:52:18</b> · 停留 41m</div></div>
+      <div><div class="t">窗口</div><div class="v">webhook_handler.rs — 幂等键改造 · <b>PyCharm</b> <span class="catchip" style="--c:var(--c-dev);margin-left:2px"><i></i>开发</span></div></div>
+      <div><div class="t">来源</div><div class="url">work-review/crates/core/src/billing/webhook_handler.rs</div></div>
+      <div class="manage"><span>改分类</span><span>记录策略</span><span>删除此条</span></div>
+    </div>
+    <div class="vfilm">
+      <div class="fr"></div><div class="fr on"></div><div class="fr"></div><div class="fr"></div><div class="fr"></div>
+      <span class="keys">第 6 / 18 张 · <kbd>←</kbd> <kbd>→</kbd> 翻阅 · <kbd>Esc</kbd> 退出</span>
+    </div>
+  </div>
+
+  <footer>示意数据 · 时间正序自上而下,与时刻尺同向 · 分类六色与概览一致(色觉可分性已校验)</footer>
+</div>
+
+<script>
+/* 时刻尺:细列 + 2px 间隙 + 分类堆叠,与概览「今日节奏」同一数据风格 */
+const CATS = [
+  { key:'dev',  color:'#3b82f6' },{ key:'meet', color:'#d97706' },{ key:'doc',  color:'#8b5cf6' },
+  { key:'comm', color:'#059669' },{ key:'ent',  color:'#be123c' },{ key:'other',color:'#94a3b8' },
+];
+const hours = {
+  9:{dev:12,comm:6,other:4}, 10:{dev:40,doc:8,meet:4}, 11:{dev:36,doc:6,comm:5},
+  12:{meet:14,comm:6,ent:4}, 13:{ent:8,other:5}, 14:{meet:22,dev:10,doc:6}, 15:{dev:30,doc:10,comm:4},
+  16:{dev:28,doc:9,comm:4}, 17:{dev:15,doc:11,meet:6,comm:5}, 18:{dev:12,comm:8,ent:5}, 19:{ent:6},
+  20:{other:8}, 21:{dev:22,doc:10}, 22:{dev:12,ent:9},
+};
+const svg = document.getElementById('mini24');
+const W=980,H=92,plotH=56,padTop=10,baseY=padTop+plotH,barW=30,gap=(W-40-24*barW)/23,x0=20,maxM=60;
+/* 当前视区:10:00–13:00 */
+let els = `<rect x="${x0+10*(barW+gap)-4}" y="${padTop-6}" width="${3*(barW+gap)+2}" height="${plotH+14}" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>`;
+els += `<text x="${x0+10*(barW+gap)}" y="${baseY+22}" font-size="10.5" fill="#3b82f6" font-weight="600">当前视区</text>`;
+for(let h=0;h<24;h++){
+  const x=x0+h*(barW+gap), seg=hours[h]||{};
+  const tot=Object.values(seg).reduce((a,b)=>a+b,0);
+  let y=baseY;
+  if(tot>0){
+    const parts=CATS.filter(c=>seg[c.key]).map(c=>({c,v:seg[c.key]}));
+    parts.forEach((p,i)=>{
+      const hpx=Math.max(p.v/maxM*plotH-(i<parts.length-1?2:0),2);
+      y-=p.v/maxM*plotH;
+      els+=`<rect x="${x}" y="${y.toFixed(1)}" width="${barW}" height="${hpx.toFixed(1)}" rx="${i===parts.length-1?3:1.5}" fill="${p.c.color}"/>`;
+    });
+  } else {
+    els+=`<rect x="${x}" y="${baseY-2}" width="${barW}" height="2" rx="1" fill="#e2e8f0"/>`;
+  }
+  if([0,6,12,18,23].includes(h)){
+    els+=`<text x="${x+barW/2}" y="${baseY+22}" font-size="10.5" fill="#94a3b8" text-anchor="middle">${h===0?'0':h}</text>`;
+  }
+}
+svg.innerHTML=els;
+</script>
+</body>
+</html>

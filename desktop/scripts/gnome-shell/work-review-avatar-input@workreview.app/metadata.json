@@ -1,0 +1,8 @@
+{
+  "uuid": "work-review-avatar-input@workreview.app",
+  "name": "Work Review Avatar Input",
+  "description": "Expose GNOME Wayland pointer state for Work Review desktop avatar linkage.",
+  "shell-version": ["45", "46", "47", "48"],
+  "url": "https://github.com/wm94i/Work-Review",
+  "version": 1
+}

@@ -1,0 +1,1537 @@
+//! Auto-extracted from the historical `commands.rs`. Behavior unchanged.
+
+use crate::database::{
+    apply_flex_overtime_correction, local_hour_end_timestamp, AppUsage, BrowserUsage,
+    CategoryUsage, DailyStats, DomainUsage, HourlyActivityBucket, HourlyAppBucket, UrlDetail,
+    UrlUsage,
+};
+use crate::error::AppError;
+use crate::privacy::{apply_excluded_domains_to_stats, apply_ignored_apps_to_stats};
+use crate::AppState;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
+use tauri::State;
+
+use super::shared::collect_privacy_filters;
+
+pub(crate) fn load_daily_stats_for_overview(state: &AppState, date: &str) -> Result<DailyStats, AppError> {
+    let segments = state.config.effective_work_segments();
+    let (ignored_apps, excluded_domains) = collect_privacy_filters(state);
+    let mut stats = state.database.get_daily_stats_with_segments_filtered(
+        date,
+        &segments,
+        &ignored_apps,
+        &excluded_domains,
+    )?;
+
+    apply_flex_overtime_correction(
+        &mut stats,
+        state.config.work_time_enabled,
+        state.config.standard_work_hours,
+    );
+
+    Ok(stats)
+}
+
+fn overview_week_bounds_for_date(anchor: chrono::NaiveDate) -> (String, String) {
+    use chrono::Datelike;
+
+    let monday = anchor - chrono::Duration::days(anchor.weekday().num_days_from_monday() as i64);
+    (
+        monday.format("%Y-%m-%d").to_string(),
+        anchor.format("%Y-%m-%d").to_string(),
+    )
+}
+
+#[derive(Default)]
+struct DomainAggregate {
+    duration: i64,
+    semantic_votes: HashMap<String, i64>,
+    urls: HashMap<String, i64>,
+}
+
+#[derive(Default)]
+struct BrowserAggregate {
+    duration: i64,
+    executable_path: Option<String>,
+    domains: HashMap<String, DomainAggregate>,
+}
+
+/// 域名列表中的浏览器来源摘要，不携带 URL 明细。
+#[derive(serde::Serialize, Debug, Clone)]
+pub struct OverviewDomainBrowserSourceSummary {
+    pub browser_name: String,
+    pub duration: i64,
+    pub percentage: f64,
+}
+
+/// 完整域名列表中的单项摘要。
+#[derive(serde::Serialize, Debug, Clone)]
+pub struct OverviewDomainSummary {
+    pub domain: String,
+    pub duration: i64,
+    pub semantic_category: Option<String>,
+    pub page_count: usize,
+    pub browser_sources: Vec<OverviewDomainBrowserSourceSummary>,
+}
+
+/// 当前概览范围内的完整域名摘要集合。
+#[derive(serde::Serialize, Debug, Clone)]
+pub struct OverviewDomainCollection {
+    pub total_count: usize,
+    pub domains: Vec<OverviewDomainSummary>,
+}
+
+/// 域名详情中的单个浏览器来源，包含该来源下的完整 URL。
+#[derive(serde::Serialize, Debug, Clone)]
+pub struct OverviewDomainBrowserSource {
+    pub browser_name: String,
+    pub duration: i64,
+    pub percentage: f64,
+    pub urls: Vec<UrlDetail>,
+}
+
+/// 单个域名的完整详情。
+#[derive(serde::Serialize, Debug, Clone)]
+pub struct OverviewDomainDetail {
+    pub domain: String,
+    pub duration: i64,
+    pub semantic_category: Option<String>,
+    pub page_count: usize,
+    pub urls: Vec<UrlDetail>,
+    pub browser_sources: Vec<OverviewDomainBrowserSource>,
+}
+
+#[derive(Default)]
+struct OverviewBrowserSourceAggregate {
+    duration: i64,
+    urls: HashMap<String, i64>,
+}
+
+fn update_preferred_path(target: &mut Option<String>, candidate: Option<String>) {
+    if target.is_none() {
+        *target = candidate.filter(|value| !value.trim().is_empty());
+    }
+}
+
+fn record_semantic_vote(
+    votes: &mut HashMap<String, i64>,
+    semantic_category: Option<String>,
+    duration: i64,
+) {
+    if duration <= 0 {
+        return;
+    }
+
+    if let Some(category) = semantic_category
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+    {
+        *votes.entry(category).or_insert(0) += duration;
+    }
+}
+
+fn resolve_primary_semantic(votes: HashMap<String, i64>) -> Option<String> {
+    votes
+        .into_iter()
+        .max_by(
+            |(left_label, left_duration), (right_label, right_duration)| {
+                left_duration
+                    .cmp(right_duration)
+                    .then_with(|| right_label.cmp(left_label))
+            },
+        )
+        .map(|(label, _)| label)
+}
+
+fn sort_url_details(items: &mut [UrlDetail]) {
+    items.sort_by(|left, right| {
+        right
+            .duration
+            .cmp(&left.duration)
+            .then_with(|| right.url.cmp(&left.url))
+    });
+}
+
+fn sort_domain_usage(items: &mut [DomainUsage]) {
+    items.sort_by(|left, right| {
+        right
+            .duration
+            .cmp(&left.duration)
+            .then_with(|| left.domain.cmp(&right.domain))
+    });
+
+    for item in items {
+        sort_url_details(&mut item.urls);
+    }
+}
+
+fn source_percentage(duration: i64, domain_duration: i64) -> f64 {
+    if duration <= 0 || domain_duration <= 0 {
+        0.0
+    } else {
+        duration as f64 * 100.0 / domain_duration as f64
+    }
+}
+
+fn collect_overview_domain_sources(
+    stats: &DailyStats,
+    domain: &DomainUsage,
+) -> Vec<OverviewDomainBrowserSource> {
+    let mut source_map: HashMap<String, OverviewBrowserSourceAggregate> = HashMap::new();
+
+    for browser in &stats.browser_usage {
+        for browser_domain in &browser.domains {
+            if !browser_domain.domain.eq_ignore_ascii_case(&domain.domain) {
+                continue;
+            }
+
+            let source = source_map.entry(browser.browser_name.clone()).or_default();
+            source.duration += browser_domain.duration;
+            for url in &browser_domain.urls {
+                *source.urls.entry(url.url.clone()).or_insert(0) += url.duration;
+            }
+        }
+    }
+
+    let attributed_duration = source_map
+        .values()
+        .map(|source| source.duration)
+        .sum::<i64>();
+    let remaining_duration = domain.duration.saturating_sub(attributed_duration);
+
+    if remaining_duration > 0 {
+        let mut residual_urls = domain
+            .urls
+            .iter()
+            .map(|url| (url.url.clone(), url.duration))
+            .collect::<HashMap<_, _>>();
+        for source in source_map.values() {
+            for (url, duration) in &source.urls {
+                let remaining = residual_urls.entry(url.clone()).or_insert(0);
+                *remaining = remaining.saturating_sub(*duration);
+            }
+        }
+        residual_urls.retain(|_, duration| *duration > 0);
+        source_map.insert(
+            "other".to_string(),
+            OverviewBrowserSourceAggregate {
+                duration: remaining_duration,
+                urls: residual_urls,
+            },
+        );
+    }
+
+    let mut sources = source_map
+        .into_iter()
+        .filter(|(_, source)| source.duration > 0)
+        .map(|(browser_name, source)| {
+            let mut urls = source
+                .urls
+                .into_iter()
+                .map(|(url, duration)| UrlDetail { url, duration })
+                .collect::<Vec<_>>();
+            sort_url_details(&mut urls);
+            OverviewDomainBrowserSource {
+                browser_name,
+                duration: source.duration,
+                percentage: source_percentage(source.duration, domain.duration),
+                urls,
+            }
+        })
+        .collect::<Vec<_>>();
+    sources.sort_by(|left, right| {
+        right
+            .duration
+            .cmp(&left.duration)
+            .then_with(|| left.browser_name.cmp(&right.browser_name))
+    });
+    sources
+}
+
+fn build_overview_domain_collection(stats: &DailyStats) -> OverviewDomainCollection {
+    let domains = stats
+        .domain_usage
+        .iter()
+        .map(|domain| OverviewDomainSummary {
+            domain: domain.domain.clone(),
+            duration: domain.duration,
+            semantic_category: domain.semantic_category.clone(),
+            page_count: domain.urls.len(),
+            browser_sources: collect_overview_domain_sources(stats, domain)
+                .into_iter()
+                .map(|source| OverviewDomainBrowserSourceSummary {
+                    browser_name: source.browser_name,
+                    duration: source.duration,
+                    percentage: source.percentage,
+                })
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+
+    OverviewDomainCollection {
+        total_count: domains.len(),
+        domains,
+    }
+}
+
+fn build_overview_domain_detail(stats: &DailyStats, domain: &str) -> Option<OverviewDomainDetail> {
+    let target = domain.trim().trim_end_matches('.');
+    let domain = stats.domain_usage.iter().find(|item| {
+        item.domain
+            .trim_end_matches('.')
+            .eq_ignore_ascii_case(target)
+    })?;
+    let mut urls = domain.urls.clone();
+    sort_url_details(&mut urls);
+
+    Some(OverviewDomainDetail {
+        domain: domain.domain.clone(),
+        duration: domain.duration,
+        semantic_category: domain.semantic_category.clone(),
+        page_count: urls.len(),
+        urls,
+        browser_sources: collect_overview_domain_sources(stats, domain),
+    })
+}
+
+fn project_overview_homepage(mut stats: DailyStats) -> DailyStats {
+    sort_domain_usage(&mut stats.domain_usage);
+    stats.domain_total_count = stats.domain_usage.len();
+    stats.domain_usage.truncate(6);
+
+    let visible_domains = stats
+        .domain_usage
+        .iter()
+        .map(|domain| domain.domain.to_lowercase())
+        .collect::<HashSet<_>>();
+    for browser in &mut stats.browser_usage {
+        browser
+            .domains
+            .retain(|domain| visible_domains.contains(&domain.domain.to_lowercase()));
+    }
+
+    stats
+}
+
+fn build_domain_usage_from_aggregate(domain: String, aggregate: DomainAggregate) -> DomainUsage {
+    let mut urls = aggregate
+        .urls
+        .into_iter()
+        .map(|(url, duration)| UrlDetail { url, duration })
+        .collect::<Vec<_>>();
+    sort_url_details(&mut urls);
+
+    DomainUsage {
+        domain,
+        duration: aggregate.duration,
+        semantic_category: resolve_primary_semantic(aggregate.semantic_votes),
+        urls,
+    }
+}
+
+fn merge_domain_usage_maps(
+    target: &mut HashMap<String, DomainAggregate>,
+    domains: Vec<DomainUsage>,
+) {
+    for domain in domains {
+        let domain_key = domain.domain.clone();
+        let entry = target.entry(domain_key).or_default();
+        entry.duration += domain.duration;
+        record_semantic_vote(
+            &mut entry.semantic_votes,
+            domain.semantic_category.clone(),
+            domain.duration,
+        );
+
+        for url in domain.urls {
+            *entry.urls.entry(url.url).or_insert(0) += url.duration;
+        }
+    }
+}
+
+fn sum_daily_stats(days: Vec<DailyStats>) -> DailyStats {
+    let mut total_duration = 0;
+    let mut screenshot_count = 0;
+    let mut browser_duration = 0;
+    let mut work_time_duration = 0;
+    let mut overtime_duration = 0;
+
+    let mut app_usage_map: HashMap<String, AppUsage> = HashMap::new();
+    let mut category_usage_map: HashMap<String, i64> = HashMap::new();
+    let mut url_usage_map: HashMap<String, UrlUsage> = HashMap::new();
+    let mut domain_usage_map: HashMap<String, DomainAggregate> = HashMap::new();
+    let mut browser_usage_map: HashMap<String, BrowserAggregate> = HashMap::new();
+    let mut hourly_activity_distribution: Vec<HourlyActivityBucket> = (0..24)
+        .map(|hour| HourlyActivityBucket { hour, duration: 0 })
+        .collect();
+
+    for day in days {
+        total_duration += day.total_duration;
+        screenshot_count += day.screenshot_count;
+        browser_duration += day.browser_duration;
+        work_time_duration += day.work_time_duration;
+        overtime_duration += day.overtime_duration;
+
+        for app in day.app_usage {
+            let entry = app_usage_map
+                .entry(app.app_name.clone())
+                .or_insert(AppUsage {
+                    app_name: app.app_name.clone(),
+                    duration: 0,
+                    count: 0,
+                    executable_path: None,
+                    screenshot_url: None,
+                });
+            entry.duration += app.duration;
+            entry.count += app.count;
+            if entry.screenshot_url.is_none() && app.screenshot_url.is_some() {
+                entry.screenshot_url = app.screenshot_url;
+            }
+            update_preferred_path(&mut entry.executable_path, app.executable_path);
+        }
+
+        for category in day.category_usage {
+            *category_usage_map.entry(category.category).or_insert(0) += category.duration;
+        }
+
+        for url in day.url_usage {
+            let entry = url_usage_map.entry(url.url.clone()).or_insert(UrlUsage {
+                url: url.url.clone(),
+                domain: url.domain.clone(),
+                duration: 0,
+            });
+            entry.duration += url.duration;
+            if entry.domain.trim().is_empty() {
+                entry.domain = url.domain;
+            }
+        }
+
+        merge_domain_usage_maps(&mut domain_usage_map, day.domain_usage);
+
+        for browser in day.browser_usage {
+            let entry = browser_usage_map
+                .entry(browser.browser_name.clone())
+                .or_default();
+            entry.duration += browser.duration;
+            update_preferred_path(&mut entry.executable_path, browser.executable_path);
+            merge_domain_usage_maps(&mut entry.domains, browser.domains);
+        }
+
+        for bucket in day.hourly_activity_distribution {
+            if (0..24).contains(&bucket.hour) {
+                hourly_activity_distribution[bucket.hour as usize].duration += bucket.duration;
+            }
+        }
+    }
+
+    let mut app_usage = app_usage_map.into_values().collect::<Vec<_>>();
+    app_usage.sort_by(|left, right| {
+        right
+            .duration
+            .cmp(&left.duration)
+            .then_with(|| left.app_name.cmp(&right.app_name))
+    });
+
+    let mut category_usage = category_usage_map
+        .into_iter()
+        .map(|(category, duration)| CategoryUsage { category, duration })
+        .collect::<Vec<_>>();
+    category_usage.sort_by(|left, right| {
+        right
+            .duration
+            .cmp(&left.duration)
+            .then_with(|| left.category.cmp(&right.category))
+    });
+
+    let mut url_usage = url_usage_map.into_values().collect::<Vec<_>>();
+    url_usage.sort_by(|left, right| {
+        right
+            .duration
+            .cmp(&left.duration)
+            .then_with(|| right.url.cmp(&left.url))
+    });
+
+    let mut domain_usage = domain_usage_map
+        .into_iter()
+        .map(|(domain, aggregate)| build_domain_usage_from_aggregate(domain, aggregate))
+        .collect::<Vec<_>>();
+    sort_domain_usage(&mut domain_usage);
+    let domain_total_count = domain_usage.len();
+
+    let mut browser_usage = browser_usage_map
+        .into_iter()
+        .map(|(browser_name, aggregate)| {
+            let mut domains = aggregate
+                .domains
+                .into_iter()
+                .map(|(domain, domain_aggregate)| {
+                    build_domain_usage_from_aggregate(domain, domain_aggregate)
+                })
+                .collect::<Vec<_>>();
+            sort_domain_usage(&mut domains);
+
+            BrowserUsage {
+                browser_name,
+                duration: aggregate.duration,
+                executable_path: aggregate.executable_path,
+                domains,
+            }
+        })
+        .collect::<Vec<_>>();
+    browser_usage.sort_by(|left, right| {
+        right
+            .duration
+            .cmp(&left.duration)
+            .then_with(|| left.browser_name.cmp(&right.browser_name))
+    });
+
+    DailyStats {
+        total_duration,
+        screenshot_count,
+        app_usage,
+        category_usage,
+        browser_duration,
+        url_usage,
+        domain_usage,
+        domain_total_count,
+        browser_usage,
+        work_time_duration,
+        overtime_duration,
+        hourly_activity_distribution,
+    }
+}
+
+fn resolve_overview_anchor_date(date: Option<&str>) -> Result<chrono::NaiveDate, AppError> {
+    match date.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) => chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+            .map_err(|e| AppError::Config(format!("解析概览日期失败: {e}"))),
+        None => Ok(chrono::Local::now().date_naive()),
+    }
+}
+
+fn resolve_overview_date_span(
+    date: Option<&str>,
+    date_from: Option<&str>,
+    date_to: Option<&str>,
+) -> Result<(chrono::NaiveDate, chrono::NaiveDate), AppError> {
+    let fallback = resolve_overview_anchor_date(date)?;
+    let start = date_from
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                .map_err(|e| AppError::Config(format!("解析概览开始日期失败: {e}")))
+        })
+        .transpose()?
+        .unwrap_or(fallback);
+    let end = date_to
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                .map_err(|e| AppError::Config(format!("解析概览结束日期失败: {e}")))
+        })
+        .transpose()?
+        .unwrap_or(start);
+
+    Ok(if start <= end {
+        (start, end)
+    } else {
+        (end, start)
+    })
+}
+
+/// 获取今日统计 —— 内部复用版（供 Tauri 命令与 localhost API 共用）
+pub(crate) fn get_today_stats_inner(state: &Arc<Mutex<AppState>>) -> Result<DailyStats, AppError> {
+    let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let stats = load_daily_stats_for_overview(&state, &today)?;
+    let (ignored_apps, excluded_domains) = collect_privacy_filters(&state);
+    let stats = apply_ignored_apps_to_stats(stats, &ignored_apps);
+    let mut stats = apply_excluded_domains_to_stats(stats, &excluded_domains);
+    stats.domain_total_count = stats.domain_usage.len();
+    Ok(stats)
+}
+
+/// 获取今日统计
+#[tauri::command]
+pub async fn get_today_stats(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<DailyStats, AppError> {
+    get_today_stats_inner(state.inner())
+}
+
+/// 加载未做首页裁剪的完整概览统计，供首页、完整域名列表与单域名详情复用。
+fn load_full_overview_stats(
+    mode: &str,
+    date: Option<&str>,
+    date_from: Option<&str>,
+    date_to: Option<&str>,
+    state: &AppState,
+) -> Result<DailyStats, AppError> {
+    let normalized_mode = mode.trim().to_lowercase();
+    let (ignored_apps, excluded_domains) = collect_privacy_filters(state);
+
+    let stats = match normalized_mode.as_str() {
+        "date" => {
+            let (start, end) = resolve_overview_date_span(date, date_from, date_to)?;
+
+            if start == end {
+                let date_value = start.format("%Y-%m-%d").to_string();
+                load_daily_stats_for_overview(state, &date_value)?
+            } else {
+                let mut daily_stats = Vec::new();
+                let mut current = start;
+                while current <= end {
+                    let current_date = current.format("%Y-%m-%d").to_string();
+                    daily_stats.push(load_daily_stats_for_overview(state, &current_date)?);
+                    current = current
+                        .succ_opt()
+                        .ok_or_else(|| AppError::Config("计算概览日期范围失败".to_string()))?;
+                }
+                sum_daily_stats(daily_stats)
+            }
+        }
+        "week" => {
+            let anchor = resolve_overview_anchor_date(date)?;
+            let (date_from, date_to) = overview_week_bounds_for_date(anchor);
+            let start = chrono::NaiveDate::parse_from_str(&date_from, "%Y-%m-%d")
+                .map_err(|e| AppError::Config(format!("解析周概览开始日期失败: {e}")))?;
+            let end = chrono::NaiveDate::parse_from_str(&date_to, "%Y-%m-%d")
+                .map_err(|e| AppError::Config(format!("解析周概览结束日期失败: {e}")))?;
+
+            let mut daily_stats = Vec::new();
+            let mut current = start;
+            while current <= end {
+                let current_date = current.format("%Y-%m-%d").to_string();
+                daily_stats.push(load_daily_stats_for_overview(state, &current_date)?);
+                current = current
+                    .succ_opt()
+                    .ok_or_else(|| AppError::Config("计算周概览日期范围失败".to_string()))?;
+            }
+            sum_daily_stats(daily_stats)
+        }
+        _ => {
+            let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+            load_daily_stats_for_overview(state, &today)?
+        }
+    };
+
+    let stats = apply_ignored_apps_to_stats(stats, &ignored_apps);
+    let mut stats = apply_excluded_domains_to_stats(stats, &excluded_domains);
+    stats.domain_total_count = stats.domain_usage.len();
+    Ok(stats)
+}
+
+/// 获取概览统计 —— 内部复用版
+pub(crate) fn get_overview_stats_inner(
+    mode: String,
+    date: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    state: &Arc<Mutex<AppState>>,
+) -> Result<DailyStats, AppError> {
+    let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    let stats = load_full_overview_stats(
+        &mode,
+        date.as_deref(),
+        date_from.as_deref(),
+        date_to.as_deref(),
+        &state,
+    )?;
+    Ok(project_overview_homepage(stats))
+}
+
+/// 获取概览统计（支持今日 / 指定日期 / 本周）
+#[tauri::command]
+pub async fn get_overview_stats(
+    mode: String,
+    date: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<DailyStats, AppError> {
+    get_overview_stats_inner(mode, date, date_from, date_to, state.inner())
+}
+
+/// 获取当前概览范围内的完整域名摘要，不包含 URL 明细。
+#[tauri::command]
+pub async fn get_overview_domains(
+    mode: String,
+    date: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<OverviewDomainCollection, AppError> {
+    let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    let stats = load_full_overview_stats(
+        &mode,
+        date.as_deref(),
+        date_from.as_deref(),
+        date_to.as_deref(),
+        &state,
+    )?;
+    Ok(build_overview_domain_collection(&stats))
+}
+
+/// 获取当前概览范围内单个域名的完整 URL 与跨浏览器来源。
+#[tauri::command]
+pub async fn get_overview_domain_detail(
+    domain: String,
+    mode: String,
+    date: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<Option<OverviewDomainDetail>, AppError> {
+    let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    let stats = load_full_overview_stats(
+        &mode,
+        date.as_deref(),
+        date_from.as_deref(),
+        date_to.as_deref(),
+        &state,
+    )?;
+    Ok(build_overview_domain_detail(&stats, &domain))
+}
+
+/// 获取指定日期的统计 —— 内部复用版
+pub(crate) fn get_daily_stats_inner(
+    date: &str,
+    state: &Arc<Mutex<AppState>>,
+) -> Result<DailyStats, AppError> {
+    let s = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    let segments = s.config.effective_work_segments();
+    let (ignored_apps, excluded_domains) = collect_privacy_filters(&s);
+    let mut stats = s.database.get_daily_stats_with_segments_filtered(
+        date,
+        &segments,
+        &ignored_apps,
+        &excluded_domains,
+    )?;
+    apply_flex_overtime_correction(
+        &mut stats,
+        s.config.work_time_enabled,
+        s.config.standard_work_hours,
+    );
+    Ok(stats)
+}
+
+/// 获取指定日期的统计
+#[tauri::command]
+pub async fn get_daily_stats(
+    date: String,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<DailyStats, AppError> {
+    get_daily_stats_inner(&date, state.inner())
+}
+
+pub(crate) fn get_hourly_app_breakdown_inner(
+    date: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    mode: Option<String>,
+    state: &Arc<Mutex<AppState>>,
+) -> Result<Vec<HourlyAppBucket>, AppError> {
+    let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    let normalized_mode = mode.unwrap_or_else(|| "date".to_string());
+    let (date_from, date_to) = match normalized_mode.trim().to_lowercase().as_str() {
+        "week" => {
+            let anchor = resolve_overview_anchor_date(date.as_deref())?;
+            overview_week_bounds_for_date(anchor)
+        }
+        "today" => {
+            let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+            (today.clone(), today)
+        }
+        _ => {
+            let (start, end) = resolve_overview_date_span(
+                date.as_deref(),
+                date_from.as_deref(),
+                date_to.as_deref(),
+            )?;
+            (
+                start.format("%Y-%m-%d").to_string(),
+                end.format("%Y-%m-%d").to_string(),
+            )
+        }
+    };
+
+    let (ignored_apps, excluded_domains) = collect_privacy_filters(&state);
+    state.database.get_hourly_app_breakdown_range_filtered(
+        &date_from,
+        &date_to,
+        &ignored_apps,
+        &excluded_domains,
+    )
+}
+
+/// 获取每小时×应用的时长分布
+#[tauri::command]
+pub async fn get_hourly_app_breakdown(
+    date: Option<String>,
+    date_from: Option<String>,
+    date_to: Option<String>,
+    mode: Option<String>,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<Vec<HourlyAppBucket>, AppError> {
+    get_hourly_app_breakdown_inner(date, date_from, date_to, mode, state.inner())
+}
+
+/// 获取历史应用列表 —— 内部复用版
+pub(crate) fn get_recent_apps_inner(state: &Arc<Mutex<AppState>>) -> Result<Vec<String>, AppError> {
+    let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    state.database.get_recent_apps(50)
+}
+
+/// 历史应用详情 —— 内部复用版，供 localhost API 返回截图 URL
+pub(crate) fn get_recent_app_usage_inner(
+    state: &Arc<Mutex<AppState>>,
+) -> Result<Vec<AppUsage>, AppError> {
+    let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    state.database.get_recent_app_usage(50)
+}
+
+/// 获取历史应用列表（从数据库）
+#[tauri::command]
+pub async fn get_recent_apps(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<Vec<String>, AppError> {
+    get_recent_apps_inner(state.inner())
+}
+
+/// 获取当前运行的应用列表
+#[tauri::command]
+pub async fn get_running_apps() -> Result<Vec<String>, AppError> {
+    get_running_apps_impl()
+}
+
+/// macOS 实现
+#[cfg(target_os = "macos")]
+fn get_running_apps_impl() -> Result<Vec<String>, AppError> {
+    use std::process::Command;
+
+    // 使用 AppleScript 获取运行中的应用
+    let output = Command::new("osascript")
+        .args([
+            "-e",
+            r#"tell application "System Events" to get name of every process whose background only is false"#
+        ])
+        .output()
+        .map_err(|e| AppError::Unknown(format!("执行 AppleScript 失败: {e}")))?;
+
+    if output.status.success() {
+        let apps_str = String::from_utf8_lossy(&output.stdout);
+        let mut apps: Vec<String> = apps_str
+            .split(", ")
+            .map(crate::monitor::normalize_display_app_name)
+            .filter(|s| !s.is_empty())
+            .collect();
+        apps.sort();
+        apps.dedup();
+        Ok(apps)
+    } else {
+        Err(AppError::Unknown("获取应用列表失败".to_string()))
+    }
+}
+
+/// Windows 实现
+#[cfg(target_os = "windows")]
+fn get_running_apps_impl() -> Result<Vec<String>, AppError> {
+    use std::collections::HashSet;
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::um::tlhelp32::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+
+    let mut apps = HashSet::new();
+
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot.is_null() {
+            return Ok(vec![]);
+        }
+
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+
+        if Process32FirstW(snapshot, &mut entry) != 0 {
+            loop {
+                // 获取进程名
+                let name_len = entry
+                    .szExeFile
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                let name = OsString::from_wide(&entry.szExeFile[..name_len])
+                    .to_string_lossy()
+                    .to_string();
+
+                // 排除系统进程
+                let name_lower = name.to_lowercase();
+                if !name_lower.ends_with(".exe") {
+                    if Process32NextW(snapshot, &mut entry) == 0 {
+                        break;
+                    }
+                    continue;
+                }
+
+                // 排除常见系统进程
+                let excluded = [
+                    "svchost.exe",
+                    "csrss.exe",
+                    "wininit.exe",
+                    "services.exe",
+                    "lsass.exe",
+                    "smss.exe",
+                    "winlogon.exe",
+                    "dwm.exe",
+                    "fontdrvhost.exe",
+                    "sihost.exe",
+                    "taskhostw.exe",
+                    "runtimebroker.exe",
+                    "searchhost.exe",
+                    "startmenuexperiencehost.exe",
+                    "textinputhost.exe",
+                    "ctfmon.exe",
+                    "conhost.exe",
+                ];
+
+                if !excluded.contains(&name_lower.as_str()) {
+                    // 移除 .exe 后缀
+                    let display_name = crate::monitor::normalize_display_app_name(&name);
+                    apps.insert(display_name);
+                }
+
+                if Process32NextW(snapshot, &mut entry) == 0 {
+                    break;
+                }
+            }
+        }
+
+        CloseHandle(snapshot);
+    }
+
+    let mut result: Vec<String> = apps.into_iter().collect();
+    result.sort();
+    Ok(result)
+}
+
+/// 其他平台
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn get_running_apps_impl() -> Result<Vec<String>, AppError> {
+    Ok(vec![])
+}
+
+/// 获取存储统计信息 —— 内部复用版
+pub(crate) fn get_storage_stats_inner(
+    state: &Arc<Mutex<AppState>>,
+) -> Result<serde_json::Value, AppError> {
+    let s = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    let stats = s
+        .storage_manager
+        .get_stats()
+        .map_err(|e| AppError::Unknown(e.to_string()))?;
+
+    Ok(serde_json::json!({
+        "total_files": stats.total_files,
+        "total_size_mb": format!("{:.1}", stats.total_size_mb),
+        "storage_limit_mb": stats.storage_limit_mb,
+        "retention_days": stats.retention_days,
+    }))
+}
+
+/// 获取存储统计信息
+#[tauri::command]
+pub async fn get_storage_stats(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<serde_json::Value, AppError> {
+    get_storage_stats_inner(state.inner())
+}
+
+/// 获取指定日期的小时摘要 —— 内部复用版。
+/// 只重算「缺失或可能不完整」的小时：已有摘要且生成于该小时结束之后的直接复用
+/// （此前每次查看都对 0..24 全量重算并 REPLACE 写库,进一次时间线 = 24 次聚合 + 24 次写）。
+/// 今天的当前小时改为内存计算、不落库,避免半截摘要进库。
+/// 删除/合并记录的路径都会失效当日摘要缓存（invalidate_daily_cache）,
+/// 因此「已有且完整即跳过」不会留下脏数据。
+pub(crate) fn get_hourly_summaries_inner(
+    date: &str,
+    state: &Arc<Mutex<AppState>>,
+) -> Result<Vec<serde_json::Value>, AppError> {
+    use chrono::Timelike;
+
+    let app_state = state.clone();
+
+    let saved_created_at: HashMap<i32, i64> = {
+        let s = app_state
+            .lock()
+            .map_err(|e| AppError::Unknown(e.to_string()))?;
+        s.database
+            .get_hourly_summaries(date)?
+            .iter()
+            .map(|summary| (summary.hour, summary.created_at))
+            .collect()
+    };
+
+    let now = chrono::Local::now();
+    let today = now.format("%Y-%m-%d").to_string();
+    let current_hour = now.hour() as i32;
+    // 只生成"已结束"的小时:今天补到当前小时之前,未来日期无可生成
+    let end_hour = if date == today {
+        current_hour
+    } else if date > today.as_str() {
+        0
+    } else {
+        24
+    };
+
+    for hour in 0..end_hour {
+        let fresh = matches!(
+            (saved_created_at.get(&hour), local_hour_end_timestamp(date, hour)),
+            (Some(&created_at), Some(end_ts)) if created_at >= end_ts
+        );
+        if !fresh {
+            crate::generate_and_save_summary(&app_state, date, hour);
+        }
+    }
+
+    let mut summaries = {
+        let s = app_state
+            .lock()
+            .map_err(|e| AppError::Unknown(e.to_string()))?;
+        s.database.get_hourly_summaries(date)?
+    };
+
+    // 今天的当前小时：内存计算,不写库(旧版本可能残留过半截摘要,一并以内存结果覆盖展示)
+    if date == today {
+        if let Some(current) = crate::build_hourly_summary(&app_state, date, current_hour) {
+            summaries.retain(|summary| summary.hour != current_hour);
+            summaries.push(current);
+            summaries.sort_by_key(|summary| summary.hour);
+        }
+    }
+
+    Ok(summaries
+        .iter()
+        .map(|s| {
+            serde_json::json!({
+                "hour": s.hour,
+                "summary": s.summary,
+                "main_apps": s.main_apps,
+                "activity_count": s.activity_count,
+                "total_duration": s.total_duration,
+            })
+        })
+        .collect())
+}
+
+/// 获取指定日期的小时摘要
+#[tauri::command]
+pub async fn get_hourly_summaries(
+    date: String,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<Vec<serde_json::Value>, AppError> {
+    get_hourly_summaries_inner(&date, state.inner())
+}
+
+/// 清理今天之前的所有活动记录
+#[tauri::command]
+pub async fn clear_old_activities(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<serde_json::Value, AppError> {
+    let data_dir = {
+        let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+        state.data_dir.clone()
+    };
+
+    // 获取要保留的日期（今天和昨天）
+    let now = chrono::Local::now();
+    let today = now.format("%Y-%m-%d").to_string();
+    let yesterday = (now - chrono::Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
+
+    let mut deleted_screenshots = 0;
+
+    // 删除旧截图目录（保留今天和昨天）
+    let screenshots_dir = data_dir.join("screenshots");
+    if screenshots_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&screenshots_dir) {
+            for entry in entries.flatten() {
+                if let Some(name) = entry.file_name().to_str() {
+                    // 保留今天和昨天的目录
+                    if name != today && name != yesterday && entry.path().is_dir() {
+                        if let Ok(dir_entries) = std::fs::read_dir(entry.path()) {
+                            for file_entry in dir_entries.flatten() {
+                                if file_entry.path().is_file() {
+                                    deleted_screenshots += 1;
+                                }
+                            }
+                        }
+                        let _ = std::fs::remove_dir_all(entry.path());
+                    }
+                }
+            }
+        }
+    }
+
+    // 同步清理数据库中对应的旧记录（保留今天和昨天，与截图保留策略一致）
+    {
+        let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+        if let Err(e) = state.database.delete_activities_before_date(&yesterday) {
+            log::warn!("清理旧活动记录失败: {e}");
+        }
+    }
+
+    Ok(serde_json::json!({
+        "deleted_screenshots": deleted_screenshots,
+        "kept_dates": [today, yesterday],
+        "message": format!("已清理 {} 张旧截图和对应活动记录，保留今天和昨天的数据", deleted_screenshots)
+    }))
+}
+
+/// 按相对 data_dir 的路径删除截图文件，返回成功删除的文件数（单文件失败只 log，不中断）
+fn remove_screenshot_files(data_dir: &std::path::Path, paths: Vec<String>) -> usize {
+    let mut removed = 0usize;
+    for p in paths {
+        if p.is_empty() {
+            continue;
+        }
+        let path = data_dir.join(&p);
+        if path.exists() {
+            match std::fs::remove_file(&path) {
+                Ok(_) => removed += 1,
+                Err(e) => log::warn!("删除截图文件失败 {}: {e}", path.display()),
+            }
+        }
+    }
+    removed
+}
+
+/// 删除单条活动记录（连带删除对应截图文件，OCR 文本随行删除）
+#[tauri::command]
+pub async fn delete_activity(
+    id: i64,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<serde_json::Value, AppError> {
+    let (data_dir, paths, deleted) = {
+        let s = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+        let (deleted, paths) = s.database.delete_activity_by_id(id)?;
+        (s.data_dir.clone(), paths, deleted)
+    };
+    let removed = remove_screenshot_files(&data_dir, paths);
+    log::info!("删除单条活动 id={id}: {deleted} 条记录, {removed} 张截图");
+    Ok(serde_json::json!({ "deleted": deleted, "removed_screenshots": removed }))
+}
+
+/// 删除指定日期（本地时区全天）的全部活动记录（连带截图）
+#[tauri::command]
+pub async fn delete_activities_by_date(
+    date: String,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<serde_json::Value, AppError> {
+    let (data_dir, paths, deleted) = {
+        let s = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+        let (deleted, paths) = s.database.delete_activities_by_date(&date)?;
+        (s.data_dir.clone(), paths, deleted)
+    };
+    let removed = remove_screenshot_files(&data_dir, paths);
+    log::info!("按日期删除 {date}: {deleted} 条记录, {removed} 张截图");
+    Ok(serde_json::json!({ "deleted": deleted, "removed_screenshots": removed }))
+}
+
+/// 删除指定时间段 [start_ts, end_ts)（Unix 秒）内的全部活动记录（连带截图）
+#[tauri::command]
+pub async fn delete_activities_by_range(
+    start_ts: i64,
+    end_ts: i64,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<serde_json::Value, AppError> {
+    let (data_dir, paths, deleted) = {
+        let s = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+        let (deleted, paths) = s.database.delete_activities_by_range(start_ts, end_ts)?;
+        (s.data_dir.clone(), paths, deleted)
+    };
+    let removed = remove_screenshot_files(&data_dir, paths);
+    log::info!("按时间段删除 [{start_ts}, {end_ts}): {deleted} 条记录, {removed} 张截图");
+    Ok(serde_json::json!({ "deleted": deleted, "removed_screenshots": removed }))
+}
+
+/// 删除指定应用的活动记录；start_ts/end_ts 同时给定时只删该时间段内的，否则删该应用全部（连带截图）
+#[tauri::command]
+pub async fn delete_activities_by_app(
+    app_name: String,
+    start_ts: Option<i64>,
+    end_ts: Option<i64>,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<serde_json::Value, AppError> {
+    let date_range = match (start_ts, end_ts) {
+        (Some(s), Some(e)) => Some((s, e)),
+        _ => None,
+    };
+    let (data_dir, paths, deleted) = {
+        let s = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+        let (deleted, paths) = s.database.delete_activities_by_app(&app_name, date_range)?;
+        (s.data_dir.clone(), paths, deleted)
+    };
+    let removed = remove_screenshot_files(&data_dir, paths);
+    log::info!("按应用删除 {app_name}: {deleted} 条记录, {removed} 张截图");
+    Ok(serde_json::json!({ "deleted": deleted, "removed_screenshots": removed }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::HourlyActivityBucket;
+    use chrono::NaiveDate;
+
+    #[test]
+    fn 概览本周范围应从周一开始到锚点日期结束() {
+        let anchor = NaiveDate::from_ymd_opt(2026, 4, 1).expect("valid anchor date");
+
+        let (date_from, date_to) = overview_week_bounds_for_date(anchor);
+
+        assert_eq!(date_from, "2026-03-30");
+        assert_eq!(date_to, "2026-04-01");
+    }
+
+    #[test]
+    fn 周概览统计应合并重复应用浏览器与小时分布() {
+        let hourly = |hour, duration| HourlyActivityBucket { hour, duration };
+        let day_one = DailyStats {
+            total_duration: 120,
+            screenshot_count: 2,
+            app_usage: vec![AppUsage {
+                app_name: "Cursor".to_string(),
+                duration: 120,
+                count: 2,
+                executable_path: Some("/Applications/Cursor.app".to_string()),
+                screenshot_url: Some("https://cdn.example.com/cursor-day-one.jpg".to_string()),
+            }],
+            category_usage: vec![CategoryUsage {
+                category: "development".to_string(),
+                duration: 120,
+            }],
+            browser_duration: 60,
+            url_usage: vec![UrlUsage {
+                url: "https://docs.example.com/a".to_string(),
+                domain: "docs.example.com".to_string(),
+                duration: 60,
+            }],
+            domain_usage: vec![DomainUsage {
+                domain: "docs.example.com".to_string(),
+                duration: 60,
+                semantic_category: Some("资料阅读".to_string()),
+                urls: vec![UrlDetail {
+                    url: "https://docs.example.com/a".to_string(),
+                    duration: 60,
+                }],
+            }],
+            domain_total_count: 1,
+            browser_usage: vec![BrowserUsage {
+                browser_name: "Google Chrome".to_string(),
+                duration: 60,
+                executable_path: Some("/Applications/Google Chrome.app".to_string()),
+                domains: vec![DomainUsage {
+                    domain: "docs.example.com".to_string(),
+                    duration: 60,
+                    semantic_category: Some("资料阅读".to_string()),
+                    urls: vec![UrlDetail {
+                        url: "https://docs.example.com/a".to_string(),
+                        duration: 60,
+                    }],
+                }],
+            }],
+            work_time_duration: 100,
+            overtime_duration: 0,
+            hourly_activity_distribution: vec![hourly(9, 60), hourly(10, 60)],
+        };
+        let day_two = DailyStats {
+            total_duration: 180,
+            screenshot_count: 3,
+            app_usage: vec![
+                AppUsage {
+                    app_name: "Cursor".to_string(),
+                    duration: 120,
+                    count: 1,
+                    executable_path: Some("/Applications/Cursor.app".to_string()),
+                    screenshot_url: None,
+                },
+                AppUsage {
+                    app_name: "Google Chrome".to_string(),
+                    duration: 60,
+                    count: 1,
+                    executable_path: Some("/Applications/Google Chrome.app".to_string()),
+                    screenshot_url: Some("https://cdn.example.com/chrome-day-two.jpg".to_string()),
+                },
+            ],
+            category_usage: vec![
+                CategoryUsage {
+                    category: "development".to_string(),
+                    duration: 120,
+                },
+                CategoryUsage {
+                    category: "browser".to_string(),
+                    duration: 60,
+                },
+            ],
+            browser_duration: 120,
+            url_usage: vec![
+                UrlUsage {
+                    url: "https://docs.example.com/a".to_string(),
+                    domain: "docs.example.com".to_string(),
+                    duration: 30,
+                },
+                UrlUsage {
+                    url: "https://news.example.com/b".to_string(),
+                    domain: "news.example.com".to_string(),
+                    duration: 90,
+                },
+            ],
+            domain_usage: vec![
+                DomainUsage {
+                    domain: "docs.example.com".to_string(),
+                    duration: 30,
+                    semantic_category: Some("资料阅读".to_string()),
+                    urls: vec![UrlDetail {
+                        url: "https://docs.example.com/a".to_string(),
+                        duration: 30,
+                    }],
+                },
+                DomainUsage {
+                    domain: "news.example.com".to_string(),
+                    duration: 90,
+                    semantic_category: Some("资料调研".to_string()),
+                    urls: vec![UrlDetail {
+                        url: "https://news.example.com/b".to_string(),
+                        duration: 90,
+                    }],
+                },
+            ],
+            domain_total_count: 2,
+            browser_usage: vec![BrowserUsage {
+                browser_name: "Google Chrome".to_string(),
+                duration: 120,
+                executable_path: Some("/Applications/Google Chrome.app".to_string()),
+                domains: vec![
+                    DomainUsage {
+                        domain: "docs.example.com".to_string(),
+                        duration: 30,
+                        semantic_category: Some("资料阅读".to_string()),
+                        urls: vec![UrlDetail {
+                            url: "https://docs.example.com/a".to_string(),
+                            duration: 30,
+                        }],
+                    },
+                    DomainUsage {
+                        domain: "news.example.com".to_string(),
+                        duration: 90,
+                        semantic_category: Some("资料调研".to_string()),
+                        urls: vec![UrlDetail {
+                            url: "https://news.example.com/b".to_string(),
+                            duration: 90,
+                        }],
+                    },
+                ],
+            }],
+            work_time_duration: 160,
+            overtime_duration: 0,
+            hourly_activity_distribution: vec![hourly(9, 30), hourly(10, 90), hourly(11, 60)],
+        };
+
+        let merged = sum_daily_stats(vec![day_one, day_two]);
+
+        assert_eq!(merged.total_duration, 300);
+        assert_eq!(merged.screenshot_count, 5);
+        assert_eq!(merged.work_time_duration, 260);
+        assert_eq!(merged.browser_duration, 180);
+        assert_eq!(merged.app_usage.len(), 2);
+        assert_eq!(merged.app_usage[0].app_name, "Cursor");
+        assert_eq!(merged.app_usage[0].duration, 240);
+        assert_eq!(merged.app_usage[0].count, 3);
+        assert_eq!(merged.hourly_activity_distribution[9].duration, 90);
+        assert_eq!(merged.hourly_activity_distribution[10].duration, 150);
+        assert_eq!(merged.hourly_activity_distribution[11].duration, 60);
+        assert_eq!(merged.browser_usage.len(), 1);
+        assert_eq!(merged.browser_usage[0].duration, 180);
+        assert_eq!(merged.browser_usage[0].domains.len(), 2);
+        assert_eq!(merged.domain_usage[0].domain, "docs.example.com");
+        assert_eq!(merged.domain_usage[0].duration, 90);
+        assert_eq!(merged.url_usage[0].url, "https://news.example.com/b");
+        assert_eq!(merged.url_usage[0].duration, 90);
+        assert_eq!(merged.domain_total_count, 2);
+    }
+
+    fn overview_domain(domain: &str, duration: i64, urls: Vec<(&str, i64)>) -> DomainUsage {
+        DomainUsage {
+            domain: domain.to_string(),
+            duration,
+            semantic_category: Some("资料阅读".to_string()),
+            urls: urls
+                .into_iter()
+                .map(|(url, duration)| UrlDetail {
+                    url: url.to_string(),
+                    duration,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn 首页概览应只投影前六域名并保留真实总数() {
+        let domains = (0..8)
+            .map(|index| {
+                overview_domain(&format!("site-{index}.example"), (8 - index) * 10, vec![])
+            })
+            .collect::<Vec<_>>();
+        let stats = DailyStats {
+            domain_usage: domains.clone(),
+            browser_usage: vec![BrowserUsage {
+                browser_name: "Google Chrome".to_string(),
+                duration: 360,
+                executable_path: None,
+                domains,
+            }],
+            ..Default::default()
+        };
+
+        let full_collection = build_overview_domain_collection(&stats);
+        let projected = project_overview_homepage(stats);
+
+        assert_eq!(full_collection.total_count, 8);
+        assert_eq!(full_collection.domains.len(), 8);
+        assert_eq!(projected.domain_total_count, 8);
+        assert_eq!(projected.domain_usage.len(), 6);
+        assert_eq!(projected.browser_usage[0].duration, 360);
+        assert_eq!(projected.browser_usage[0].domains.len(), 6);
+        assert!(projected.browser_usage[0]
+            .domains
+            .iter()
+            .all(|domain| projected
+                .domain_usage
+                .iter()
+                .any(|visible| visible.domain == domain.domain)));
+    }
+
+    #[test]
+    fn 域名集合应返回完整摘要且不携带网址明细() {
+        let stats = overview_sources_fixture();
+
+        let collection = build_overview_domain_collection(&stats);
+
+        assert_eq!(collection.total_count, 1);
+        assert_eq!(collection.domains.len(), 1);
+        let summary = &collection.domains[0];
+        assert_eq!(summary.domain, "docs.example.com");
+        assert_eq!(summary.duration, 100);
+        assert_eq!(summary.page_count, 2);
+        assert_eq!(summary.browser_sources.len(), 3);
+        assert_eq!(summary.browser_sources[0].browser_name, "Google Chrome");
+        assert_eq!(summary.browser_sources[1].browser_name, "Safari");
+        assert_eq!(summary.browser_sources[2].browser_name, "other");
+        assert!((summary.browser_sources[2].percentage - 20.0).abs() < f64::EPSILON);
+        let serialized = serde_json::to_value(&collection).expect("域名集合应可序列化");
+        assert!(serialized["domains"][0].get("urls").is_none());
+        assert!(serialized["domains"][0]["browser_sources"][0]
+            .get("urls")
+            .is_none());
+    }
+
+    #[test]
+    fn 域名详情应只返回目标域名并补齐无法归属的来源() {
+        let stats = overview_sources_fixture();
+
+        let detail =
+            build_overview_domain_detail(&stats, "docs.example.com").expect("应返回目标域名详情");
+
+        assert_eq!(detail.domain, "docs.example.com");
+        assert_eq!(detail.urls.len(), 2);
+        assert_eq!(detail.browser_sources.len(), 3);
+        let other = detail
+            .browser_sources
+            .iter()
+            .find(|source| source.browser_name == "other")
+            .expect("应补齐 other 来源");
+        assert_eq!(other.duration, 20);
+        assert!((other.percentage - 20.0).abs() < f64::EPSILON);
+        assert_eq!(other.urls.len(), 2);
+        assert_eq!(other.urls.iter().map(|url| url.duration).sum::<i64>(), 20);
+        assert!(build_overview_domain_detail(&stats, "missing.example.com").is_none());
+    }
+
+    fn overview_sources_fixture() -> DailyStats {
+        DailyStats {
+            domain_usage: vec![overview_domain(
+                "docs.example.com",
+                100,
+                vec![
+                    ("https://docs.example.com/a", 60),
+                    ("https://docs.example.com/b", 40),
+                ],
+            )],
+            browser_usage: vec![
+                BrowserUsage {
+                    browser_name: "Google Chrome".to_string(),
+                    duration: 50,
+                    executable_path: None,
+                    domains: vec![overview_domain(
+                        "docs.example.com",
+                        50,
+                        vec![("https://docs.example.com/a", 50)],
+                    )],
+                },
+                BrowserUsage {
+                    browser_name: "Safari".to_string(),
+                    duration: 30,
+                    executable_path: None,
+                    domains: vec![overview_domain(
+                        "docs.example.com",
+                        30,
+                        vec![("https://docs.example.com/b", 30)],
+                    )],
+                },
+            ],
+            ..Default::default()
+        }
+    }
+}
+
+/// 获取区间内逐日投入合计（概览「按天投入」卡）。
+/// 区间按自然日展开，最多 31 天，超出部分从起点截断；
+/// 逐日复用 load_daily_stats_for_overview（与概览统计同口径，含工作时段与隐私过滤），
+/// 返回 [{ date, total_duration, work_time_duration }]。
+#[tauri::command]
+pub async fn get_range_daily_totals(
+    date_from: String,
+    date_to: String,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<Vec<serde_json::Value>, AppError> {
+    let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+    let (start, end) = resolve_overview_date_span(
+        None,
+        Some(date_from.as_str()),
+        Some(date_to.as_str()),
+    )?;
+
+    let mut totals = Vec::new();
+    let mut current = start;
+    while current <= end && totals.len() < 31 {
+        let current_date = current.format("%Y-%m-%d").to_string();
+        let stats = load_daily_stats_for_overview(&state, &current_date)?;
+        totals.push(serde_json::json!({
+            "date": current_date,
+            "total_duration": stats.total_duration,
+            "work_time_duration": stats.work_time_duration,
+        }));
+        current = current
+            .succ_opt()
+            .ok_or_else(|| AppError::Config("计算按天投入日期范围失败".to_string()))?;
+    }
+
+    Ok(totals)
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 屏幕录制权限（截屏功能需要） -->
+    <key>com.apple.security.device.screen-capture</key>
+    <true/>
+    
+    <!-- 应用沙箱（关闭以允许访问系统功能） -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+    
+    <!-- 允许继承父进程权限 -->
+    <key>com.apple.security.inherit</key>
+    <true/>
+</dict>
+</plist>

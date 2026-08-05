@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设置改版 Mockup · Work Review</title>
+<style>
+  /* ── 基底 token:与 overview-redesign-mockup.html 一致 ── */
+  :root{
+    --surface-page:#f4f6f9; --surface-featured:#ffffff; --surface-subtle:#f8fafc;
+    --ink:#0f172a; --ink-2:#475569; --ink-3:#94a3b8;
+    --line:#e2e8f0; --line-soft:#eef2f7;
+    --primary:#3b82f6; --primary-soft:#dbeafe;
+    --c-dev:#3b82f6; --c-meet:#d97706; --c-doc:#8b5cf6; --c-comm:#059669; --c-ent:#be123c; --c-other:#94a3b8;
+    --r-card:22px; --r-inner:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"SF Pro Display","SF Pro Text","PingFang SC","Hiragino Sans GB","Segoe UI Variable Text","Microsoft YaHei",sans-serif;
+    background:var(--surface-page); color:var(--ink); font-size:15px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; padding:34px 24px 120px;
+  }
+  .shell{max-width:1024px;margin:0 auto}
+  .num{font-variant-numeric:tabular-nums}
+  .page-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:16px}
+  .page-head h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .page-head .date{margin-left:10px;font-size:13px;color:var(--ink-3);font-weight:500}
+
+  .layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:14px;align-items:start}
+  .card{background:var(--surface-featured);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:20px 22px}
+
+  /* ── 左导航:搜索 + 分组 ── */
+  .nav{padding:14px}
+  .search{display:flex;align-items:center;gap:8px;background:var(--surface-subtle);border:1px solid var(--line-soft);
+    border-radius:12px;padding:7px 11px;font-size:13px;color:var(--ink-3);margin-bottom:12px}
+  .grp{margin-top:10px}
+  .grp .gt{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--ink-3);padding:0 10px;margin-bottom:4px}
+  .item{display:flex;align-items:center;gap:9px;border-radius:12px;padding:7.5px 10px;font-size:13.5px;font-weight:550;color:var(--ink-2);cursor:pointer}
+  .item:hover{background:var(--surface-subtle)}
+  .item.on{background:#eff6ff;color:var(--primary);font-weight:650}
+  .item .ic{width:22px;height:22px;border-radius:7px;background:var(--surface-subtle);border:1px solid var(--line-soft);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .item.on .ic{background:#dbeafe;border-color:#bfdbfe}
+  .item .beta{margin-left:auto;font-size:9.5px;font-weight:700;letter-spacing:.05em;color:var(--ink-3);
+    border:1px solid var(--line);border-radius:6px;padding:0 5px;background:#fff}
+  .item .warn{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#b45309;font-weight:600}
+  .item .warn i{width:7px;height:7px;border-radius:999px;background:#f59e0b}
+
+  /* ── 右列:分区标题 + 故事卡 ── */
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;margin:2px 4px 12px}
+  .sec-head h2{font-size:16px;font-weight:700}
+  .sec-head p{font-size:12.5px;color:var(--ink-3)}
+  .stack{display:flex;flex-direction:column;gap:12px}
+  .card-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .card-head h3{font-size:15px;font-weight:650}
+  .chip{font-size:10.5px;font-weight:700;border-radius:7px;padding:1px 8px;letter-spacing:.03em}
+  .chip.save{background:#fffbeb;border:1px solid #fde68a;color:#b45309}
+  .chip.live{background:#ecfdf5;border:1px solid #a7f3d0;color:#047857}
+  .lead{font-size:13px;color:var(--ink-2);margin-bottom:14px}
+  .lead b{color:var(--ink);font-weight:650}
+
+  /* 24h 预览条 */
+  .dayband{position:relative;height:16px;border-radius:999px;background:var(--line-soft);overflow:hidden;margin-bottom:6px}
+  .dayband i{position:absolute;top:0;bottom:0;background:linear-gradient(180deg,#60a5fa,#3b82f6);border-radius:6px}
+  .bandlbl{display:flex;justify-content:space-between;font-size:10.5px;color:#cbd5e1;padding:0 2px;margin-bottom:14px}
+
+  /* 时段编辑行 */
+  .segrow{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line-soft);background:var(--surface-subtle);
+    border-radius:var(--r-inner);margin-bottom:8px;font-size:13.5px}
+  .segrow .lb{color:var(--ink-3);font-size:12px;font-weight:600;min-width:44px}
+  .tm{background:#fff;border:1px solid var(--line);border-radius:9px;padding:3px 11px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  .segrow .dash{color:#cbd5e1}
+  .segrow .du{margin-left:auto;font-size:12px;color:var(--ink-3)}
+  .segrow .rm{border:0;background:transparent;color:var(--ink-3);font-size:12px;font-weight:600;cursor:pointer;padding:2px 6px;border-radius:8px}
+  .segrow .rm:hover{color:#be123c;background:#fff1f2}
+  .addseg{border:1px dashed var(--line);background:transparent;border-radius:var(--r-inner);width:100%;padding:7px;
+    font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;font-family:inherit}
+  .adv{margin-top:12px;font-size:12px;color:var(--ink-3)}
+  .adv b{color:var(--ink-2);font-weight:600}
+
+  /* 行式设置(开关) */
+  .rows{display:flex;flex-direction:column}
+  .srow{display:flex;align-items:center;gap:10px;padding:10px 2px;border-top:1px solid var(--line-soft)}
+  .srow:first-child{border-top:0}
+  .srow .t{font-size:13.5px;font-weight:550;color:var(--ink)}
+  .srow .d{font-size:12px;color:var(--ink-3)}
+  .sw{margin-left:auto;width:38px;height:22px;border-radius:999px;background:#e2e8f0;position:relative;flex-shrink:0;cursor:pointer;transition:background .15s}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(15,23,42,.2);transition:left .15s}
+  .sw.on{background:var(--primary)}
+  .sw.on::after{left:18px}
+  .numin{display:flex;align-items:center;gap:7px;margin-left:auto}
+  .numin .box{background:#fff;border:1px solid var(--line);border-radius:9px;padding:3px 12px;font-weight:600;min-width:56px;text-align:center}
+  .numin em{font-style:normal;font-size:12px;color:var(--ink-3)}
+
+  /* ── 底部未保存更改条 ── */
+  .dirtybar{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;width:min(1024px,calc(100vw - 48px));
+    display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:18px;padding:11px 18px;box-shadow:0 16px 40px rgba(15,23,42,.14)}
+  .dirtybar .dot{width:8px;height:8px;border-radius:999px;background:#f59e0b;flex-shrink:0}
+  .dirtybar p{font-size:13px;color:var(--ink-2)}
+  .dirtybar p b{color:var(--ink);font-weight:650}
+  .dirtybar .sp{margin-left:auto;display:flex;gap:8px}
+  .btn{border-radius:11px;padding:7px 16px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;border:1px solid var(--line);background:#fff;color:var(--ink-2)}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 6px 14px rgba(59,130,246,.28)}
+
+  footer{margin-top:24px;text-align:center;font-size:12px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="page-head">
+    <div style="display:flex;align-items:baseline">
+      <h1>设置</h1><span class="date">代表性屏:通用 · 时间与记录</span>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- 左导航:搜索 + 5 组(取代 7 个平级 tab + 置顶权限卡) -->
+    <div class="card nav">
+      <div class="search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        搜索设置项…
+      </div>
+
+      <div class="grp">
+        <div class="gt">记录</div>
+        <div class="item on"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>通用 · 时间与记录</div>
+        <div class="item"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></span>隐私与排除</div>
+      </div>
+
+      <div class="grp">
+        <div class="gt">智能</div>
+        <div class="item"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></span>AI 模型</div>
+        <div class="item"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="9" r="4"/><path d="M5 20c1.4-3 4-4.5 7-4.5s5.6 1.5 7 4.5"/></svg></span>数字形象<span class="beta">BETA</span></div>
+      </div>
+
+      <div class="grp">
+        <div class="gt">数据</div>
+        <div class="item"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/></svg></span>存储与截图</div>
+        <div class="item"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><path d="M12 3v10m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg></span>导出与备份</div>
+      </div>
+
+      <div class="grp">
+        <div class="gt">接入</div>
+        <div class="item"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/></svg></span>节点网关<span class="beta">BETA</span></div>
+        <div class="item"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg></span>消息机器人</div>
+      </div>
+
+      <div class="grp">
+        <div class="gt">系统</div>
+        <div class="item"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><path d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z"/></svg></span>权限状态<span class="warn"><i></i>1 项待授权</span></div>
+        <div class="item"><span class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg></span>外观与语言</div>
+      </div>
+    </div>
+
+    <!-- 右列:一个分区的重构示例 -->
+    <div>
+      <div class="sec-head">
+        <h2>通用 · 时间与记录</h2>
+        <p>决定「工作时长 / 加班 / 占比」如何计算</p>
+      </div>
+
+      <div class="stack">
+
+        <!-- 故事卡 1:工作时段 —— 结论行 + 24h 预览 + 编辑行 -->
+        <div class="card">
+          <div class="card-head">
+            <h3>工作时段</h3>
+            <span class="chip save">需保存</span>
+            <span class="sw on" style="margin-left:auto"></span>
+          </div>
+          <p class="lead">每日合计 <b class="num">7h30m</b> —— 概览里「工作时长 / 加班 / 占比」都以此为基准。</p>
+
+          <div class="dayband">
+            <i style="left:37.5%;width:12.5%"></i>   <!-- 09:00–12:00 -->
+            <i style="left:58.3%;width:18.7%"></i>   <!-- 14:00–18:30 -->
+          </div>
+          <div class="bandlbl num"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>
+
+          <div class="segrow">
+            <span class="lb">时段 1</span>
+            <span class="tm">09:00</span><span class="dash">—</span><span class="tm">12:00</span>
+            <span class="du num">3h00m</span>
+            <button class="rm">移除</button>
+          </div>
+          <div class="segrow">
+            <span class="lb">时段 2</span>
+            <span class="tm">14:00</span><span class="dash">—</span><span class="tm">18:30</span>
+            <span class="du num">4h30m</span>
+            <button class="rm">移除</button>
+          </div>
+          <button class="addseg">+ 添加时段(最多 8 段)</button>
+
+          <p class="adv">高级:<b>空闲检测 5 分钟</b> · <b>标准工时 8h</b>(加班基准) <span style="color:var(--primary);font-weight:600;cursor:pointer">展开 ▾</span></p>
+        </div>
+
+        <!-- 故事卡 2:每日目标 —— 数字带参照系 -->
+        <div class="card">
+          <div class="card-head">
+            <h3>每日目标</h3>
+            <span class="chip save">需保存</span>
+          </div>
+          <div class="rows">
+            <div class="srow">
+              <div>
+                <div class="t">目标工作时长</div>
+                <div class="d">本周平均 <b class="num" style="color:var(--ink-2)">6h48m</b>,供设定参考</div>
+              </div>
+              <div class="numin"><span class="box num">6.5</span><em>小时 / 天</em></div>
+            </div>
+            <div class="srow">
+              <div>
+                <div class="t">达成后发送通知</div>
+                <div class="d">当日累计到达目标时提醒一次</div>
+              </div>
+              <span class="sw on"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 故事卡 3:系统行为 —— 保存语义逐行标注 -->
+        <div class="card">
+          <div class="card-head">
+            <h3>系统行为</h3>
+          </div>
+          <div class="rows">
+            <div class="srow">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="t">开机自启</span><span class="chip live">即时生效</span>
+              </div>
+              <span class="sw on"></span>
+            </div>
+            <div class="srow">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="t">隐藏 Dock 图标</span><span class="chip live">即时生效</span>
+              </div>
+              <span class="sw"></span>
+            </div>
+            <div class="srow">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="t">轻量模式</span><span class="chip save">需保存</span>
+                </div>
+                <div class="d">降低采样频率与后台占用,适合低配设备</div>
+              </div>
+              <span class="sw on"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 故事卡 4:日报与提醒 -->
+        <div class="card">
+          <div class="card-head">
+            <h3>日报与提醒</h3>
+          </div>
+          <div class="rows">
+            <div class="srow">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="t">每日自动生成日报</span><span class="chip save">需保存</span>
+                </div>
+                <div class="d">到点后台生成,可在「报告」页查看;留空则手动生成</div>
+              </div>
+              <div class="numin"><span class="box num">18:30</span></div>
+            </div>
+            <div class="srow">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="t">休息提醒</span><span class="chip save">需保存</span>
+                </div>
+                <div class="d">连续工作达到间隔后提醒起身休息</div>
+              </div>
+              <div class="numin"><span class="box num">50</span><em>分钟 / 次</em></div>
+              <span class="sw on" style="margin-left:12px"></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <footer>示意数据 · 左导航 5 组替代 7 平级 tab / 保存语义逐项标注 / 未保存更改条常驻可见</footer>
+</div>
+
+<!-- 底部 sticky:未保存更改条(dirty bar) -->
+<div class="dirtybar">
+  <span class="dot"></span>
+  <p><b>2 项未保存更改</b>:工作时段 · 轻量模式 —— 离开页面前会提醒你</p>
+  <div class="sp">
+    <button class="btn">放弃</button>
+    <button class="btn primary">保存更改</button>
+  </div>
+</div>
+</body>
+</html>

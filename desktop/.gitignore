@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+src-tauri/target/
+test_uia/target/
+test_uia/*.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data
+/data/
+*.db
+*.db-journal
+/screenshots/
+
+# Live2D SDK / local experiment files (not shipped in release)
+# 注意：用 `/lib/` 锚定到仓库根目录，避免误伤 `src/lib/`（前端核心代码所在地）。
+/lib/
+src/lib/components/Avatar/AvatarCanvasLive2D.svelte
+
+# Tauri
+src-tauri/target/
+src-tauri/WixTools/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+/env/
+/venv/
+
+# Bot config
+bots/config.json
+
+# Project docs (local only)
+plan-*.md
+TEST_REPORT_*.md
+src-tauri/icons.backup/
+.worktrees/
+.superpowers/
+# Cargo 工作区根目录的 target/（子 crate 的 target 已分别在上面显式列出）
+/target/
+
+# 会话工作文件（plan-*.md 匹配不到根目录 plan.md，显式列出）
+plan.md
+.claude/
+.zcode/

@@ -1,0 +1,13 @@
+[target.aarch64-apple-darwin]
+linker = "/usr/bin/cc"
+
+[target.x86_64-apple-darwin]
+linker = "/usr/bin/cc"
+
+[env]
+# 避免 PATH 中被 Node 工具覆盖的 cc 干扰 Rust 构建
+CC_aarch64_apple_darwin = "/usr/bin/cc"
+CXX_aarch64_apple_darwin = "/usr/bin/c++"
+CC_x86_64_apple_darwin = "/usr/bin/cc"
+CXX_x86_64_apple_darwin = "/usr/bin/c++"
+SDKROOT = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"

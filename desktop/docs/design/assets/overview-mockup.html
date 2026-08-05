@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>概览改版 Mockup · Work Review</title>
+<style>
+  :root{
+    --surface-page:#f4f6f9; --surface-featured:#ffffff; --surface-subtle:#f8fafc;
+    --ink:#0f172a; --ink-2:#475569; --ink-3:#94a3b8;
+    --line:#e2e8f0; --line-soft:#eef2f7;
+    --primary:#3b82f6; --primary-soft:#dbeafe;
+    --c-dev:#3b82f6; --c-meet:#d97706; --c-doc:#8b5cf6; --c-comm:#059669; --c-ent:#be123c; --c-other:#94a3b8;
+    --r-card:22px; --r-inner:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"SF Pro Display","SF Pro Text","PingFang SC","Hiragino Sans GB","Segoe UI Variable Text","Microsoft YaHei",sans-serif;
+    background:var(--surface-page); color:var(--ink); font-size:15px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; padding:34px 24px 60px;
+  }
+  .shell{max-width:1024px;margin:0 auto}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* ── 页头:标题 + 分段控制并入一行,不再占一张卡 ── */
+  .page-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+  .page-head h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .page-head .date{margin-left:10px;font-size:13px;color:var(--ink-3);font-weight:500}
+  .seg{display:flex;background:#e9edf3;border-radius:12px;padding:3px;gap:2px}
+  .seg button{border:0;background:transparent;border-radius:9px;padding:5.5px 16px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;font-family:inherit}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(15,23,42,.08)}
+
+  /* ── 洞察条 ── */
+  .insight{
+    display:flex;align-items:center;gap:14px;margin-bottom:14px;
+    background:linear-gradient(90deg,#eff6ff 0%,#ffffff 55%);
+    border:1px solid #dbeafe;border-radius:var(--r-card);padding:14px 20px;
+  }
+  .insight .spark{flex-shrink:0;width:34px;height:34px;border-radius:12px;background:#dbeafe;display:flex;align-items:center;justify-content:center}
+  .insight p{font-size:14px;color:var(--ink-2)}
+  .insight p strong{color:var(--ink);font-weight:600}
+  .insight a{margin-left:auto;flex-shrink:0;font-size:13px;font-weight:600;color:var(--primary);text-decoration:none;white-space:nowrap}
+
+  /* ── KPI 行:每张卡都有参照系 ── */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .kpi{background:var(--surface-featured);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:16px 18px 15px;min-height:112px}
+  .kpi .t{font-size:13px;font-weight:500;color:var(--ink-2)}
+  .kpi .v{margin-top:10px;font-size:1.9rem;font-weight:650;letter-spacing:-.02em;line-height:1}
+  .kpi .v small{font-size:1.15rem;font-weight:600;color:var(--ink-2);margin-left:1px}
+  .kpi .d{margin-top:9px;font-size:12px;color:var(--ink-3);font-weight:500;display:flex;align-items:center;gap:4px}
+  .kpi .d .arrow{font-weight:700}
+  .kpi .d .up{color:#2563eb}.kpi .d .down{color:#64748b}
+
+  /* ── 主视觉卡:今日节奏 = 构成条 + 24h 分布,一个叙事 ── */
+  .card{background:var(--surface-featured);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:20px 22px;margin-bottom:14px}
+  .card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .card-head h3{font-size:15px;font-weight:650}
+  .card-head .sub{font-size:12.5px;color:var(--ink-3)}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2)}
+  .legend i{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+  .legend b{color:var(--ink);font-weight:600}
+  .legend em{font-style:normal;color:var(--ink-3)}
+
+  .compo{display:flex;height:14px;border-radius:999px;overflow:hidden;gap:2px;background:transparent}
+  .compo i{display:block;height:100%}
+  .compo i:first-child{border-radius:999px 0 0 999px}
+  .compo i:last-child{border-radius:0 999px 999px 0}
+
+  .hourly-wrap{margin-top:20px;position:relative}
+  .hourly-svg{width:100%;height:auto;display:block}
+  .tip{
+    position:fixed;z-index:50;pointer-events:none;opacity:0;transition:opacity .12s;
+    background:#0f172a;color:#f1f5f9;border-radius:10px;padding:8px 11px;font-size:12px;line-height:1.5;
+    box-shadow:0 8px 24px rgba(15,23,42,.25);max-width:220px;
+  }
+  .tip b{color:#fff}
+  .tip .row{display:flex;align-items:center;gap:6px}
+  .tip .row i{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+
+  details.dtable{margin-top:12px}
+  details.dtable summary{font-size:12px;color:var(--ink-3);cursor:pointer;user-select:none}
+  details.dtable table{margin-top:8px;border-collapse:collapse;font-size:12px;color:var(--ink-2)}
+  details.dtable td,details.dtable th{border:1px solid var(--line);padding:3px 8px;text-align:right}
+  details.dtable th{background:var(--surface-subtle);font-weight:600}
+
+  /* ── 双栏:网站(按域名) × 应用 ── */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .rowlist{display:flex;flex-direction:column;gap:4px}
+  .rrow{display:grid;grid-template-columns:26px minmax(0,150px) 1fr 58px;align-items:center;gap:10px;padding:7px 8px;border-radius:12px}
+  .rrow:hover{background:var(--surface-subtle)}
+  .rrow .ic{width:26px;height:26px;border-radius:8px;background:var(--surface-subtle);border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--ink-2)}
+  .rrow .nm{font-size:13.5px;font-weight:550;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rrow .nm em{display:block;font-style:normal;font-size:11px;color:var(--ink-3);font-weight:450}
+  .rrow .bar{height:7px;border-radius:999px;background:var(--line-soft);overflow:hidden}
+  .rrow .bar i{display:block;height:100%;border-radius:999px;background:#60a5fa}
+  .rrow .val{font-size:12.5px;color:var(--ink-2);font-weight:600;text-align:right}
+  .card .more{display:block;margin-top:10px;font-size:12.5px;color:var(--ink-3)}
+  .card .more a{color:var(--primary);font-weight:600;text-decoration:none}
+
+  /* ── 周模式差异化示意 ── */
+  .weeknote{display:flex;align-items:center;gap:10px;margin:26px 0 12px;color:var(--ink-3);font-size:12.5px;font-weight:600;letter-spacing:.02em}
+  .weeknote::before,.weeknote::after{content:"";flex:1;height:1px;background:var(--line)}
+  .wk .bars{display:flex;align-items:flex-end;gap:10px;height:150px;padding:0 4px}
+  .wk .b{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:7px}
+  .wk .b i{width:100%;max-width:44px;border-radius:6px 6px 3px 3px;background:#cbd5e1;display:block;position:relative;flex-shrink:0}
+  .wk .b.today i{background:var(--primary)}
+  .wk .b .lb{font-size:12px;color:var(--ink-3);font-weight:500}
+  .wk .b.today .lb{color:var(--primary);font-weight:700}
+  .wk .b .tag{font-size:11px;color:var(--ink-2);font-weight:600}
+  .spark-svg{width:100%;height:auto;display:block;margin-top:6px}
+
+  footer{margin-top:26px;text-align:center;font-size:12px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- 页头 -->
+  <div class="page-head">
+    <div style="display:flex;align-items:baseline">
+      <h1>概览</h1><span class="date num">7月26日 · 周日</span>
+    </div>
+    <div class="seg">
+      <button class="on">今天</button><button>本周</button><button>自定义</button>
+    </div>
+  </div>
+
+  <!-- 洞察条:后端 get_insights 已就绪,这里是它的家 -->
+  <div class="insight">
+    <div class="spark">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="#3b82f6"><path d="M12 2.5l2 6.4 6.5 2.1-6.5 2.1-2 6.4-2-6.4L3.5 11l6.5-2.1zM19 15.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/></svg>
+    </div>
+    <p>今天最专注的时段是 <strong>10:00–12:00</strong>(连续 1h47m);总投入比上周日 <strong>多 42 分钟</strong>,主要来自「开发」。</p>
+    <a href="#">查看本周回顾 →</a>
+  </div>
+
+  <!-- KPI:每个数字都带参照系 -->
+  <div class="kpis">
+    <div class="kpi">
+      <div class="t">总投入</div>
+      <div class="v num">7<small>h</small>24<small>m</small></div>
+      <div class="d"><span class="arrow up">↑</span>较上周日 +42m</div>
+    </div>
+    <div class="kpi">
+      <div class="t">工作时长</div>
+      <div class="v num">5<small>h</small>47<small>m</small></div>
+      <div class="d">占比 78% · 含加班 32m</div>
+    </div>
+    <div class="kpi">
+      <div class="t">专注峰值</div>
+      <div class="v num">10–12<small>时</small></div>
+      <div class="d">最长连续专注 1h47m</div>
+    </div>
+    <div class="kpi">
+      <div class="t">娱乐占比</div>
+      <div class="v num">8<small>%</small></div>
+      <div class="d"><span class="arrow down">↓</span>较上周日 −5%</div>
+    </div>
+  </div>
+
+  <!-- 主视觉:今日节奏(构成 × 时段,一个故事) -->
+  <div class="card">
+    <div class="card-head">
+      <h3>今日节奏</h3>
+      <span class="sub">工作时段 09:00–18:00 · 悬停查看分解</span>
+    </div>
+
+    <div class="compo" id="compo"></div>
+    <div class="legend" id="legend"></div>
+
+    <div class="hourly-wrap">
+      <svg class="hourly-svg" id="hourly" viewBox="0 0 980 210" role="img" aria-label="24 小时活动分布,按分类着色"></svg>
+    </div>
+
+    <details class="dtable">
+      <summary>数据表</summary>
+      <table id="dtable"></table>
+    </details>
+  </div>
+
+  <!-- 双栏:域名为主角(浏览器降为次级说明) × 应用 -->
+  <div class="cols">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-head"><h3>常驻网站</h3><span class="sub">按域名聚合</span></div>
+      <div class="rowlist" id="domains"></div>
+      <span class="more">23 个站点 · 经 Chrome、Safari 访问 · <a href="#">查看全部 →</a></span>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-head"><h3>应用投入</h3><span class="sub">Top 6</span></div>
+      <div class="rowlist" id="apps"></div>
+      <span class="more">共 21 个应用 · <a href="#">查看全部 →</a></span>
+    </div>
+  </div>
+
+  <!-- 周模式差异化:不再复用小时图 -->
+  <div class="weeknote">切到「本周」时,第一视角换成按天 —— 小时分布退为"典型一天"</div>
+  <div class="cols">
+    <div class="card wk" style="margin-bottom:0">
+      <div class="card-head"><h3>按天投入(本周)</h3><span class="sub">最重:周四 8h02m</span></div>
+      <div class="bars" id="weekbars"></div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-head"><h3>典型一天(本周平均)</h3><span class="sub">节奏曲线</span></div>
+      <svg class="spark-svg" id="typical" viewBox="0 0 460 150" role="img" aria-label="本周平均的一天节奏曲线"></svg>
+    </div>
+  </div>
+
+  <footer>示意数据 · 沿用现有 editorial 体系(22px 圆角 / slate 阶 / SF Pro + 苹方) · 分类配色已通过色觉可分性校验</footer>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+const CATS = [
+  { key:'dev',  name:'开发', color:'#3b82f6' },
+  { key:'meet', name:'会议', color:'#d97706' },
+  { key:'doc',  name:'文档', color:'#8b5cf6' },
+  { key:'comm', name:'沟通', color:'#059669' },
+  { key:'ent',  name:'娱乐', color:'#be123c' },
+  { key:'other',name:'其他', color:'#94a3b8' },
+];
+const fmt = m => m >= 60 ? `${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}m` : `${m}m`;
+
+/* ── 分类构成(今天) ── */
+const compo = { dev:187, meet:80, doc:67, comm:53, ent:36, other:21 };  // 计 444m = 7h24m
+const total = Object.values(compo).reduce((a,b)=>a+b,0);
+document.getElementById('compo').innerHTML = CATS
+  .map(c => `<i style="background:${c.color};width:${(compo[c.key]/total*100).toFixed(1)}%"></i>`).join('');
+document.getElementById('legend').innerHTML = CATS
+  .map(c => `<span><i style="background:${c.color}"></i>${c.name} <b>${fmt(compo[c.key])}</b> <em>${Math.round(compo[c.key]/total*100)}%</em></span>`).join('');
+
+/* ── 24h 分布(分类堆叠) ── */
+const hours = {
+  8:{comm:10,other:4}, 9:{dev:12,comm:6,other:4}, 10:{dev:40,doc:8,meet:4}, 11:{dev:36,doc:6,comm:5},
+  12:{meet:14,comm:6,ent:4}, 13:{ent:8,other:5}, 14:{meet:22,dev:10,doc:6}, 15:{dev:30,doc:10,comm:4},
+  16:{dev:28,doc:9,comm:4}, 17:{dev:15,doc:11,meet:6,comm:5}, 18:{dev:12,comm:8,ent:5}, 19:{ent:6},
+  20:{other:8}, 21:{dev:22,doc:10}, 22:{dev:12,ent:9},
+};
+const svg = document.getElementById('hourly');
+const W=980, H=210, plotH=150, padTop=26, baseY=padTop+plotH, barW=30, gap=(W-40-24*barW)/23, x0=20;
+const maxM = 60;
+let els = `<rect x="${x0+9*(barW+gap)-4}" y="${padTop-14}" width="${9*(barW+gap)+2}" height="${plotH+22}" rx="10" fill="#f1f5f9" opacity="0.6"/>`;
+els += `<text x="${x0+9*(barW+gap)+2}" y="${padTop-2}" font-size="10.5" fill="#94a3b8">工作时段</text>`;
+[15,30,45,60].forEach(m=>{
+  const y = baseY - m/maxM*plotH;
+  els += `<line x1="${x0}" y1="${y}" x2="${W-20}" y2="${y}" stroke="#eef2f7" stroke-width="1"/>`;
+  els += `<text x="${W-18}" y="${y+3.5}" font-size="10" fill="#cbd5e1" text-anchor="start">${m}</text>`;
+});
+const hourTotals = {};
+for(let h=0; h<24; h++){
+  const x = x0 + h*(barW+gap);
+  const seg = hours[h] || {};
+  const tot = Object.values(seg).reduce((a,b)=>a+b,0);
+  hourTotals[h]=tot;
+  let y = baseY;
+  if (tot > 0){
+    const parts = CATS.filter(c=>seg[c.key]).map(c=>({c, v:seg[c.key]}));
+    parts.forEach((p,i)=>{
+      const hpx = Math.max(p.v/maxM*plotH - (i<parts.length-1 ? 2 : 0), 2.5);
+      y -= p.v/maxM*plotH;
+      const isTop = i===parts.length-1;
+      els += `<rect x="${x}" y="${y.toFixed(1)}" width="${barW}" height="${hpx.toFixed(1)}" rx="${isTop?4:1.5}" fill="${p.c.color}" data-h="${h}"/>`;
+    });
+  } else {
+    els += `<rect x="${x}" y="${baseY-2.5}" width="${barW}" height="2.5" rx="1.25" fill="#e2e8f0" data-h="${h}"/>`;
+  }
+  els += `<rect x="${x-gap/2}" y="${padTop-14}" width="${barW+gap}" height="${plotH+34}" fill="transparent" data-hit="${h}"/>`;
+  if ([0,6,12,18,23].includes(h)) {
+    els += `<text x="${x+barW/2}" y="${baseY+18}" font-size="11" fill="#94a3b8" text-anchor="middle">${h}</text>`;
+  }
+}
+const peakX = x0 + 10*(barW+gap) + barW/2;
+const peakY = baseY - hourTotals[10]/maxM*plotH;
+els += `<text x="${peakX}" y="${peakY-8}" font-size="11" font-weight="600" fill="#475569" text-anchor="middle">峰值 52m</text>`;
+svg.innerHTML = els;
+
+/* hover tooltip */
+const tip = document.getElementById('tip');
+svg.addEventListener('mousemove', e=>{
+  const t = e.target.closest('[data-hit],[data-h]');
+  if(!t){ tip.style.opacity=0; return; }
+  const h = +(t.dataset.hit ?? t.dataset.h);
+  const seg = hours[h]||{}; const tot = hourTotals[h]||0;
+  let rows = CATS.filter(c=>seg[c.key])
+    .map(c=>`<div class="row"><i style="background:${c.color}"></i>${c.name} ${fmt(seg[c.key])}</div>`).join('');
+  tip.innerHTML = `<b>${String(h).padStart(2,'0')}:00–${String(h+1).padStart(2,'0')}:00 · ${tot? fmt(tot):'无记录'}</b>${rows}`;
+  tip.style.opacity=1;
+  tip.style.left = Math.min(e.clientX+14, innerWidth-240)+'px';
+  tip.style.top  = (e.clientY+14)+'px';
+});
+svg.addEventListener('mouseleave', ()=> tip.style.opacity=0);
+
+/* 数据表(可访问性兜底) */
+document.getElementById('dtable').innerHTML =
+  '<tr><th>时段</th>' + CATS.map(c=>`<th>${c.name}</th>`).join('') + '<th>合计</th></tr>' +
+  Object.keys(hours).map(h=>{
+    const seg=hours[h];
+    return `<tr><td>${String(h).padStart(2,'0')}:00</td>` +
+      CATS.map(c=>`<td>${seg[c.key]||''}</td>`).join('') +
+      `<td>${Object.values(seg).reduce((a,b)=>a+b,0)}m</td></tr>`;
+  }).join('');
+
+/* ── 域名 × 应用 双栏 ── */
+const domains = [
+  ['github.com','1h52m',112,'代码评审 · 21 页'],
+  ['localhost:5173','58m',58,'本地开发'],
+  ['docs.google.com','41m',41,'方案文档 · 6 页'],
+  ['stackoverflow.com','33m',33,'检索 · 11 页'],
+  ['chat.openai.com','27m',27,'AI 辅助'],
+  ['bilibili.com','19m',19,'娱乐 · 4 页'],
+];
+document.getElementById('domains').innerHTML = domains.map(([d,v,m,sub])=>`
+  <div class="rrow">
+    <div class="ic">${d[0].toUpperCase()}</div>
+    <div class="nm">${d}<em>${sub}</em></div>
+    <div class="bar"><i style="width:${(m/112*100).toFixed(0)}%"></i></div>
+    <div class="val num">${v}</div>
+  </div>`).join('');
+
+const apps = [
+  ['PyCharm','3h12m',192,'开发'],
+  ['Chrome','2h26m',146,'浏览'],
+  ['iTerm','47m',47,'终端'],
+  ['微信','38m',38,'沟通'],
+  ['Figma','21m',21,'设计'],
+  ['Obsidian','13m',13,'笔记'],
+];
+document.getElementById('apps').innerHTML = apps.map(([a,v,m,sub])=>`
+  <div class="rrow">
+    <div class="ic">${a[0]}</div>
+    <div class="nm">${a}<em>${sub}</em></div>
+    <div class="bar"><i style="width:${(m/192*100).toFixed(0)}%"></i></div>
+    <div class="val num">${v}</div>
+  </div>`).join('');
+
+/* ── 周模式示意 ── */
+const week = [['一',6.2],['二',7.4],['三',5.1],['四',8.03],['五',7.4],['六',2.1],['日',7.4]];
+const wmax = 8.03;
+document.getElementById('weekbars').innerHTML = week.map(([d,v],i)=>`
+  <div class="b ${i===6?'today':''}">
+    ${i===3?'<span class="tag num">8h02m</span>':''}
+    <i style="height:${(v/wmax*96).toFixed(0)}px"></i>
+    <span class="lb">${d}</span>
+  </div>`).join('');
+
+/* 典型一天曲线 */
+const tw=460, th=150, tpad=16;
+const shape=[0,0,0,0,0,0,1,3,14,28,46,42,22,12,32,40,38,30,20,8,6,22,14,3];
+const tmax=46;
+const pts = shape.map((v,i)=>[tpad + i*(tw-2*tpad)/23, th-24-(v/tmax*(th-48))]);
+const line = pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+document.getElementById('typical').innerHTML =
+  `<path d="${line} L ${pts[23][0]},${th-24} L ${pts[0][0]},${th-24} Z" fill="#dbeafe" opacity="0.55"/>` +
+  `<path d="${line}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` +
+  [0,6,12,18,23].map(h=>`<text x="${(tpad + h*(tw-2*tpad)/23).toFixed(1)}" y="${th-8}" font-size="10.5" fill="#94a3b8" text-anchor="middle">${h}</text>`).join('') +
+  `<text x="${pts[10][0]}" y="${pts[10][1]-8}" font-size="10.5" fill="#475569" font-weight="600" text-anchor="middle">10–12 峰值</text>`;
+</script>
+</body>
+</html>

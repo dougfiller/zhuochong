@@ -1,0 +1,118 @@
+{
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev",
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:5173"
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": [
+      "nsis",
+      "dmg",
+      "app",
+      "deb",
+      "rpm",
+      "appimage"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    },
+    "icon": [
+      "icons/16x16.png",
+      "icons/32x32.png",
+      "icons/48x48.png",
+      "icons/64x64.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/256x256.png",
+      "icons/512x512.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "copyright": "© 2026 WorkReview",
+    "category": "Productivity",
+    "shortDescription": "工作回顾与AI日报助手",
+    "longDescription": "一个高性能、低占用的工作活动追踪与AI日报生成工具，帮你记录每天的辛勤付出。",
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": "WorkReview Self-Signed",
+      "infoPlist": "Info.plist",
+      "entitlements": "entitlements.plist"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "xdotool",
+          "xprintidle",
+          "x11-utils",
+          "libglib2.0-bin",
+          "tesseract-ocr",
+          "gnome-screenshot | grim | scrot | maim | imagemagick",
+          "procps"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "xdotool",
+          "xprintidle",
+          "xorg-x11-utils",
+          "glib2",
+          "tesseract",
+          "gnome-screenshot",
+          "procps-ng"
+        ]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  },
+  "productName": "Work Review",
+  "mainBinaryName": "Work_Review",
+  "version": "1.1.0",
+  "identifier": "com.workreview.app",
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE5RTJFOUZBREEwMTA5RjIKUldUeUNRSGErdW5pcVdnajJvT3B2Vm9wdXlwb0QvVTBoQUZTTGYvSHJ2emhma3BWdnE3Q3dJTnkK",
+      "endpoints": [
+        "https://github.com/wm94i/Work-Review/releases/latest/download/updater.json",
+        "https://gh-proxy.cn/https://github.com/wm94i/Work-Review/releases/latest/download/updater-ghproxy.json",
+        "https://gh-proxy.com/https://github.com/wm94i/Work-Review/releases/latest/download/updater-ghp.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "title": "Work Review",
+        "width": 1000,
+        "height": 700,
+        "visible": false,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "hiddenTitle": true,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "dragDropEnabled": false,
+        "useHttpsScheme": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: asset: https://asset.localhost; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* https://api.github.com https://gh-proxy.cn https://gh-proxy.com"
+    }
+  }
+}

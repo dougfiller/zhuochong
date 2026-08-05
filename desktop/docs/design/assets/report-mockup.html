@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日报改版 Mockup · Work Review</title>
+<style>
+  /* ── 基底:与概览定稿 mockup 完全同源的 token ── */
+  :root{
+    --surface-page:#f4f6f9; --surface-featured:#ffffff; --surface-subtle:#f8fafc;
+    --ink:#0f172a; --ink-2:#475569; --ink-3:#94a3b8;
+    --line:#e2e8f0; --line-soft:#eef2f7;
+    --primary:#3b82f6; --primary-soft:#dbeafe;
+    --c-dev:#3b82f6; --c-meet:#d97706; --c-doc:#8b5cf6; --c-comm:#059669; --c-ent:#be123c; --c-other:#94a3b8;
+    --r-card:22px; --r-inner:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"SF Pro Display","SF Pro Text","PingFang SC","Hiragino Sans GB","Segoe UI Variable Text","Microsoft YaHei",sans-serif;
+    background:var(--surface-page); color:var(--ink); font-size:15px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; padding:28px 24px 36px;
+  }
+  .shell{max-width:1024px;margin:0 auto}
+  .num{font-variant-numeric:tabular-nums}
+
+  .page-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+  .page-head h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .page-head .date{margin-left:10px;font-size:13px;color:var(--ink-3);font-weight:500}
+  .head-tools{display:flex;align-items:center;gap:10px}
+  .seg{display:flex;background:#e9edf3;border-radius:12px;padding:3px;gap:2px}
+  .seg button{border:0;background:transparent;border-radius:9px;padding:5.5px 16px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;font-family:inherit}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(15,23,42,.08)}
+  .ghost{border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 13px;font-size:12.5px;font-weight:600;color:var(--ink-2);font-family:inherit}
+  .cta{border:0;background:var(--primary);color:#fff;border-radius:10px;padding:7px 15px;font-size:12.5px;font-weight:600;font-family:inherit;box-shadow:0 2px 6px rgba(59,130,246,.28)}
+
+  .insight{
+    display:flex;align-items:center;gap:14px;margin-bottom:14px;
+    background:linear-gradient(90deg,#eff6ff 0%,#ffffff 55%);
+    border:1px solid #dbeafe;border-radius:var(--r-card);padding:13px 20px;
+  }
+  .insight .spark{flex-shrink:0;width:34px;height:34px;border-radius:12px;background:#dbeafe;display:flex;align-items:center;justify-content:center}
+  .insight p{font-size:14px;color:var(--ink-2)}
+  .insight p strong{color:var(--ink);font-weight:600}
+  .insight a{margin-left:auto;flex-shrink:0;font-size:13px;font-weight:600;color:var(--primary);text-decoration:none;white-space:nowrap}
+
+  /* ── 历史周条:哪天有报告一眼可见 ── */
+  .histstrip{display:flex;align-items:center;gap:8px;margin-bottom:14px;background:var(--surface-featured);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:10px 16px}
+  .histstrip .lb{font-size:12px;font-weight:600;color:var(--ink-3);margin-right:4px;white-space:nowrap}
+  .day{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 12px;border-radius:11px;font-size:12px;color:var(--ink-2);font-weight:600}
+  .day i{width:6px;height:6px;border-radius:99px;background:var(--primary)}
+  .day.none{color:var(--ink-3);font-weight:500}
+  .day.none i{background:transparent;border:1.5px solid #cbd5e1;width:5px;height:5px}
+  .day.on{background:var(--primary);color:#fff;box-shadow:0 2px 6px rgba(59,130,246,.28)}
+  .day.on i{background:#fff}
+  .histstrip .meta{margin-left:auto;font-size:12px;color:var(--ink-3)}
+  .histstrip .meta a{color:var(--primary);font-weight:600;text-decoration:none}
+
+  /* ── KPI:与报告同口径,每个数字带参照系 ── */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .kpi{background:var(--surface-featured);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:15px 18px 13px;min-height:104px}
+  .kpi .t{font-size:13px;font-weight:500;color:var(--ink-2)}
+  .kpi .v{margin-top:9px;font-size:1.8rem;font-weight:650;letter-spacing:-.02em;line-height:1}
+  .kpi .v small{font-size:1.1rem;font-weight:600;color:var(--ink-2);margin-left:1px}
+  .kpi .d{margin-top:8px;font-size:12px;color:var(--ink-3);font-weight:500}
+  .kpi .d .up{color:#2563eb;font-weight:700}.kpi .d .down{color:#64748b;font-weight:700}
+
+  /* ── 阅读布局:目录 × 文章 ── */
+  .reading{display:grid;grid-template-columns:168px minmax(0,1fr);gap:14px;align-items:start;margin-bottom:14px}
+  .toc{position:sticky;top:12px;background:var(--surface-subtle);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:14px 8px 12px 14px}
+  .toc .t{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--ink-3);margin-bottom:8px}
+  .toc a{position:relative;display:block;padding:5px 8px;border-radius:9px;font-size:12.5px;color:var(--ink-2);text-decoration:none;line-height:1.5}
+  .toc a.on{color:var(--primary);font-weight:650;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.05)}
+  .toc a.on::before{content:"";position:absolute;left:-8px;top:50%;transform:translateY(-50%);width:3px;height:14px;border-radius:99px;background:var(--primary)}
+  .toc .foot{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);font-size:11px;color:var(--ink-3);line-height:1.6}
+
+  .article{background:var(--surface-featured);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:22px 28px 20px}
+  .art-meta{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line-soft);font-size:12px;color:var(--ink-3)}
+  .art-meta .dot{width:7px;height:7px;border-radius:99px;background:#10b981}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:600;background:var(--surface-subtle);border:1px solid var(--line);color:var(--ink-2)}
+  .pill.ok{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+  .art-meta .acts{margin-left:auto;display:flex;gap:4px}
+  .art-meta .acts span{width:26px;height:26px;border-radius:8px;border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:12px}
+
+  .sec{padding:16px 0 4px}
+  .sec + .sec{border-top:1px dashed var(--line-soft)}
+  .sec h2{font-size:16.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .sec h2 .no{color:var(--ink-3);font-weight:600;font-size:14px}
+  .sec p{font-size:14px;color:var(--ink-2);margin-bottom:8px}
+  .sec p b,.sec li b{color:var(--ink);font-weight:600}
+  .sec ul{margin:0 0 8px 0;padding-left:0;list-style:none}
+  .sec li{position:relative;font-size:14px;color:var(--ink-2);padding-left:16px;margin-bottom:5px}
+  .sec li::before{content:"";position:absolute;left:2px;top:9px;width:5px;height:5px;border-radius:2px;background:var(--primary)}
+  .evi{text-decoration:underline dotted 1.5px #93c5fd;text-underline-offset:3px;cursor:pointer}
+
+  /* 证据 chips:正文数字可跳到时间线/概览 */
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin:2px 0 8px}
+  .chips span{display:inline-flex;align-items:center;gap:6px;padding:3.5px 10px;border-radius:99px;background:var(--surface-subtle);border:1px solid var(--line-soft);font-size:12px;font-weight:600;color:var(--ink-2)}
+  .chips i{width:7px;height:7px;border-radius:2.5px;flex-shrink:0}
+  .chips em{font-style:normal;color:var(--ink-3);font-weight:500}
+
+  /* 数据对照面板 */
+  .proof{margin:4px 0 10px;background:var(--surface-subtle);border:1px solid var(--line-soft);border-radius:var(--r-inner);padding:12px 14px}
+  .proof .cap{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--ink-3);margin-bottom:9px}
+  .proof .cap b{color:var(--ink-2);font-weight:650}
+  .compo{display:flex;height:12px;border-radius:999px;overflow:hidden;gap:2px}
+  .compo i{display:block;height:100%}
+  .compo i:first-child{border-radius:999px 0 0 999px}
+  .compo i:last-child{border-radius:0 999px 999px 0}
+  .legend{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:9px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-2)}
+  .legend i{width:8px;height:8px;border-radius:2.5px;flex-shrink:0}
+  .legend b{color:var(--ink);font-weight:600}
+  .legend em{font-style:normal;color:var(--ink-3)}
+
+  .collapsed{display:flex;align-items:center;justify-content:space-between;padding:12px 0;font-size:14px;color:var(--ink-2);font-weight:600}
+  .collapsed .hint{font-size:12px;color:var(--ink-3);font-weight:500}
+
+  .todo{display:flex;align-items:flex-start;gap:9px;padding:7px 10px;border-radius:10px;background:var(--surface-subtle);border:1px solid var(--line-soft);margin-bottom:6px}
+  .todo i{flex-shrink:0;width:15px;height:15px;border-radius:5px;border:1.5px solid #93c5fd;margin-top:3px}
+  .todo p{margin:0;font-size:13.5px}
+
+  .weeknote{display:flex;align-items:center;gap:10px;margin:18px 0 12px;color:var(--ink-3);font-size:12.5px;font-weight:600;letter-spacing:.02em}
+  .weeknote::before,.weeknote::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .card{background:var(--surface-featured);border:1px solid var(--line-soft);border-radius:var(--r-card);padding:16px 18px}
+  .card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .card-head h3{font-size:14.5px;font-weight:650}
+  .card-head .sub{font-size:12px;color:var(--ink-3)}
+  .hrow{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 8px;border-radius:10px;font-size:12.5px}
+  .hrow:hover{background:var(--surface-subtle)}
+  .hrow .d{color:var(--ink-2);font-weight:650;font-variant-numeric:tabular-nums}
+  .hrow .x{color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hrow .s{color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .mitem{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:12px;border:1px solid var(--line-soft);margin-bottom:7px}
+  .mitem .mi{width:28px;height:28px;border-radius:9px;background:var(--surface-subtle);border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+  .mitem b{display:block;font-size:13px;font-weight:650}
+  .mitem span{font-size:11.5px;color:var(--ink-3)}
+  .mitem .kbd{margin-left:auto;align-self:center;font-size:11px;color:var(--ink-3);background:var(--surface-subtle);border:1px solid var(--line-soft);border-radius:6px;padding:1px 7px;white-space:nowrap}
+
+  footer{margin-top:18px;text-align:center;font-size:12px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- 页头:标题 + 日期切换 + 唯一主操作 -->
+  <div class="page-head">
+    <div style="display:flex;align-items:baseline">
+      <h1>日报</h1><span class="date num">7月26日 · 周日</span>
+    </div>
+    <div class="head-tools">
+      <div class="seg">
+        <button class="on">今天</button><button>昨天</button><button>选日期</button>
+      </div>
+      <button class="ghost">导出 ▾</button>
+      <button class="cta">重新生成</button>
+    </div>
+  </div>
+
+  <!-- 洞察条 = 报告 TL;DR:先给结论再展开全文 -->
+  <div class="insight">
+    <div class="spark">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="#3b82f6"><path d="M12 2.5l2 6.4 6.5 2.1-6.5 2.1-2 6.4-2-6.4L3.5 11l6.5-2.1zM19 15.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/></svg>
+    </div>
+    <p>主线是<strong>「支付模块重构」</strong>:两段深度冲刺完成幂等键改造并通过评审;会议占比回落到 <strong>18%</strong>,遗留 1 个 code review 建议明早处理。</p>
+    <a href="#">跳到明日建议 →</a>
+  </div>
+
+  <!-- 历史周条:报告的"有无"先于"打开" -->
+  <div class="histstrip">
+    <span class="lb">本周</span>
+    <div class="day num"><span>一 20</span><i></i></div>
+    <div class="day num"><span>二 21</span><i></i></div>
+    <div class="day none num"><span>三 22</span><i></i></div>
+    <div class="day num"><span>四 23</span><i></i></div>
+    <div class="day num"><span>五 24</span><i></i></div>
+    <div class="day none num"><span>六 25</span><i></i></div>
+    <div class="day on num"><span>日 26</span><i></i></div>
+    <span class="meta">已生成 5/7 天 · <a href="#">合并导出本周 →</a></span>
+  </div>
+
+  <!-- KPI:与报告同口径的四个答案 -->
+  <div class="kpis">
+    <div class="kpi">
+      <div class="t">总投入</div>
+      <div class="v num">7<small>h</small>24<small>m</small></div>
+      <div class="d"><span class="up">↑</span> 较上周日 +42m</div>
+    </div>
+    <div class="kpi">
+      <div class="t">深度冲刺</div>
+      <div class="v num">2<small>段</small></div>
+      <div class="d">最长 1h47m · 均在上午</div>
+    </div>
+    <div class="kpi">
+      <div class="t">会议占比</div>
+      <div class="v num">18<small>%</small></div>
+      <div class="d"><span class="down">↓</span> 较本周均值 −7pt</div>
+    </div>
+    <div class="kpi">
+      <div class="t">数据底座</div>
+      <div class="v num">486<small>条</small></div>
+      <div class="d">21 应用 · 与生成时一致 ✓</div>
+    </div>
+  </div>
+
+  <!-- 阅读布局:目录 × 文章卡 -->
+  <div class="reading">
+    <nav class="toc">
+      <div class="t">目录</div>
+      <a class="on num" href="#">一、今日概览</a>
+      <a class="num" href="#">二、工作内容</a>
+      <a class="num" href="#">三、时间分配</a>
+      <a class="num" href="#">四、网站与应用</a>
+      <a class="num" href="#">五、明日建议</a>
+      <div class="foot">生成于 22:41<br>云端增强 · 数据快照已固化</div>
+    </nav>
+
+    <div class="article">
+      <div class="art-meta">
+        <span class="dot"></span><span class="num">生成于 7月26日 22:41</span>
+        <span class="pill">云端增强</span>
+        <span class="pill ok">数据快照 ✓</span>
+        <div class="acts"><span>✎</span><span>⌖</span><span>﹀</span></div>
+      </div>
+
+      <div class="sec">
+        <h2><span class="no num">一、</span>今日概览</h2>
+        <p>今天的工作围绕<b>支付模块重构</b>展开,上午两段连续冲刺完成了 <span class="evi num">webhook 幂等键改造</span>,下午在评审与站会之间穿插推进测试用例。晚间补了一小时收尾,整体节奏前紧后松。</p>
+        <div class="chips">
+          <span><i style="background:var(--c-dev)"></i>PyCharm <em class="num">3h12m</em></span>
+          <span><i style="background:var(--c-dev)"></i>最长会话 <em class="num">10:12–11:47</em></span>
+          <span><i style="background:var(--c-meet)"></i>会议 <em class="num">1h20m</em></span>
+          <span>↳ 点击定位到时间线对应会话</span>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h2><span class="no num">二、</span>工作内容</h2>
+        <ul>
+          <li><b>支付模块重构</b>:抽出 retry 逻辑、改造幂等键,补 6 个回归用例(<span class="evi num">10:12–11:47 会话 ↗</span>)。</li>
+          <li><b>方案评审</b>:重构方案在站会过审,批注 3 处命名问题待处理。</li>
+          <li><b>协作支持</b>:帮同事排查 CI 缓存失效,产出临时修复脚本。</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2><span class="no num">三、</span>时间分配</h2>
+        <p>开发占 <b>42%</b> 为绝对主线;会议集中在 12:00–15:00,<b>没有切碎上午的深度时段</b>,是今天节奏优于昨天的关键。</p>
+        <div class="proof">
+          <div class="cap"><b>数据对照</b><span>构成条与正文数字同源 · 快照取自生成时刻</span></div>
+          <div class="compo" id="compo"></div>
+          <div class="legend" id="legend"></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="collapsed"><span><span class="no num" style="color:var(--ink-3)">四、</span>网站与应用</span><span class="hint">已折叠 · 与概览「常驻网站 / 应用投入」重复,默认收起 ﹀</span></div>
+      </div>
+
+      <div class="sec">
+        <h2><span class="no num">五、</span>明日建议</h2>
+        <div class="todo"><i></i><p>上午优先处理遗留的 <b>code review</b>(约 30m),避免阻塞同事合入。</p></div>
+        <div class="todo"><i></i><p>把今天批注的 3 处命名问题合进下一次提交,<b>预计 20m</b>。</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导出与历史动线 -->
+  <div class="weeknote">导出从三个并排按钮收敛为一个菜单;历史从「盲选日期」变成带状态的列表</div>
+  <div class="cols">
+    <div class="card">
+      <div class="card-head"><h3>历史日报</h3><span class="sub">最近生成 · 含首句摘要</span></div>
+      <div class="hrow"><span class="d num">7月25日</span><span class="x">未生成 · 当日有 3h02m 记录,可补生成</span><span class="s">○</span></div>
+      <div class="hrow"><span class="d num">7月24日</span><span class="x">完成数据导出模块联调,晚间处理线上告警…</span><span class="s num">22:40</span></div>
+      <div class="hrow"><span class="d num">7月23日</span><span class="x">重构方案初稿与两轮评审,会议偏多…</span><span class="s num">23:02</span></div>
+      <div class="hrow"><span class="d num">7月22日</span><span class="x">碎片化的一天:12 段短会话,建议整块安排…</span><span class="s num">22:38</span></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>导出 ▾ 菜单</h3><span class="sub">动作合一处 · 默认目录可在设置修改</span></div>
+      <div class="mitem"><div class="mi">📄</div><div><b>导出当日 Markdown</b><span>reports/2026-07-26.md</span></div><span class="kbd">⌘E</span></div>
+      <div class="mitem"><div class="mi">🗂</div><div><b>合并导出区间…</b><span>本周 / 上周 / 本月 / 自定义,拼成单个文件</span></div><span class="kbd">5 篇</span></div>
+      <div class="mitem"><div class="mi">⧉</div><div><b>复制全文</b><span>直接粘贴到周报 / IM,不落盘</span></div><span class="kbd">⌘⇧C</span></div>
+    </div>
+  </div>
+
+  <footer>示意数据 · 版式沿用概览定稿(22px 圆角 / slate 阶 / 分类六色) · 正文列宽约 52rem 保持阅读舒适度</footer>
+</div>
+
+<script>
+const CATS = [
+  { key:'dev',  name:'开发', color:'#3b82f6' },
+  { key:'meet', name:'会议', color:'#d97706' },
+  { key:'doc',  name:'文档', color:'#8b5cf6' },
+  { key:'comm', name:'沟通', color:'#059669' },
+  { key:'ent',  name:'娱乐', color:'#be123c' },
+  { key:'other',name:'其他', color:'#94a3b8' },
+];
+const fmt = m => m >= 60 ? `${Math.floor(m/60)}h${String(m%60).padStart(2,'0')}m` : `${m}m`;
+const compo = { dev:187, meet:80, doc:67, comm:53, ent:36, other:21 }; // 与概览示意同源:计 7h24m
+const total = Object.values(compo).reduce((a,b)=>a+b,0);
+document.getElementById('compo').innerHTML = CATS
+  .map(c => `<i style="background:${c.color};width:${(compo[c.key]/total*100).toFixed(1)}%"></i>`).join('');
+document.getElementById('legend').innerHTML = CATS
+  .map(c => `<span><i style="background:${c.color}"></i>${c.name} <b>${fmt(compo[c.key])}</b> <em>${Math.round(compo[c.key]/total*100)}%</em></span>`).join('');
+</script>
+</body>
+</html>
