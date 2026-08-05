@@ -16,3 +16,19 @@
 | 当前 `desktop/` 状态 | 复核 manifest 与官方归档 | 已验证为可信上游冻结基线；测试生成的 `node_modules/` 和 `dist/` 已移除，基线恢复为 580 个受控文件。 |
 
 本次来源门禁已解除；但 Rust workspace 测试尚非全绿，后续如要解除完整发布门禁，应以独立任务诊断并修复上述上游测试失败，不能把它掩盖为来源冻结问题。
+
+## Work Review 修改前回归基线与继承矩阵（2026-08-05）
+
+检测脚本：`kaifa/kaifa_test/verify_work_review_regression_baseline.py`。脚本只读取 `desktop/` 的冻结 manifest、矩阵、结果 JSON 和脱敏摘要；不启动应用、不安装依赖、不联网，也不会读取聊天导出或真实截图。
+
+| 验收项 | 命令/方法 | 实际结果 |
+| --- | --- | --- |
+| 自动化前端基线 | `cd desktop && node --test` | 通过；479/479。摘要见 `BASE-AUTO-FE-summary.txt`。 |
+| 自动化前端构建 | `cd desktop && npm run build` | 通过；Vite 5.4.21，240 个模块转换完成。 |
+| Rust 编译 | `cd desktop && cargo check --workspace --all-targets --quiet` | 通过。 |
+| Rust lint | `cd desktop && cargo clippy --workspace --all-targets -- -D warnings` | 通过；保留上游依赖 `block v0.1.6` 的 future-incompat 警告，不误报零警告。 |
+| Rust workspace 测试 | `cd desktop && cargo test --workspace --quiet` | 失败；372 通过、1 失败，固定登记为 `UPSTREAM-RUST-001`，未修改或跳过该测试。 |
+| 基线工件一致性 | `python3 -B kaifa/kaifa_test/verify_work_review_regression_baseline.py --project-root .` | 应通过；校验 10 条 AC-BASE、5 条自动化支撑行、冻结 580 文件、摘要 SHA-256 和既有失败归因。 |
+| 冻结来源复核 | `python3 -B kaifa/kaifa_test/verify_work_review_baseline.py verify --source '参考/Work-Review-main' --destination desktop` | 应通过本地快照；只有网络可用时才会重新验证官方归档。 |
+
+Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无凭据模型/网络契约的 BASE-06、09--10 记录为 `not-run`；这些不是通过结果。后续在受控 Windows 机器上只能补同一行的 `before` 证据，任何微信/RAG 改动后只能补 `after` 证据。

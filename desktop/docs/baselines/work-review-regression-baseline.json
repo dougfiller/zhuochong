@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "baseline_id": "work-review-v1.1.0-before-wechat-rag-20260805",
+  "captured_at": "2026-08-05T15:46:00Z",
+  "source": {
+    "manifest": "docs/baselines/work-review-source.json",
+    "tag": "v1.1.0",
+    "commit": "500f9d2cb3027392cfcc32ad18395dfe348fb4a1",
+    "source_file_count": 580,
+    "source_total_bytes": 44961912,
+    "files_sha256": "31dd2192f602ee0b4d6f659311186d2230416e42357744ac8c57e778f20cb14a",
+    "fresh_upstream_verification": "not-run: this run could only verify the local frozen snapshot; the manifest retains the step-1 official archive proof"
+  },
+  "environment": {
+    "execution_os": "macOS (host; version intentionally not used as a Windows result)",
+    "target_os": "Windows 11 x64",
+    "windows_execution": "blocked: no Windows 11 x64 + WebView2 test machine was supplied",
+    "display_topology": "not-run",
+    "toolchains": {
+      "node": "v24.14.1",
+      "npm": "11.11.0",
+      "cargo": "1.97.1",
+      "rustc": "1.97.1"
+    },
+    "lockfiles": {
+      "package-lock.json": "2a49f91f1071d107a936fb7df83253b53edd48464d7647d52d3745d708310e85",
+      "Cargo.lock": "df846576f7ae56821f3184729559dbc3a2f1f84e73b7bf4c5ab2012b887710dc"
+    }
+  },
+  "commands": [
+    {"id": "AUTO-FE", "command": "node --test", "exit_code": 0, "summary": "479 passed; 0 failed", "evidence": "docs/baselines/evidence/BASE-AUTO-FE-summary.txt", "log_sha256": "a4762615564c71c7ede9ec64fe7c6da5aa67cc711b9143caccb129cea185d1ac"},
+    {"id": "AUTO-BUILD", "command": "npm run build", "exit_code": 0, "summary": "Vite 5.4.21 production build; 240 modules transformed", "evidence": "docs/baselines/evidence/BASE-AUTO-BUILD-summary.txt", "log_sha256": "cf5792562de67e013c36c80a84f517140c8d86fe6deeda1a8b61f100810dd8ff"},
+    {"id": "AUTO-RUST-CHECK", "command": "cargo check --workspace --all-targets --quiet", "exit_code": 0, "summary": "completed successfully", "evidence": "docs/baselines/evidence/BASE-AUTO-RUST-CHECK-summary.txt", "log_sha256": "689655dbf434eead816f148aa9c6d038679c8f8f2b547e566bb2669d8e19e308"},
+    {"id": "AUTO-RUST-CLIPPY", "command": "cargo clippy --workspace --all-targets -- -D warnings", "exit_code": 0, "summary": "completed successfully; upstream block v0.1.6 future-incompat warning retained", "evidence": "docs/baselines/evidence/BASE-AUTO-RUST-CLIPPY-summary.txt", "log_sha256": "7ffd6dc6e1efbeec4fac8adceda1f65c717f83ef1aec50d60b278b1006a88d6b"},
+    {"id": "AUTO-RUST-TEST", "command": "cargo test --workspace --quiet", "exit_code": 101, "summary": "372 passed; 1 known failure", "evidence": "docs/baselines/evidence/BASE-AUTO-RUST-TEST-summary.txt", "log_sha256": "b65f0a8d0d511e78779a5a1acbb0d999ac453a666d0413dfd4e74c15d2c1bc5f"}
+  ],
+  "items": [
+    {"id": "BASE-01", "before_status": "blocked", "before_evidence": [], "before_reason": "Windows-only lifecycle scenario not run", "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-02", "before_status": "blocked", "before_evidence": [], "before_reason": "Windows foreground and idle scenario not run", "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-03", "before_status": "blocked", "before_evidence": [], "before_reason": "Windows screenshot/OCR fixture scenario not run", "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-04", "before_status": "blocked", "before_evidence": [], "before_reason": "Windows UI scenario not run", "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-05", "before_status": "blocked", "before_evidence": [], "before_reason": "Windows report/export fixture scenario not run", "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-06", "before_status": "not-run", "before_evidence": [], "before_reason": "No model credential or controlled mock contract run", "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-07", "before_status": "blocked", "before_evidence": [], "before_reason": "Windows restart and temporary-data scenario not run", "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-08", "before_status": "blocked", "before_evidence": [], "before_reason": "Windows multi-monitor and WebView2 scenario not run", "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-09", "before_status": "not-run", "before_evidence": [], "before_reason": "No real requests were authorized; controlled isolation contract remains pending", "after_status": "not-run", "release_blocker": "conditional", "known_issue": "none"},
+    {"id": "BASE-10", "before_status": "not-run", "before_evidence": [], "before_reason": "Mock/queue/error-path contract inventory remains pending", "after_status": "not-run", "release_blocker": "conditional", "known_issue": "none"},
+    {"id": "BASE-AUTO-FE", "before_status": "pass", "before_evidence": ["AUTO-FE"], "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-AUTO-BUILD", "before_status": "pass", "before_evidence": ["AUTO-BUILD"], "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-AUTO-RUST-CHECK", "before_status": "pass", "before_evidence": ["AUTO-RUST-CHECK"], "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-AUTO-RUST-CLIPPY", "before_status": "pass", "before_evidence": ["AUTO-RUST-CLIPPY"], "after_status": "not-run", "release_blocker": "yes", "known_issue": "none"},
+    {"id": "BASE-AUTO-RUST-TEST", "before_status": "fail", "before_evidence": ["AUTO-RUST-TEST"], "before_reason": "UPSTREAM-RUST-001", "after_status": "not-run", "release_blocker": "yes", "known_issue": "UPSTREAM-RUST-001"}
+  ],
+  "known_issues": [
+    {
+      "id": "UPSTREAM-RUST-001",
+      "test": "commands::system::tests::图标解析应忽略与app_name矛盾的executable_path",
+      "before_status": "fail",
+      "observed": "浏览器不应因脏 executable_path 显示编译器图标, 实际首位: None",
+      "command_id": "AUTO-RUST-TEST",
+      "release_blocker": true
+    }
+  ],
+  "release_gate": "closed: required before rows include fail, blocked, and not-run; all after rows are not-run"
+}

@@ -1,0 +1,10 @@
+baseline_id=work-review-v1.1.0-before-wechat-rag-20260805
+captured_at=2026-08-05T15:46:00Z
+command=cargo test --workspace --quiet
+exit_code=101
+tests=373
+pass=372
+fail=1
+failed_test=commands::system::tests::图标解析应忽略与app_name矛盾的executable_path
+observed=浏览器不应因脏 executable_path 显示编译器图标, 实际首位: None
+privacy=No screenshots, activity content, credentials, endpoints, or absolute user paths are stored.

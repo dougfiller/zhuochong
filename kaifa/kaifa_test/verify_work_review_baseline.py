@@ -24,7 +24,15 @@ METADATA_FILES = {
     "work-review-source.json",
     "reference-ledger.md",
     "third-party-assets.md",
+    "work-review-inheritance-matrix.md",
+    "work-review-regression-baseline.json",
+    "evidence/BASE-AUTO-FE-summary.txt",
+    "evidence/BASE-AUTO-BUILD-summary.txt",
+    "evidence/BASE-AUTO-RUST-CHECK-summary.txt",
+    "evidence/BASE-AUTO-RUST-CLIPPY-summary.txt",
+    "evidence/BASE-AUTO-RUST-TEST-summary.txt",
 }
+METADATA_DIRECTORIES = {"evidence"}
 EXCLUDED_DIRECTORY_NAMES = {
     ".git",
     ".cache",
@@ -341,7 +349,10 @@ def verify(destination: Path, source: Path, version: str, tag: str, commit: str)
     metadata_paths = {
         path.relative_to(metadata_dir).as_posix() for path in metadata_dir.rglob("*") if path.is_file()
     }
-    if metadata_paths != METADATA_FILES or any(path.is_dir() for path in metadata_dir.rglob("*")):
+    metadata_directories = {
+        path.relative_to(metadata_dir).as_posix() for path in metadata_dir.rglob("*") if path.is_dir()
+    }
+    if metadata_paths != METADATA_FILES or metadata_directories != METADATA_DIRECTORIES:
         raise ValueError("baseline metadata directory contains missing or unexpected files")
     missing = sorted(path for path in REQUIRED_PATHS if not (destination / path).exists())
     if missing:

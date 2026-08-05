@@ -1,0 +1,9 @@
+baseline_id=work-review-v1.1.0-before-wechat-rag-20260805
+captured_at=2026-08-05T15:46:00Z
+command=node --test
+exit_code=0
+tests=479
+pass=479
+fail=0
+duration_ms=3662.558166
+privacy=No screenshots, activity content, credentials, endpoints, or absolute user paths are stored.

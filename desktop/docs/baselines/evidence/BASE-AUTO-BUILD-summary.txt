@@ -1,0 +1,7 @@
+baseline_id=work-review-v1.1.0-before-wechat-rag-20260805
+captured_at=2026-08-05T15:46:00Z
+command=npm run build
+exit_code=0
+tool=vite 5.4.21
+result=240 modules transformed; production build completed
+privacy=No screenshots, activity content, credentials, endpoints, or absolute user paths are stored.

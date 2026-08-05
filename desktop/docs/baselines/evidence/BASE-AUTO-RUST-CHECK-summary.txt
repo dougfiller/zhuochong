@@ -1,0 +1,6 @@
+baseline_id=work-review-v1.1.0-before-wechat-rag-20260805
+captured_at=2026-08-05T15:46:00Z
+command=cargo check --workspace --all-targets --quiet
+exit_code=0
+result=completed successfully
+privacy=No screenshots, activity content, credentials, endpoints, or absolute user paths are stored.
