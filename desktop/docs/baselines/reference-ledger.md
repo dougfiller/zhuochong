@@ -9,3 +9,4 @@
 | VPet — 未在本步骤使用 | 不适用 | 后续能力评估参考 | 本步骤未复制 | 如后续采用，先追加来源、许可和补丁记录 |
 | Umi-OCR — 未在本步骤使用 | 不适用 | 后续 OCR 能力评估参考 | 本步骤未复制 | 如后续采用，先追加来源、许可和补丁记录 |
 | Open-LLM-VTuber — 未在本步骤使用 | 不适用 | 后续模型接入评估参考 | 本步骤未复制 | 如后续采用，先追加来源、许可和补丁记录 |
+| 品牌与发行安全下限（2026-08-06） | `src-tauri/tauri.conf.json`、`src-tauri/src/commands/updater.rs`、`.github/workflows/release.yml` | 本产品补丁 | 移除上游更新端点和公钥，禁用 updater 产物、网络更新与正式 Release | 正式名称、identifier、binary、图标授权、签名、更新源和公钥未冻结；取得全部可审计输入后另立补丁恢复受控发行链 |

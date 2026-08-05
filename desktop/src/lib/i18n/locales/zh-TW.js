@@ -390,6 +390,7 @@ export default {
     },
     updater: {
       checking: '正在檢查更新...',
+      disabled: '目前發行未啟用自動更新',
       upToDate: '目前已是最新版本',
       availableManual: '發現新版本，但目前發布暫未準備好線上更新',
       newVersionTitle: '發現新版本',

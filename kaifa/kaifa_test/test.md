@@ -32,3 +32,15 @@
 | 冻结来源复核 | `python3 -B kaifa/kaifa_test/verify_work_review_baseline.py verify --source '参考/Work-Review-main' --destination desktop` | 应通过本地快照；只有网络可用时才会重新验证官方归档。 |
 
 Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无凭据模型/网络契约的 BASE-06、09--10 记录为 `not-run`；这些不是通过结果。后续在受控 Windows 机器上只能补同一行的 `before` 证据，任何微信/RAG 改动后只能补 `after` 证据。
+
+## 品牌、应用标识和发行安全下限适配（2026-08-06）
+
+本步骤没有新增独立检测脚本；在 `desktop/` 既有 Node 测试中扩展了 updater、打包配置和 Release workflow 的静态门禁。命令只读取源码/配置或编译 updater 单元测试，不访问更新 endpoint，也不创建发行物。
+
+| 验收项 | 命令/方法 | 实际结果 |
+| --- | --- | --- |
+| 更新与发行安全门禁 | `cd desktop && node --test src/UpdaterFlow.test.js src/lib/utils/updater.test.js src/ReleasePackaging.test.js releaseWorkflow.test.js` | 13/13 通过；确认 updater 明确 disabled、原生插件依赖/注册/capability 均不存在、Tauri 不生成 updater artifacts、CSP 不含上游域名、Release workflow 不会发布。 |
+| Rust updater 单元测试 | `cd desktop && npm ci && npm run build && cargo test --manifest-path src-tauri/Cargo.toml commands::updater::tests --quiet` | 前端构建通过；Rust 测试 1 通过、0 失败、370 过滤。禁用响应不提供 release URL，且不可用作自动安装。 |
+| 配置与残留地址扫描 | `node -e "JSON.parse(require('node:fs').readFileSync('desktop/src-tauri/tauri.conf.json'))"`；针对 updater 源码、Tauri 配置和 Release workflow 搜索上游 endpoint/代理 manifest | 通过；JSON 合法，目标范围未发现上游 Release API、代理或 `updater.json`。 |
+| 全量前端测试（环境限制） | `cd desktop && node --test` | 未通过，非本次代码失败：445 通过、5 失败；当前未安装依赖导致缺少 `playwright`、`svelte` 与 `vite`。未执行安装以免改变工作区依赖状态。 |
+| Rust 格式检查（环境限制） | `rustfmt --check desktop/src-tauri/src/commands/updater.rs` | 未运行；当前 `stable-aarch64-apple-darwin` toolchain 未安装 `rustfmt` component。 |

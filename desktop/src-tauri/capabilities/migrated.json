@@ -76,9 +76,6 @@
     "dialog:default",
     "shell:default",
     "fs:default",
-    "process:allow-restart",
-    "updater:allow-check",
-    "updater:allow-download-and-install",
-    "updater:default"
+    "process:allow-restart"
   ]
 }

@@ -400,6 +400,7 @@ export default {
     },
     updater: {
       checking: 'Checking for updates...',
+      disabled: 'Automatic updates are not enabled for this release',
       upToDate: 'You are already on the latest version',
       availableManual: 'A new version is available, but online update is not ready for this release yet',
       newVersionTitle: 'New version available',

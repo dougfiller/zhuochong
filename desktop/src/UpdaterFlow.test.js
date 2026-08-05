@@ -1,20 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 
 async function readCommandsSource() {
-  // commands.rs 已按领域拆分为 commands/*.rs，这里拼接所有子模块以保持断言语义不变。
-  const dir = new URL('../src-tauri/src/commands/', import.meta.url);
-  const files = (await readdir(dir)).filter((f) => f.endsWith('.rs'));
-  const parts = await Promise.all(files.map((f) => readFile(new URL(f, dir), 'utf8')));
-  return parts.join('\n');
+  return readFile(new URL('../src-tauri/src/commands/updater.rs', import.meta.url), 'utf8');
 }
 
-test('后端检查更新应优先验证当前平台存在可安装更新包', async () => {
+test('未配置本产品更新信任链时后端必须禁用更新且不得保留上游地址', async () => {
   const source = await readCommandsSource();
 
-  assert.match(source, /check_installable_update/);
-  assert.match(source, /\.updater_builder\(\)/);
-  assert.match(source, /match updater\.check\(\)\.await/);
-  assert.match(source, /auto_update_ready: true/);
+  assert.match(source, /AUTO_UPDATE_DISABLED_MESSAGE/);
+  assert.match(source, /disabled: true/);
+  assert.match(source, /pub async fn should_check_updates[\s\S]*?Ok\(false\)/);
+  assert.doesNotMatch(source, /wm94i\/Work-Review|gh-proxy|api\.github\.com|\.updater_builder\(\)|reqwest::Client/);
+});
+
+test('未配置本产品更新信任链时不得注册原生 updater 或授予其权限', async () => {
+  const [cargoToml, mainSource, capability] = await Promise.all([
+    readFile(new URL('../src-tauri/Cargo.toml', import.meta.url), 'utf8'),
+    readFile(new URL('../src-tauri/src/main.rs', import.meta.url), 'utf8'),
+    readFile(new URL('../src-tauri/capabilities/migrated.json', import.meta.url), 'utf8'),
+  ]);
+
+  assert.doesNotMatch(cargoToml, /tauri-plugin-updater/);
+  assert.doesNotMatch(mainSource, /tauri_plugin_updater/);
+  assert.doesNotMatch(capability, /updater:/);
 });

@@ -390,6 +390,7 @@ export default {
     },
     updater: {
       checking: '正在检查更新...',
+      disabled: '当前发行未启用自动更新',
       upToDate: '当前已是最新版本',
       availableManual: '发现新版本，但当前发布暂未准备好在线更新',
       newVersionTitle: '发现新版本',

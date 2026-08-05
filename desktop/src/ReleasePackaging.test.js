@@ -94,3 +94,19 @@ test('本地 mac 打包脚本应关闭 updater 产物签名，避免缺少私钥
   );
   assert.equal(localTauriConfig.bundle.createUpdaterArtifacts, false);
 });
+
+test('未冻结本产品发行输入时不得生成 updater 产物或保留上游更新配置', async () => {
+  const tauriConfig = JSON.parse(
+    await readFile(new URL('../src-tauri/tauri.conf.json', import.meta.url), 'utf8')
+  );
+  const releaseWorkflow = await readFile(
+    new URL('../.github/workflows/release.yml', import.meta.url),
+    'utf8'
+  );
+
+  assert.equal(tauriConfig.bundle.createUpdaterArtifacts, false);
+  assert.equal(tauriConfig.plugins?.updater, undefined);
+  assert.doesNotMatch(tauriConfig.app.security.csp, /api\.github\.com|gh-proxy/);
+  assert.match(releaseWorkflow, /Formal release is disabled/);
+  assert.doesNotMatch(releaseWorkflow, /ncipollo\/release-action|updater\.json|Work_Review_portable/);
+});

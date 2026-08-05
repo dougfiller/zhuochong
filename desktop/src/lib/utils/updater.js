@@ -105,6 +105,12 @@ export async function runUpdateFlow(options = {}) {
 
   try {
     const releaseInfo = await invoke('check_github_update');
+
+    if (releaseInfo?.disabled) {
+      onStatusChange(t('updater.disabled'));
+      return { updated: false, available: false, disabled: true };
+    }
+
     await invoke('update_last_check_time').catch((error) => {
       console.warn('记录更新检查时间失败:', error);
     });
