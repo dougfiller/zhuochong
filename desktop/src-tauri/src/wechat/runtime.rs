@@ -1,7 +1,352 @@
-/// Placeholder state for the future reply workflow. It intentionally holds no
-/// app state, database handle, capture data, OCR text, or model client.
-#[derive(Default)]
-pub(crate) struct WechatReplyRuntime;
+use super::content::{WechatContentKind, WechatContentStore};
+use super::state_machine::{ReplyMode, ReplyState, StateMachine};
+use super::trace::{M2TraceMetadata, ReplyTraceEvent, ReplyTraceStore};
+use super::types::{BindingGeneration, BindingObservationVersion, CaptureVersion, ContractError, GeneratedReply, OcrReadyReply, RequestId, SuggestionGeneration};
+use crate::knowledge::types::RetrievedReply;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+/// Metadata-only authority for one in-process reply. It intentionally holds no
+/// application state, capture pixels, OCR text, excerpts, suggestions, database,
+/// or model client. The trace handle is the sole durable side effect.
+#[derive(Clone)]
+pub(crate) struct WechatReplyRuntime {
+    inner: Arc<Mutex<RuntimeInner>>,
+}
+
+struct RuntimeInner {
+    next_suggestion_generation: u64,
+    active: Option<ActiveReply>,
+}
+
+struct ActiveReply {
+    state: StateMachine,
+    capture_version: Option<CaptureVersion>,
+    deadline: Instant,
+    cancel: tokio::sync::watch::Sender<bool>,
+    trace: ReplyTraceStore,
+    model_transport_calls: u8,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct BeginReplySnapshot {
+    pub(crate) mode: ReplyMode,
+    pub(crate) binding_generation: BindingGeneration,
+    pub(crate) observation_version: BindingObservationVersion,
+    pub(crate) capture_version: Option<CaptureVersion>,
+    pub(crate) timeout: Duration,
+}
+
+/// A private, unforgeable capability. It contains no body data and no path.
+#[derive(Clone, Debug)]
+pub(crate) struct ReplyLease {
+    request_id: RequestId,
+    suggestion_generation: SuggestionGeneration,
+}
+
+impl ReplyLease {
+    pub(crate) fn request_id(&self) -> &RequestId { &self.request_id }
+    pub(crate) fn suggestion_generation(&self) -> SuggestionGeneration { self.suggestion_generation }
+}
+
+impl Default for WechatReplyRuntime {
+    fn default() -> Self {
+        Self { inner: Arc::new(Mutex::new(RuntimeInner { next_suggestion_generation: 0, active: None })) }
+    }
+}
+
+impl WechatReplyRuntime {
+    /// Claims the authoritative slot and makes `validating` durable before
+    /// exposing a lease. A busy request is never created or traced.
+    pub(crate) fn begin_reply(&self, snapshot: BeginReplySnapshot, trace: ReplyTraceStore) -> Result<ReplyLease, ContractError> {
+        let mut inner = self.inner.lock().map_err(|_| ContractError::WxContractViolation)?;
+        if inner.active.is_some() {
+            return Err(ContractError::WxBusy);
+        }
+        let suggestion_generation = SuggestionGeneration::new(inner.next_suggestion_generation.saturating_add(1));
+        let request_id = RequestId::new();
+        let mut state = StateMachine::new(
+            request_id.clone(), snapshot.mode, suggestion_generation,
+            snapshot.binding_generation, snapshot.observation_version,
+        );
+        let (cancel, _) = tokio::sync::watch::channel(false);
+        let active = ActiveReply {
+            state: state.clone(), capture_version: snapshot.capture_version,
+            deadline: Instant::now() + snapshot.timeout, cancel, trace: trace.clone(), model_transport_calls: 0,
+        };
+        let event = event_for(&active, ReplyState::Validating, None, None)?;
+        trace.append(event)?;
+        state.advance(ReplyState::Validating, 1)?;
+        inner.next_suggestion_generation = suggestion_generation.value();
+        inner.active = Some(ActiveReply { state, ..active });
+        Ok(ReplyLease { request_id, suggestion_generation })
+    }
+
+    /// Stages are checked, traced, and committed while the same lock is held.
+    /// Any trace failure clears the slot and prevents downstream continuation.
+    pub(crate) fn transition(
+        &self,
+        lease: &ReplyLease,
+        expected: ReplyState,
+        next: ReplyState,
+        error: Option<ContractError>,
+        m2: Option<M2TraceMetadata>,
+    ) -> Result<(), ContractError> {
+        let mut inner = self.inner.lock().map_err(|_| ContractError::WxContractViolation)?;
+        let Some(active) = inner.active.as_mut() else { return Err(ContractError::WxRequestStale); };
+        if !lease_matches(active, lease) {
+            if let Err(error) = record_stale(active, lease) {
+                inner.active = None;
+                return Err(error);
+            }
+            return Err(ContractError::WxRequestStale);
+        }
+        if active.state.state() != expected {
+            return fail_closed(&mut inner, ContractError::WxContractViolation);
+        }
+        if *active.cancel.borrow() || Instant::now() >= active.deadline {
+            let result = transition_terminal(active, ReplyState::Cancelled, Some(ContractError::WxRequestCancelled));
+            if result.is_err() { inner.active = None; }
+            return result;
+        }
+        if next == ReplyState::ReplyReady && active.model_transport_calls != 1 {
+            return fail_closed(&mut inner, ContractError::WxContractViolation);
+        }
+        let mut candidate = active.state.clone();
+        if candidate.advance(next, candidate.stage_seq().saturating_add(1)).is_err() {
+            return fail_closed(&mut inner, ContractError::WxContractViolation);
+        }
+        let event = event_for(active, next, error, m2)?;
+        if let Err(error) = active.trace.append(event) {
+            inner.active = None;
+            return Err(error);
+        }
+        active.state = candidate;
+        Ok(())
+    }
+
+    /// M2 is the one non-generic edge: the existing state machine verifies that
+    /// the retrieved envelope belongs to this request before generation starts.
+    pub(crate) fn complete_retrieval(
+        &self,
+        lease: &ReplyLease,
+        reply: &RetrievedReply,
+        m2: M2TraceMetadata,
+    ) -> Result<(), ContractError> {
+        let mut inner = self.inner.lock().map_err(|_| ContractError::WxContractViolation)?;
+        let Some(active) = inner.active.as_mut() else { return Err(ContractError::WxRequestStale); };
+        if !lease_matches(active, lease) {
+            if let Err(error) = record_stale(active, lease) {
+                inner.active = None;
+                return Err(error);
+            }
+            return Err(ContractError::WxRequestStale);
+        }
+        if *active.cancel.borrow() || Instant::now() >= active.deadline {
+            let result = transition_terminal(active, ReplyState::Cancelled, Some(ContractError::WxRequestCancelled));
+            if result.is_err() { inner.active = None; }
+            return result;
+        }
+        let mut candidate = active.state.clone();
+        if candidate.complete_retrieval(reply, candidate.stage_seq().saturating_add(1)).is_err() {
+            return fail_closed(&mut inner, ContractError::WxContractViolation);
+        }
+        let event = event_for(active, ReplyState::Generating, None, Some(m2))?;
+        if let Err(error) = active.trace.append(event) {
+            inner.active = None;
+            return Err(error);
+        }
+        active.state = candidate;
+        Ok(())
+    }
+
+    pub(crate) fn cancel_reply(&self, lease: &ReplyLease) -> Result<(), ContractError> {
+        let mut inner = self.inner.lock().map_err(|_| ContractError::WxContractViolation)?;
+        let Some(active) = inner.active.as_mut() else { return Err(ContractError::WxRequestStale); };
+        if !lease_matches(active, lease) {
+            if let Err(error) = record_stale(active, lease) {
+                inner.active = None;
+                return Err(error);
+            }
+            return Err(ContractError::WxRequestStale);
+        }
+        let _ = active.cancel.send(true);
+        let result = transition_terminal(active, ReplyState::Cancelled, Some(ContractError::WxRequestCancelled));
+        if result.is_err() { inner.active = None; }
+        result
+    }
+
+    /// Releases the active slot only after a terminal stage has been persisted.
+    pub(crate) fn finish_reply(&self, lease: ReplyLease) -> Result<(), ContractError> {
+        let mut inner = self.inner.lock().map_err(|_| ContractError::WxContractViolation)?;
+        let Some(active) = inner.active.as_mut() else { return Err(ContractError::WxRequestStale); };
+        if !lease_matches(active, &lease) {
+            if let Err(error) = record_stale(active, &lease) {
+                inner.active = None;
+                return Err(error);
+            }
+            return Err(ContractError::WxRequestStale);
+        }
+        if !matches!(active.state.state(), ReplyState::ReplyReady | ReplyState::Failed | ReplyState::Cancelled) {
+            return Err(ContractError::WxContractViolation);
+        }
+        inner.active = None;
+        Ok(())
+    }
+
+    pub(crate) fn cancellation_receiver(&self, lease: &ReplyLease) -> Result<tokio::sync::watch::Receiver<bool>, ContractError> {
+        let inner = self.inner.lock().map_err(|_| ContractError::WxContractViolation)?;
+        let active = inner.active.as_ref().ok_or(ContractError::WxRequestStale)?;
+        if !lease_matches(active, lease) { return Err(ContractError::WxRequestStale); }
+        Ok(active.cancel.subscribe())
+    }
+
+    pub(crate) fn record_model_transport_call(&self, lease: &ReplyLease) -> Result<(), ContractError> {
+        let mut inner = self.inner.lock().map_err(|_| ContractError::WxContractViolation)?;
+        let active = inner.active.as_mut().ok_or(ContractError::WxRequestStale)?;
+        if !lease_matches(active, lease) { return Err(ContractError::WxRequestStale); }
+        if active.state.state() != ReplyState::Generating || active.model_transport_calls >= 1 {
+            return fail_closed(&mut inner, ContractError::WxContractViolation);
+        }
+        active.model_transport_calls += 1;
+        Ok(())
+    }
+
+    /// The only content-write path is runtime-owned: a current lease, the
+    /// completed source stage, and the latest retention snapshot are all
+    /// checked under the active-request lock. Disabling retention also removes
+    /// any earlier body persisted for this request.
+    pub(super) fn retain_ocr_content(
+        &self,
+        lease: &ReplyLease,
+        store: &WechatContentStore,
+        reply: &OcrReadyReply,
+        retention_enabled: bool,
+        retention_days: u16,
+    ) -> Result<bool, ContractError> {
+        if reply.request_id() != lease.request_id() {
+            return Err(ContractError::WxRequestStale);
+        }
+        self.retain_content(store, lease, WechatContentKind::OcrText, reply.text().as_bytes(), retention_enabled, retention_days)
+    }
+
+    pub(super) fn retain_suggestion_content(
+        &self,
+        lease: &ReplyLease,
+        store: &WechatContentStore,
+        reply: &GeneratedReply,
+        retention_enabled: bool,
+        retention_days: u16,
+    ) -> Result<bool, ContractError> {
+        let inner = self.inner.lock().map_err(|_| ContractError::WxContractViolation)?;
+        let active = inner.active.as_ref().ok_or(ContractError::WxRequestStale)?;
+        if !lease_matches(active, lease)
+            || !reply.is_current(
+                lease.request_id(),
+                lease.suggestion_generation(),
+                (active.state.mode() == ReplyMode::M2).then_some(active.state.binding_generation()),
+            )
+        {
+            return Err(ContractError::WxRequestStale);
+        }
+        drop(inner);
+        self.retain_content(store, lease, WechatContentKind::Suggestion, reply.text().as_bytes(), retention_enabled, retention_days)
+    }
+
+    /// Keeps the raw-byte operation private so callers cannot pair an
+    /// arbitrary request UUID with arbitrary data. The typed helpers above are
+    /// the only capability-bearing entry points.
+    fn retain_content(
+        &self,
+        store: &WechatContentStore,
+        lease: &ReplyLease,
+        kind: WechatContentKind,
+        body: &[u8],
+        retention_enabled: bool,
+        retention_days: u16,
+    ) -> Result<bool, ContractError> {
+        let mut inner = self.inner.lock().map_err(|_| ContractError::WxContractViolation)?;
+        let active = inner.active.as_mut().ok_or(ContractError::WxRequestStale)?;
+        if !lease_matches(active, lease) {
+            return Err(ContractError::WxRequestStale);
+        }
+        if *active.cancel.borrow() || Instant::now() >= active.deadline {
+            let result = transition_terminal(active, ReplyState::Cancelled, Some(ContractError::WxRequestCancelled));
+            if result.is_err() { inner.active = None; }
+            return result.map(|_| false);
+        }
+        if !retention_enabled || retention_days == 0 || retention_days > 30 {
+            if store.delete_request(lease.request_id()).is_err() {
+                return fail_closed(&mut inner, ContractError::WxContentPersistFailed).map(|_| false);
+            }
+            return Ok(false);
+        }
+        if !content_stage_is_valid(kind, active.state.state()) {
+            return fail_closed(&mut inner, ContractError::WxContractViolation).map(|_| false);
+        }
+        match store.retain(lease.request_id(), kind, body, retention_enabled, retention_days) {
+            Ok(retained) => Ok(retained),
+            Err(_) => fail_closed(&mut inner, ContractError::WxContentPersistFailed).map(|_| false),
+        }
+    }
+}
+
+fn lease_matches(active: &ActiveReply, lease: &ReplyLease) -> bool {
+    active.state.request_id() == lease.request_id() && active.state.suggestion_generation() == lease.suggestion_generation()
+}
+
+fn event_for(active: &ActiveReply, next: ReplyState, error: Option<ContractError>, m2: Option<M2TraceMetadata>) -> Result<ReplyTraceEvent, ContractError> {
+    Ok(ReplyTraceEvent::stage(
+        active.state.request_id(), active.state.stage_seq().saturating_add(1), next,
+        active.capture_version, active.state.suggestion_generation(), active.state.binding_generation(),
+        active.state.observation_version(), active.model_transport_calls, error, m2,
+    ))
+}
+
+fn transition_terminal(active: &mut ActiveReply, next: ReplyState, error: Option<ContractError>) -> Result<(), ContractError> {
+    if matches!(active.state.state(), ReplyState::ReplyReady | ReplyState::Failed | ReplyState::Cancelled) {
+        return Ok(());
+    }
+    let mut candidate = active.state.clone();
+    candidate.advance(next, candidate.stage_seq().saturating_add(1))?;
+    let event = event_for(active, next, error, None)?;
+    active.trace.append(event)?;
+    active.state = candidate;
+    Ok(())
+}
+
+/// A protocol violation belongs to the current lease, so it must not leave the
+/// single-flight slot waiting for a best-effort caller cleanup. If persistence
+/// of the terminal event fails, the slot is still released and the trace error
+/// is returned instead of pretending the request was auditable.
+fn fail_closed(inner: &mut RuntimeInner, error: ContractError) -> Result<(), ContractError> {
+    let terminal = inner
+        .active
+        .as_mut()
+        .ok_or(ContractError::WxRequestStale)
+        .and_then(|active| transition_terminal(active, ReplyState::Failed, Some(error)));
+    inner.active = None;
+    match terminal {
+        Ok(()) => Err(error),
+        Err(trace_error) => Err(trace_error),
+    }
+}
+
+fn content_stage_is_valid(kind: WechatContentKind, state: ReplyState) -> bool {
+    match kind {
+        WechatContentKind::Capture => matches!(state, ReplyState::Ocr | ReplyState::Retrieving | ReplyState::Generating | ReplyState::ReplyReady),
+        WechatContentKind::OcrText => matches!(state, ReplyState::Retrieving | ReplyState::Generating | ReplyState::ReplyReady),
+        WechatContentKind::RetrievalExcerpt => matches!(state, ReplyState::Generating | ReplyState::ReplyReady),
+        WechatContentKind::Suggestion => state == ReplyState::ReplyReady,
+    }
+}
+
+fn record_stale(active: &mut ActiveReply, _lease: &ReplyLease) -> Result<(), ContractError> {
+    active.trace.append(ReplyTraceEvent::stale_result(
+        active.state.request_id(), active.state.stage_seq().max(1), active.state.state(),
+        active.state.suggestion_generation(), active.state.binding_generation(), active.state.observation_version(), active.model_transport_calls,
+    ))
+}
 
 impl WechatReplyRuntime {
     /// Private OCR hand-off for a verified capture. It has no Tauri command and
@@ -424,5 +769,135 @@ pub(crate) struct UnavailableWechatReplyModel;
 impl WechatReplyModelPort for UnavailableWechatReplyModel {
     fn reply_is_unavailable(&self) -> &'static str {
         "WX_TEXT_MODEL_UNAVAILABLE"
+    }
+}
+
+#[cfg(test)]
+mod reply_runtime_tests {
+    use super::*;
+    use crate::knowledge::types::{retrieval_fixture, RetrievalOutcome, RetrievalStatus};
+    use crate::wechat::trace::{RetrievalMode, TraceQuery};
+
+    fn snapshot() -> BeginReplySnapshot {
+        BeginReplySnapshot {
+            mode: ReplyMode::M1,
+            binding_generation: BindingGeneration::new(4),
+            observation_version: BindingObservationVersion::new(5),
+            capture_version: Some(CaptureVersion::new(6)),
+            timeout: Duration::from_secs(5),
+        }
+    }
+
+    #[test]
+    fn single_flight_stages_are_monotonic_and_busy_is_untraced() {
+        let directory = std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let trace = ReplyTraceStore::new(&directory);
+        let runtime = WechatReplyRuntime::default();
+        let lease = runtime.begin_reply(snapshot(), trace.clone()).unwrap();
+        assert!(matches!(runtime.begin_reply(snapshot(), trace.clone()), Err(ContractError::WxBusy)));
+        runtime.transition(&lease, ReplyState::Validating, ReplyState::Capturing, None, None).unwrap();
+        runtime.transition(&lease, ReplyState::Capturing, ReplyState::Ocr, None, None).unwrap();
+        runtime.transition(&lease, ReplyState::Ocr, ReplyState::Generating, None, None).unwrap();
+        runtime.record_model_transport_call(&lease).unwrap();
+        runtime.transition(&lease, ReplyState::Generating, ReplyState::ReplyReady, None, None).unwrap();
+        runtime.finish_reply(lease).unwrap();
+        let page = trace.list(TraceQuery { request_id: None, occurred_after: None, occurred_before: None, cursor: None, limit: 100 }).unwrap();
+        assert_eq!(page.entry_count(), 5);
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn cancelled_lease_cannot_progress() {
+        let directory = std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let trace = ReplyTraceStore::new(&directory);
+        let runtime = WechatReplyRuntime::default();
+        let lease = runtime.begin_reply(snapshot(), trace.clone()).unwrap();
+        runtime.cancel_reply(&lease).unwrap();
+        assert_eq!(runtime.transition(&lease, ReplyState::Validating, ReplyState::Capturing, None, None), Err(ContractError::WxContractViolation));
+        assert_eq!(runtime.finish_reply(lease), Err(ContractError::WxRequestStale));
+        assert!(runtime.begin_reply(snapshot(), trace).is_ok());
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn illegal_transition_records_failure_and_releases_the_slot() {
+        let directory = std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let trace = ReplyTraceStore::new(&directory);
+        let runtime = WechatReplyRuntime::default();
+        let lease = runtime.begin_reply(snapshot(), trace.clone()).unwrap();
+
+        assert_eq!(
+            runtime.transition(&lease, ReplyState::Capturing, ReplyState::Ocr, None, None),
+            Err(ContractError::WxContractViolation)
+        );
+        assert!(runtime.begin_reply(snapshot(), trace.clone()).is_ok());
+        let page = trace.list(TraceQuery { request_id: Some(lease.request_id().clone()), occurred_after: None, occurred_before: None, cursor: None, limit: 100 }).unwrap();
+        assert_eq!(page.entry_count(), 2);
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn duplicate_model_call_records_failure_and_releases_the_slot() {
+        let directory = std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let trace = ReplyTraceStore::new(&directory);
+        let runtime = WechatReplyRuntime::default();
+        let lease = runtime.begin_reply(snapshot(), trace).unwrap();
+        runtime.transition(&lease, ReplyState::Validating, ReplyState::Capturing, None, None).unwrap();
+        runtime.transition(&lease, ReplyState::Capturing, ReplyState::Ocr, None, None).unwrap();
+        runtime.transition(&lease, ReplyState::Ocr, ReplyState::Generating, None, None).unwrap();
+        runtime.record_model_transport_call(&lease).unwrap();
+
+        assert_eq!(runtime.record_model_transport_call(&lease), Err(ContractError::WxContractViolation));
+        assert!(runtime.begin_reply(snapshot(), ReplyTraceStore::new(&directory)).is_ok());
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn mismatched_m2_retrieval_records_failure_and_releases_the_slot() {
+        let directory = std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let trace = ReplyTraceStore::new(&directory);
+        let runtime = WechatReplyRuntime::default();
+        let lease = runtime.begin_reply(BeginReplySnapshot { mode: ReplyMode::M2, ..snapshot() }, trace).unwrap();
+        runtime.transition(&lease, ReplyState::Validating, ReplyState::Capturing, None, None).unwrap();
+        runtime.transition(&lease, ReplyState::Capturing, ReplyState::Ocr, None, None).unwrap();
+        runtime.transition(&lease, ReplyState::Ocr, ReplyState::Retrieving, None, None).unwrap();
+        let wrong_reply = retrieval_fixture(
+            RequestId::new(),
+            "fixture",
+            RetrievalOutcome::Retrieved(RetrievalStatus::Success),
+            &[("excerpt", 1)],
+            1,
+        ).unwrap();
+        let metadata = M2TraceMetadata::new(None, Some(1), None, None, RetrievalMode::NoHit, vec![], vec![], None).unwrap();
+
+        assert_eq!(runtime.complete_retrieval(&lease, &wrong_reply, metadata), Err(ContractError::WxContractViolation));
+        assert!(runtime.begin_reply(snapshot(), ReplyTraceStore::new(&directory)).is_ok());
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn disabling_retention_deletes_only_the_current_request_content() {
+        let directory = std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let trace = ReplyTraceStore::new(&directory);
+        let content = WechatContentStore::new(&directory);
+        let runtime = WechatReplyRuntime::default();
+        let lease = runtime.begin_reply(snapshot(), trace).unwrap();
+        runtime.transition(&lease, ReplyState::Validating, ReplyState::Capturing, None, None).unwrap();
+        runtime.transition(&lease, ReplyState::Capturing, ReplyState::Ocr, None, None).unwrap();
+        runtime.transition(&lease, ReplyState::Ocr, ReplyState::Generating, None, None).unwrap();
+
+        let ocr = OcrReadyReply::from_backend(
+            super::super::types::CapturedWechat {
+                request_id: lease.request_id().clone(),
+                capture_version: CaptureVersion::new(6),
+                stable_message_id: "fixture".into(),
+                is_single_chat: true,
+            },
+            super::super::types::OcrBackendResult::Text(super::super::types::NormalizedOcrText::parse("private").unwrap()),
+        ).unwrap();
+        assert!(runtime.retain_ocr_content(&lease, &content, &ocr, true, 1).unwrap());
+        assert!(!runtime.retain_ocr_content(&lease, &content, &ocr, false, 0).unwrap());
+        assert!(!content.request_exists(lease.request_id()));
+        let _ = std::fs::remove_dir_all(directory);
     }
 }

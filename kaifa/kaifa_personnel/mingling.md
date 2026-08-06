@@ -112,3 +112,17 @@ cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features
 
 - `verify_wechat_windows_ocr.py` 检查 `wechat/ocr.rs` 只消费 `chat_rgba`，并拒绝路径、进程、PowerShell、Paddle、StorageFile、HTTP、Tauri command 与文件 API；它还确认 `OcrService` 的新内存入口直接使用 WinRT `SoftwareBitmap`/`OcrEngine`，以及 production catalog 仍为空。
 - Windows target 编译和真机 UAT 必须在受控 Windows 11 x64 上补做。当前 host 未安装 `x86_64-pc-windows-msvc` target，不能用 macOS 合成测试替代该证据；未取得冻结 probe 前，fallback 保持 Disabled。
+
+## 单请求运行时阶段追踪和内容留存（2026-08-06）
+
+```bash
+# 只读源码与虚构 fixture 的静态隐私/隔离门禁；不启动应用、访问网络、读取微信或创建内容文件。
+python3 -B kaifa/kaifa_test/verify_wechat_reply_runtime.py --project-root .
+
+# 定向 Rust 单测和本机编译检查；单测仅在系统临时目录创建虚构 metadata/content。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat:: --no-default-features
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features
+```
+
+- `verify_wechat_reply_runtime.py` 检查 single-flight runtime、metadata-only JSONL trace、独立 content root 和两个只读/删除 command 的源码边界；它拒绝 trace/content 依赖上传、数据库、知识库、localhost API 或截图服务。
+- `list_wechat_reply_traces` 仅查询脱敏 trace DTO；`delete_wechat_reply_content` 仅删除受管理的 UUID content 请求目录。二者不是生成、OCR、检索、模型或上传入口。

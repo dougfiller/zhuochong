@@ -127,6 +127,18 @@ impl StateMachine {
 
     pub(crate) fn state(&self) -> ReplyState { self.state }
 
+    pub(crate) fn request_id(&self) -> &RequestId { &self.request_id }
+
+    pub(crate) fn mode(&self) -> ReplyMode { self.mode }
+
+    pub(crate) fn stage_seq(&self) -> u64 { self.stage_seq }
+
+    pub(crate) fn suggestion_generation(&self) -> SuggestionGeneration { self.suggestion_generation }
+
+    pub(crate) fn binding_generation(&self) -> BindingGeneration { self.binding_generation }
+
+    pub(crate) fn observation_version(&self) -> BindingObservationVersion { self.observation_version }
+
     fn is_legal(&self, next: ReplyState) -> bool {
         use ReplyState::*;
         match (self.state, next) {

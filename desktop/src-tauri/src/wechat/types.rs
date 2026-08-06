@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::fmt;
 use std::sync::OnceLock;
 use uuid::Uuid;
 
@@ -19,6 +20,18 @@ impl RequestId {
         hash.update(salt.as_bytes());
         hash.update(self.0.as_bytes());
         hex::encode(&hash.finalize()[..12])
+    }
+
+    pub(crate) fn parse(value: &str) -> Result<Self, ContractError> {
+        Uuid::parse_str(value)
+            .map(Self)
+            .map_err(|_| ContractError::WxTraceInvalidQuery)
+    }
+}
+
+impl fmt::Display for RequestId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
     }
 }
 
@@ -238,6 +251,12 @@ pub(crate) enum ContractError {
     LlmFailed,
     #[serde(rename = "WX_CONTRACT_VIOLATION")]
     WxContractViolation,
+    #[serde(rename = "WX_TRACE_PERSIST_FAILED")]
+    WxTracePersistFailed,
+    #[serde(rename = "WX_TRACE_INVALID_QUERY")]
+    WxTraceInvalidQuery,
+    #[serde(rename = "WX_CONTENT_PERSIST_FAILED")]
+    WxContentPersistFailed,
 }
 
 #[cfg(test)]

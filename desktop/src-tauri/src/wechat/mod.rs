@@ -1,6 +1,8 @@
 mod fixtures;
 mod model_contract;
 mod ocr;
+pub(crate) mod content;
+pub(crate) mod trace;
 pub(crate) mod capture;
 pub(crate) mod commands;
 pub(crate) mod config;

@@ -114,3 +114,18 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | diff 空白检查 | `git diff --check -- desktop/src-tauri/src/ocr.rs desktop/src-tauri/src/wechat desktop/src-tauri/Cargo.toml kaifa/kaifa_test` | 通过。 | 通过 |
 | Windows target 编译与 WinRT/UAT | `cargo check --target x86_64-pc-windows-msvc ...`；Windows 11 x64 受控 probe | blocked；本机仅安装 `aarch64-apple-darwin`，目标检查因缺 `x86_64-pc-windows-msvc` target 失败；未执行 Windows 真机或真实微信。 | blocked |
 | Rust 格式检查 | `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` | 环境限制；`stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component。 | 未运行 |
+
+## 单请求运行时阶段追踪和内容留存（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_wechat_reply_runtime.py`。该脚本只读取本步骤源码和虚构 fixture；不启动 Tauri、访问网络、读取真实微信数据、创建数据库、调用 OCR/检索/模型或上传。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 静态隐私与隔离门禁 | `python3 -B kaifa/kaifa_test/verify_wechat_reply_runtime.py --project-root .` | 检查 single-flight、JSONL append/tail recovery、独立 content root、只读 trace/受限删除 command，并拒绝上传、数据库、知识库、localhost 与 screenshot service 依赖。 | 通过 |
+| single-flight、阶段顺序、取消 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml reply_runtime_tests --no-default-features` | 2/2 通过：第二 begin 返回 `WX_BUSY` 且不留 trace；M1 阶段从 validating 到 reply_ready 单调，取消后的租约无法继续。 | 通过 |
+| JSONL 恢复与分页 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::trace::tests --no-default-features` | 2/2 通过：分页游标受 filter 绑定，末尾截断行标记恢复，中段损坏 fail-closed。 | 通过 |
+| 内容关闭与限定删除 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::content::tests --no-default-features` | 2/2 通过：默认关闭不创建目录，手动删除只清理 UUID 请求目录并保留异常条目。 | 通过 |
+| 微信模块回归 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat:: --no-default-features` | 44/44 通过；包含既有 capture/OCR/state-machine 契约与本步骤 runtime/trace/content 测试。 | 通过 |
+| 当前平台编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features` | 通过；仅有既存/未接线模块 dead-code 警告和 `block v0.1.6` future-incompat 提示。 | 通过 |
+| Rust 格式检查 | `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` | 未运行：`stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component。 | 环境限制 |
+| Windows 微信/OCR/模型实机流程 | 受控 Windows 11 x64 环境 | 本步骤没有用户触发入口、模型 transport 或已启用 production profile；未执行，不能由 macOS 单测替代。 | not-run |

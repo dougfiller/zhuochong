@@ -27,7 +27,9 @@ pub(crate) use crate::knowledge::commands::{
     get_knowledge_settings_status, validate_knowledge_local_embedding,
 };
 #[allow(unused_imports)]
-pub(crate) use crate::wechat::commands::get_wechat_settings_status;
+pub(crate) use crate::wechat::commands::{
+    delete_wechat_reply_content, get_wechat_settings_status, list_wechat_reply_traces,
+};
 
 // 所有 pub command + DTO（main.rs generate_handler 的 commands::xxx 不变）
 pub use stats::*;

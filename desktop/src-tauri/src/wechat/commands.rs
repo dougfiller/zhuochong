@@ -1,11 +1,24 @@
 use super::config::{model_profile_is_available, profile_is_trusted, profile_options, CompatibilityProfileOption};
+use super::content::{ContentDeleteResult, WechatContentStore};
+use super::trace::{ReplyTraceStore, TraceQuery, WechatReplyTracePage};
 use super::WechatReplyRuntime;
+use chrono::{DateTime, Utc};
 use crate::config::WechatConfig;
 use crate::error::AppError;
 use crate::AppState;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::State;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TraceQueryInput {
+    request_id: Option<String>,
+    occurred_after: Option<String>,
+    occurred_before: Option<String>,
+    cursor: Option<String>,
+    limit: Option<u16>,
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +42,40 @@ pub(crate) async fn get_wechat_settings_status(
         (state.config.wechat.clone(), state.config.text_model_profiles.clone())
     };
     Ok(status_for(&config, &profiles))
+}
+
+/// Read-only metadata query. The input and output intentionally have no content
+/// body, data-directory path, error detail, or filesystem handle fields.
+#[tauri::command]
+pub(crate) async fn list_wechat_reply_traces(
+    input: TraceQueryInput,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<WechatReplyTracePage, AppError> {
+    let data_dir = state.lock().map_err(|error| AppError::Unknown(error.to_string()))?.data_dir.clone();
+    let request_id = input.request_id.as_deref().map(super::types::RequestId::parse).transpose().map_err(contract_error)?;
+    let occurred_after = parse_timestamp(input.occurred_after.as_deref()).map_err(contract_error)?;
+    let occurred_before = parse_timestamp(input.occurred_before.as_deref()).map_err(contract_error)?;
+    ReplyTraceStore::new(data_dir)
+        .list(TraceQuery { request_id, occurred_after, occurred_before, cursor: input.cursor, limit: input.limit.unwrap_or(50) })
+        .map_err(contract_error)
+}
+
+#[tauri::command]
+pub(crate) async fn delete_wechat_reply_content(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<ContentDeleteResult, AppError> {
+    let data_dir = state.lock().map_err(|error| AppError::Unknown(error.to_string()))?.data_dir.clone();
+    WechatContentStore::new(data_dir).delete_all().map_err(contract_error)
+}
+
+fn parse_timestamp(value: Option<&str>) -> Result<Option<DateTime<Utc>>, super::types::ContractError> {
+    value
+        .map(|value| DateTime::parse_from_rfc3339(value).map(|time| time.with_timezone(&Utc)).map_err(|_| super::types::ContractError::WxTraceInvalidQuery))
+        .transpose()
+}
+
+fn contract_error(error: super::types::ContractError) -> AppError {
+    AppError::Unknown(serde_json::to_string(&error).unwrap_or_else(|_| "\"WX_CONTRACT_VIOLATION\"".into()))
 }
 
 fn status_for(config: &WechatConfig, profiles: &[crate::config::TextModelProfile]) -> WechatSettingsStatus {

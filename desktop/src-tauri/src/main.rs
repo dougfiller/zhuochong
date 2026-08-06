@@ -4210,6 +4210,27 @@ async fn main() {
                 log::warn!("初始化开机自启功能失败: {e}");
             }
 
+            // WeChat body retention is isolated from StorageManager. A damaged
+            // config never triggers destructive cleanup during startup.
+            if let Some(state) = app.try_state::<Arc<Mutex<AppState>>>() {
+                let (data_dir, retention_enabled, retention_days, can_cleanup) = {
+                    let state = state.inner().lock().unwrap_or_else(|error| error.into_inner());
+                    (
+                        state.data_dir.clone(),
+                        state.config.wechat.content_retention_enabled,
+                        state.config.wechat.content_retention_days,
+                        should_run_startup_cleanup(state.config_load_status),
+                    )
+                };
+                if can_cleanup {
+                    if let Err(error) = wechat::content::WechatContentStore::new(data_dir)
+                        .cleanup_expired(retention_enabled, retention_days)
+                    {
+                        log::warn!("微信回复内容留存清理失败: {:?}", error);
+                    }
+                }
+            }
+
             let window = app
                 .get_webview_window("main")
                 .expect("main window should exist at setup");
@@ -4521,6 +4542,8 @@ async fn main() {
             commands::get_config,
             commands::save_config,
             wechat::commands::get_wechat_settings_status,
+            wechat::commands::list_wechat_reply_traces,
+            wechat::commands::delete_wechat_reply_content,
             knowledge::commands::get_knowledge_settings_status,
             knowledge::commands::validate_knowledge_local_embedding,
             commands::get_update_settings,
