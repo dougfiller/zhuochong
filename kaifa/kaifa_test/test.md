@@ -157,3 +157,16 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 范围内格式与空白 | `rustfmt --edition 2021 --check desktop/src-tauri/src/wechat/model_client.rs desktop/src-tauri/src/wechat/runtime.rs`；`git diff --check -- desktop/src-tauri/src/wechat/model_client.rs desktop/src-tauri/src/wechat/runtime.rs kaifa/kaifa_test/verify_wechat_model_transport.py` | 两项均成功；未格式化或修改范围外文件。 | 通过 |
 
 `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check` 仍失败：输出包含 `agent/executor.rs`、`agent/model.rs` 及多处既有范围外格式差异。它不是本阶段范围内格式检查的通过结论，也未被本阶段格式化。
+
+## M1 手动微信回复后端编排闭环（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_wechat_reply_flow.py`。脚本只读取步骤 11 的 Rust 源码，拒绝 Tauri command、M2/RAG、展示/剪贴板/输入控制和 HTTP；不会启动应用、访问网络、真实微信、模型、知识库、数据库或用户内容。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 静态编排和安全边界 | `python3 -B kaifa/kaifa_test/verify_wechat_reply_flow.py --project-root .` | 检查 M1-only module gate、同一 lease request id、capture-version 到 OCR trace 的原子交接、OCR-only input、版本过期 gate 和 runtime-owned model call；无禁用能力。 | 通过 |
+| 私有门面快照 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::reply_flow::tests' --no-default-features --features 'wechat-contract-check,wechat-m1'` | 1/1 通过：M1 从零 capture version、零 M2 binding 开始。 | 通过 |
+| runtime handoff 与模型终态 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::runtime::reply_runtime_tests' --no-default-features --features 'wechat-contract-check,wechat-m1'` | 11/11 通过：capture version 在 OCR 前绑定，single-flight、模型零/一次调用、失败终态和 lease 释放保持成立。 | 通过 |
+| M1/M2 feature 门禁 | 两条 `cargo check ... --features 'wechat-contract-check,wechat-m1|wechat-m2'` | 均编译成功；M2 不编译 reply flow。 | 通过 |
+| 范围内格式与空白 | `rustfmt --edition 2021 --check ...runtime.rs ...reply_flow.rs`；`git diff --check -- ...` | 两项通过；未格式化范围外既有文件。 | 通过 |
+| Windows 真机闭环 | 受控 Windows 11 x64、启用的精确微信 profile 和虚构/受控模型 | 当前 macOS 未安装 Windows target，且 production profile 仍为空；本机测试不能替代真机验证。 | not-run |

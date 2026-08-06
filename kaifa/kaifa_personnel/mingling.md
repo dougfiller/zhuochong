@@ -144,3 +144,20 @@ cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features -
 
 - `verify_wechat_model_transport.py` 检查共享 transport、普通 command 委托、微信私有 client、精确 profile resolver 与 runtime 提交 helper；并拒绝 client 中出现 Tauri command 或单轮请求体出现工具字段。脚本只读取源码。
 - Rust 测试验证四 provider 的单轮 body 只有 system + user 且没有工具字段，拒绝工具/截断/空白结果；微信 profile 必须精确、已测试成功且模型非空；fake transport 只收到一条固定 system + user 请求；运行时未计数时不能提交回复。
+
+## M1 手动微信回复后端编排闭环（2026-08-06）
+
+以下命令只验证步骤 11 的私有 M1 编排和虚构 fixture；不启动 Tauri、不访问真实微信、模型、知识库、数据库或网络。
+
+```bash
+python3 -B kaifa/kaifa_test/verify_wechat_reply_flow.py --project-root .
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::reply_flow::tests' --no-default-features --features 'wechat-contract-check,wechat-m1'
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::runtime::reply_runtime_tests' --no-default-features --features 'wechat-contract-check,wechat-m1'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+rustfmt --edition 2021 --check desktop/src-tauri/src/wechat/runtime.rs desktop/src-tauri/src/wechat/reply_flow.rs
+git diff --check -- desktop/src-tauri/src/wechat/mod.rs desktop/src-tauri/src/wechat/runtime.rs desktop/src-tauri/src/wechat/reply_flow.rs kaifa/kaifa_test/verify_wechat_reply_flow.py
+```
+
+- `verify_wechat_reply_flow.py` 仅读取本步骤源码，确认 M1-only module gate、lease request id 贯穿 capture、capture-version 原子写入 OCR trace、OCR-only M1 input、stale-capture gate 和 runtime-owned model call；同时拒绝 command、M2/RAG、气泡、剪贴板、输入控制和 HTTP 依赖。
+- Rust 定向测试只使用系统临时目录 trace 与 fake transport；不创建真实截图或请求。两个 feature 编译分别确认 M1 含私有 reply flow，而 M2 不引用它。

@@ -2,6 +2,8 @@ mod fixtures;
 mod model_contract;
 mod model_client;
 mod ocr;
+#[cfg(feature = "wechat-m1")]
+mod reply_flow;
 pub(crate) mod content;
 pub(crate) mod trace;
 pub(crate) mod capture;

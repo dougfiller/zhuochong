@@ -179,6 +179,59 @@ impl WechatReplyRuntime {
         Ok(())
     }
 
+    /// Binds the version allocated by the guarded capture before the OCR event
+    /// is written. This keeps the lease, capture slices, and trace on one
+    /// request without exposing mutable runtime state to callers.
+    pub(crate) fn enter_ocr_after_capture(
+        &self,
+        lease: &ReplyLease,
+        capture_version: CaptureVersion,
+    ) -> Result<(), ContractError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| ContractError::WxContractViolation)?;
+        let Some(active) = inner.active.as_mut() else {
+            return Err(ContractError::WxRequestStale);
+        };
+        if !lease_matches(active, lease) {
+            if let Err(error) = record_stale(active, lease) {
+                inner.active = None;
+                return Err(error);
+            }
+            return Err(ContractError::WxRequestStale);
+        }
+        if active.state.state() != ReplyState::Capturing {
+            return fail_closed(&mut inner, ContractError::WxContractViolation);
+        }
+        if *active.cancel.borrow() || Instant::now() >= active.deadline {
+            let result = transition_terminal(
+                active,
+                ReplyState::Cancelled,
+                Some(ContractError::WxRequestCancelled),
+            );
+            if result.is_err() {
+                inner.active = None;
+            }
+            return result;
+        }
+        let mut candidate = active.state.clone();
+        if candidate
+            .advance(ReplyState::Ocr, candidate.stage_seq().saturating_add(1))
+            .is_err()
+        {
+            return fail_closed(&mut inner, ContractError::WxContractViolation);
+        }
+        active.capture_version = Some(capture_version);
+        let event = event_for(active, ReplyState::Ocr, None, None)?;
+        if let Err(error) = active.trace.append(event) {
+            inner.active = None;
+            return Err(error);
+        }
+        active.state = candidate;
+        Ok(())
+    }
+
     /// M2 is the one non-generic edge: the existing state machine verifies that
     /// the retrieved envelope belongs to this request before generation starts.
     pub(crate) fn complete_retrieval(
@@ -376,29 +429,8 @@ impl WechatReplyRuntime {
         Ok(())
     }
 
-    /// Runs exactly one private M1 model call after the caller has copied the
-    /// configuration snapshot. This layer owns the call-count and terminal
-    /// transition so an await never holds the runtime mutex.
     #[cfg(feature = "wechat-m1")]
-    pub(crate) async fn generate_m1_reply(
-        &self,
-        config: WechatConfig,
-        profiles: Vec<TextModelProfile>,
-        input: M1ReplyInput,
-        lease: &ReplyLease,
-    ) -> Result<GeneratedReply, ContractError> {
-        self.generate_m1_reply_with_client(
-            &WechatReplyModelClient::new(),
-            config,
-            profiles,
-            input,
-            lease,
-        )
-        .await
-    }
-
-    #[cfg(feature = "wechat-m1")]
-    async fn generate_m1_reply_with_client(
+    pub(super) async fn generate_m1_reply_with_client(
         &self,
         client: &WechatReplyModelClient,
         config: WechatConfig,
@@ -905,10 +937,17 @@ impl WechatReplyRuntime {
         app: tauri::AppHandle,
         coordinator: &CaptureCoordinator,
         screenshot_service: crate::screenshot::ScreenshotService,
+        identity: super::window_identity::WechatWindowIdentity,
+        request_id: super::types::RequestId,
         timeout: std::time::Duration,
         mut cancel: Option<tokio::sync::watch::Receiver<bool>>,
-    ) -> Result<super::capture::WechatCaptureSlices, super::types::ContractError> {
-        let identity = self.validate_foreground_wechat()?;
+    ) -> Result<
+        (
+            super::capture::WechatCaptureSlices,
+            super::window_identity::WechatWindowIdentity,
+        ),
+        super::types::ContractError,
+    > {
         let _permit = coordinator
             .try_acquire()
             .ok_or(super::types::ContractError::WxBusy)?;
@@ -935,12 +974,15 @@ impl WechatReplyRuntime {
             super::capture::EphemeralCapturedFrame::new(frame),
             &current,
         )?;
-        Ok(super::capture::WechatCaptureSlices {
-            request_id: super::types::RequestId::new(),
-            capture_version: coordinator.next_capture_version(),
-            chat_rgba,
-            header_identity_rgba,
-        })
+        Ok((
+            super::capture::WechatCaptureSlices {
+                request_id,
+                capture_version: coordinator.next_capture_version(),
+                chat_rgba,
+                header_identity_rgba,
+            },
+            current,
+        ))
     }
 }
 
@@ -1272,6 +1314,52 @@ mod reply_runtime_tests {
             .transition(&lease, ReplyState::Ocr, ReplyState::Generating, None, None)
             .unwrap();
         lease
+    }
+
+    #[test]
+    fn capture_handoff_binds_the_lease_version_before_ocr() {
+        let directory =
+            std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let trace = ReplyTraceStore::new(&directory);
+        let runtime = WechatReplyRuntime::default();
+        let lease = runtime
+            .begin_reply(
+                BeginReplySnapshot {
+                    capture_version: None,
+                    ..snapshot()
+                },
+                trace,
+            )
+            .unwrap();
+        runtime
+            .transition(
+                &lease,
+                ReplyState::Validating,
+                ReplyState::Capturing,
+                None,
+                None,
+            )
+            .unwrap();
+        runtime
+            .enter_ocr_after_capture(&lease, CaptureVersion::new(9))
+            .unwrap();
+        runtime
+            .transition(
+                &lease,
+                ReplyState::Ocr,
+                ReplyState::Failed,
+                Some(ContractError::WxOcrEmpty),
+                None,
+            )
+            .unwrap();
+        runtime.finish_reply(lease).unwrap();
+        let trace_file = directory
+            .join("wechat_reply")
+            .join("trace")
+            .join(format!("{}.jsonl", chrono::Utc::now().format("%F")));
+        let trace = std::fs::read_to_string(trace_file).unwrap();
+        assert!(trace.contains("\"captureVersion\":9"));
+        let _ = std::fs::remove_dir_all(directory);
     }
 
     #[test]
