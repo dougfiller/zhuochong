@@ -235,6 +235,8 @@ pub(crate) enum ContractError {
     WxOcrFailed,
     #[serde(rename = "WX_GROUP_CHAT_UNSUPPORTED")]
     WxGroupChatUnsupported,
+    #[serde(rename = "WX_TEXT_MODEL_UNAVAILABLE")]
+    WxTextModelUnavailable,
     #[serde(rename = "WX_REQUEST_CANCELLED")]
     WxRequestCancelled,
     #[serde(rename = "WX_REQUEST_STALE")]

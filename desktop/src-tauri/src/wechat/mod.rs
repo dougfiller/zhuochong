@@ -1,5 +1,6 @@
 mod fixtures;
 mod model_contract;
+mod model_client;
 mod ocr;
 pub(crate) mod content;
 pub(crate) mod trace;
@@ -27,18 +28,18 @@ mod untrusted_constructor_probe {
 
 #[cfg(feature = "wechat-contract-probe-m1-rag")]
 mod m1_rag_probe {
-    use super::model_contract::generate_rag_reply;
+    use super::model_client::WechatReplyModelClient;
 
     const _: () = {
-        let _ = generate_rag_reply;
+        let _ = WechatReplyModelClient::generate_m2;
     };
 }
 
 #[cfg(feature = "wechat-contract-probe-m2-m1")]
 mod m2_m1_probe {
-    use super::model_contract::generate_m1_reply;
+    use super::model_client::WechatReplyModelClient;
 
     const _: () = {
-        let _ = generate_m1_reply;
+        let _ = WechatReplyModelClient::generate_m1;
     };
 }

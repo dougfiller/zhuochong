@@ -126,3 +126,21 @@ cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features
 
 - `verify_wechat_reply_runtime.py` 检查 single-flight runtime、metadata-only JSONL trace、独立 content root 和两个只读/删除 command 的源码边界；它拒绝 trace/content 依赖上传、数据库、知识库、localhost API 或截图服务。
 - `list_wechat_reply_traces` 仅查询脱敏 trace DTO；`delete_wechat_reply_content` 仅删除受管理的 UUID content 请求目录。二者不是生成、OCR、检索、模型或上传入口。
+
+## 无工具单轮模型 transport 与微信专用客户端（2026-08-06）
+
+```bash
+# 只读源码的静态边界检查；不启动 Tauri、不访问网络、真实微信、模型或知识库。
+python3 -B kaifa/kaifa_test/verify_wechat_model_transport.py
+
+# 纯 Rust 定向测试与 feature 编译；测试使用虚构模型配置和 fake transport，不发 HTTP 请求。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'agent::model::tests' --no-default-features
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::config::tests' --no-default-features
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::model_client::tests' --no-default-features
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::runtime::reply_runtime_tests' --no-default-features
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+```
+
+- `verify_wechat_model_transport.py` 检查共享 transport、普通 command 委托、微信私有 client、精确 profile resolver 与 runtime 提交 helper；并拒绝 client 中出现 Tauri command 或单轮请求体出现工具字段。脚本只读取源码。
+- Rust 测试验证四 provider 的单轮 body 只有 system + user 且没有工具字段，拒绝工具/截断/空白结果；微信 profile 必须精确、已测试成功且模型非空；fake transport 只收到一条固定 system + user 请求；运行时未计数时不能提交回复。

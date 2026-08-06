@@ -1,13 +1,12 @@
 //! Auto-extracted from the historical `commands.rs`. Behavior unchanged.
 
 use crate::analysis::AppLocale;
-use crate::config::{AiProvider, ModelConfig};
+use crate::config::ModelConfig;
 use crate::database::MemorySearchItem;
 use crate::error::AppError;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use tauri::State;
 
 use super::shared::collect_privacy_filters;
@@ -447,206 +446,11 @@ pub(crate) async fn generate_text_answer_with_model(
     system_prompt: &str,
     prompt: &str,
 ) -> Result<String, AppError> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .connect_timeout(Duration::from_secs(10))
-        .build()
-        .map_err(|e| AppError::Unknown(e.to_string()))?;
-
-    match model_config.provider {
-        AiProvider::Ollama => {
-            let ollama_base = model_config.endpoint.trim().trim_end_matches('/');
-            let ollama_url = if ollama_base.ends_with("/api/chat") {
-                ollama_base.to_string()
-            } else {
-                format!("{ollama_base}/api/chat")
-            };
-            let response = client
-                .post(&ollama_url)
-                .json(&serde_json::json!({
-                    "model": model_config.model,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": system_prompt
-                        },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    "stream": false
-                }))
-                .send()
-                .await?;
-
-            if !response.status().is_success() {
-                return Err(AppError::Analysis(format!(
-                    "Ollama 记忆问答失败: {}",
-                    response.status()
-                )));
-            }
-
-            let result: serde_json::Value = response.json().await?;
-            let answer = result["message"]["content"]
-                .as_str()
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            if answer.is_empty() {
-                return Err(AppError::Analysis("Ollama 返回空内容".to_string()));
-            }
-            Ok(answer)
-        }
-        AiProvider::Claude => {
-            let api_key = model_config.api_key.as_deref().unwrap_or("");
-            if api_key.is_empty() {
-                return Err(AppError::Analysis("Claude API Key 未配置".to_string()));
-            }
-
-            let claude_base = model_config.endpoint.trim().trim_end_matches('/');
-            let claude_url = if claude_base.ends_with("/messages") {
-                claude_base.to_string()
-            } else {
-                format!("{claude_base}/messages")
-            };
-            let response = client
-                .post(&claude_url)
-                .header("x-api-key", api_key)
-                .header("anthropic-version", "2023-06-01")
-                .header("content-type", "application/json")
-                .json(&serde_json::json!({
-                    "model": model_config.model,
-                    "max_tokens": 1600,
-                    "system": system_prompt,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
-                }))
-                .send()
-                .await?;
-
-            if !response.status().is_success() {
-                let error_text = response.text().await.unwrap_or_default();
-                return Err(AppError::Analysis(format!(
-                    "Claude 记忆问答失败: {error_text}"
-                )));
-            }
-
-            let result: serde_json::Value = response.json().await?;
-            let answer = result["content"][0]["text"]
-                .as_str()
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            if answer.is_empty() {
-                return Err(AppError::Analysis("Claude 返回空内容".to_string()));
-            }
-            Ok(answer)
-        }
-        AiProvider::Gemini => {
-            let api_key = model_config.api_key.as_deref().unwrap_or("");
-            if api_key.is_empty() {
-                return Err(AppError::Analysis("Gemini API Key 未配置".to_string()));
-            }
-
-            let gemini_base = model_config.endpoint.trim().trim_end_matches('/');
-            // Key 走请求头而非 URL query，避免进代理日志/Referer（与 ai.rs / model.rs 一致）
-            let gemini_url = format!(
-                "{}/models/{}:generateContent",
-                gemini_base, model_config.model
-            );
-            let response = client
-                .post(&gemini_url)
-                .header("x-goog-api-key", api_key)
-                .json(&serde_json::json!({
-                    // system 指令走 systemInstruction 字段（而非拼进 user content），
-                    // 保持系统指令优先级，降低外部文本注入的影响面
-                    "contents": [{
-                        "parts": [{ "text": prompt }]
-                    }],
-                    "systemInstruction": {
-                        "parts": [{ "text": system_prompt }]
-                    },
-                    "generationConfig": {
-                        "temperature": 0.2,
-                        "maxOutputTokens": 1600
-                    }
-                }))
-                .send()
-                .await?;
-
-            if !response.status().is_success() {
-                let error_text = response.text().await.unwrap_or_default();
-                return Err(AppError::Analysis(format!(
-                    "Gemini 记忆问答失败: {error_text}"
-                )));
-            }
-
-            let result: serde_json::Value = response.json().await?;
-            let answer = result["candidates"][0]["content"]["parts"][0]["text"]
-                .as_str()
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            if answer.is_empty() {
-                return Err(AppError::Analysis("Gemini 返回空内容".to_string()));
-            }
-            Ok(answer)
-        }
-        _ => {
-            let endpoint = model_config.endpoint.trim().trim_end_matches('/');
-            let url = if endpoint.ends_with("/chat/completions") {
-                endpoint.to_string()
-            } else {
-                format!("{endpoint}/chat/completions")
-            };
-            let mut request = client.post(&url).json(&serde_json::json!({
-                "model": model_config.model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": system_prompt
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "max_tokens": 1600,
-                "temperature": 0.2
-            }));
-
-            if let Some(api_key) = &model_config.api_key {
-                if !api_key.is_empty() {
-                    request = request.header("Authorization", format!("Bearer {api_key}"));
-                }
-            }
-
-            let response = request.send().await?;
-
-            if !response.status().is_success() {
-                let error_text = response.text().await.unwrap_or_default();
-                return Err(AppError::Analysis(format!(
-                    "OpenAI 兼容记忆问答失败: {error_text}"
-                )));
-            }
-
-            let result: serde_json::Value = response.json().await?;
-            let answer = result["choices"][0]["message"]["content"]
-                .as_str()
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            if answer.is_empty() {
-                return Err(AppError::Analysis("模型返回空内容".to_string()));
-            }
-            Ok(answer)
-        }
-    }
+    crate::agent::model::complete_single_turn_text(
+        model_config,
+        crate::agent::model::SingleTurnTextRequest::new(system_prompt, prompt),
+    )
+    .await
 }
 
 fn agent_event_delivery_error(message: impl Into<String>) -> AppError {

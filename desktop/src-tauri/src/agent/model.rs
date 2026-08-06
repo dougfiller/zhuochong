@@ -7,6 +7,7 @@
 
 use crate::config::{AiProvider, ModelConfig};
 use crate::error::AppError;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::OnceLock;
@@ -75,6 +76,63 @@ pub enum StopReason {
     Stop,
     ToolCall,
     MaxTokens,
+}
+
+/// Exactly one system prompt and one user prompt, without history or tools.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SingleTurnTextRequest {
+    system_prompt: String,
+    user_prompt: String,
+}
+
+impl SingleTurnTextRequest {
+    pub(crate) fn new(system_prompt: impl Into<String>, user_prompt: impl Into<String>) -> Self {
+        Self { system_prompt: system_prompt.into(), user_prompt: user_prompt.into() }
+    }
+
+    pub(crate) fn system_prompt(&self) -> &str { &self.system_prompt }
+    pub(crate) fn user_prompt(&self) -> &str { &self.user_prompt }
+}
+
+#[async_trait]
+pub(crate) trait SingleTurnTextTransport: Send + Sync {
+    async fn complete(&self, model: &ModelConfig, request: SingleTurnTextRequest) -> Result<String, AppError>;
+}
+
+pub(crate) struct ProviderSingleTurnTextTransport;
+
+#[async_trait]
+impl SingleTurnTextTransport for ProviderSingleTurnTextTransport {
+    async fn complete(&self, model: &ModelConfig, request: SingleTurnTextRequest) -> Result<String, AppError> {
+        complete_single_turn_text(model, request).await
+    }
+}
+
+/// Sends one non-streaming, no-tools request directly. This intentionally does
+/// not use `send_with_retry`: one logical request is one physical request.
+pub(crate) async fn complete_single_turn_text(
+    model_config: &ModelConfig,
+    request: SingleTurnTextRequest,
+) -> Result<String, AppError> {
+    let client = chat_client()?;
+    let response = match model_config.provider {
+        AiProvider::Ollama => single_turn_ollama(client, model_config, &request).await?,
+        AiProvider::Claude => single_turn_claude(client, model_config, &request).await?,
+        AiProvider::Gemini => single_turn_gemini(client, model_config, &request).await?,
+        _ => single_turn_openai_compatible(client, model_config, &request).await?,
+    };
+    single_turn_text(response)
+}
+
+fn single_turn_text(response: LlmResponse) -> Result<String, AppError> {
+    if response.stop_reason != StopReason::Stop || response.tool_calls.is_some() {
+        return Err(AppError::Analysis("模型没有完成纯文本回复".to_string()));
+    }
+    let text = response.content.unwrap_or_default().trim().to_owned();
+    if text.is_empty() {
+        return Err(AppError::Analysis("模型返回空内容".to_string()));
+    }
+    Ok(text)
 }
 
 /// LLM 的统一响应 — 不管底层是什么提供商
@@ -190,6 +248,102 @@ pub async fn chat_with_tools(
         AiProvider::Gemini => chat_gemini(client, model_config, &full_messages, tools).await,
         _ => chat_openai_compatible(client, model_config, &full_messages, tools).await,
     }
+}
+
+fn single_turn_messages(request: &SingleTurnTextRequest) -> Vec<Value> {
+    vec![
+        json!({ "role": "system", "content": request.system_prompt }),
+        json!({ "role": "user", "content": request.user_prompt }),
+    ]
+}
+
+fn single_turn_request_body(model: &ModelConfig, request: &SingleTurnTextRequest) -> Value {
+    match model.provider {
+        AiProvider::Ollama => json!({ "model": model.model, "messages": single_turn_messages(request), "stream": false }),
+        AiProvider::Claude => json!({
+            "model": model.model, "max_tokens": 1600, "system": request.system_prompt,
+            "messages": [{ "role": "user", "content": request.user_prompt }],
+        }),
+        AiProvider::Gemini => json!({
+            "contents": [{ "parts": [{ "text": request.user_prompt }]}],
+            "systemInstruction": { "parts": [{ "text": request.system_prompt }]},
+            "generationConfig": { "temperature": 0.2, "maxOutputTokens": 1600 },
+        }),
+        _ => json!({
+            "model": model.model, "messages": single_turn_messages(request),
+            "max_tokens": 1600, "temperature": 0.2,
+        }),
+    }
+}
+
+async fn single_turn_openai_compatible(
+    client: &reqwest::Client,
+    model_config: &ModelConfig,
+    request: &SingleTurnTextRequest,
+) -> Result<LlmResponse, AppError> {
+    let endpoint = model_config.endpoint.trim().trim_end_matches('/');
+    let url = if endpoint.ends_with("/chat/completions") { endpoint.to_string() } else { format!("{endpoint}/chat/completions") };
+    let body = single_turn_request_body(model_config, request);
+    let mut http = client.post(url).json(&body);
+    if let Some(api_key) = model_config.api_key.as_deref().filter(|key| !key.is_empty()) {
+        http = http.header("Authorization", format!("Bearer {api_key}"));
+    }
+    let response = http.send().await?;
+    if !response.status().is_success() {
+        return Err(AppError::Analysis(format!("LLM 调用失败: {}", response.status())));
+    }
+    parse_openai_response(&response.json().await?)
+}
+
+async fn single_turn_ollama(
+    client: &reqwest::Client,
+    model_config: &ModelConfig,
+    request: &SingleTurnTextRequest,
+) -> Result<LlmResponse, AppError> {
+    let endpoint = model_config.endpoint.trim().trim_end_matches('/');
+    let url = if endpoint.ends_with("/api/chat") { endpoint.to_string() } else { format!("{endpoint}/api/chat") };
+    let body = single_turn_request_body(model_config, request);
+    let response = client.post(url).json(&body).send().await?;
+    if !response.status().is_success() {
+        return Err(AppError::Analysis(format!("Ollama 调用失败: {}", response.status())));
+    }
+    parse_ollama_response(&response.json().await?)
+}
+
+async fn single_turn_claude(
+    client: &reqwest::Client,
+    model_config: &ModelConfig,
+    request: &SingleTurnTextRequest,
+) -> Result<LlmResponse, AppError> {
+    let api_key = model_config.api_key.as_deref().filter(|key| !key.is_empty())
+        .ok_or_else(|| AppError::Analysis("Claude API Key 未配置".to_string()))?;
+    let endpoint = model_config.endpoint.trim().trim_end_matches('/');
+    let url = if endpoint.ends_with("/messages") { endpoint.to_string() } else { format!("{endpoint}/messages") };
+    let body = single_turn_request_body(model_config, request);
+    let response = client.post(url).header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01").header("content-type", "application/json")
+        .json(&body).send().await?;
+    if !response.status().is_success() {
+        return Err(AppError::Analysis(format!("Claude 调用失败: {}", response.status())));
+    }
+    parse_claude_response(&response.json().await?)
+}
+
+async fn single_turn_gemini(
+    client: &reqwest::Client,
+    model_config: &ModelConfig,
+    request: &SingleTurnTextRequest,
+) -> Result<LlmResponse, AppError> {
+    let api_key = model_config.api_key.as_deref().filter(|key| !key.is_empty())
+        .ok_or_else(|| AppError::Analysis("Gemini API Key 未配置".to_string()))?;
+    let endpoint = model_config.endpoint.trim().trim_end_matches('/');
+    let url = format!("{endpoint}/models/{}:generateContent", model_config.model);
+    let body = single_turn_request_body(model_config, request);
+    let response = client.post(url).header("x-goog-api-key", api_key).json(&body).send().await?;
+    if !response.status().is_success() {
+        return Err(AppError::Analysis(format!("Gemini 调用失败: {}", response.status())));
+    }
+    parse_gemini_response(&response.json().await?)
 }
 
 // ══════════════════════════════════════════════════════════
@@ -592,6 +746,29 @@ fn parse_openai_response(result: &Value) -> Result<LlmResponse, AppError> {
     })
 }
 
+fn parse_ollama_response(result: &Value) -> Result<LlmResponse, AppError> {
+    let message = &result["message"];
+    let tool_calls = message["tool_calls"].as_array().map(|calls| {
+        calls.iter().map(|call| ToolCall {
+            id: call["id"].as_str().unwrap_or_default().to_owned(),
+            name: call["function"]["name"].as_str().unwrap_or_default().to_owned(),
+            arguments: call["function"]["arguments"].clone(),
+        }).collect::<Vec<_>>()
+    }).filter(|calls| !calls.is_empty());
+    let stop_reason = if result["done_reason"].as_str() == Some("length") {
+        StopReason::MaxTokens
+    } else if tool_calls.is_some() {
+        StopReason::ToolCall
+    } else {
+        StopReason::Stop
+    };
+    Ok(LlmResponse {
+        content: message["content"].as_str().map(str::to_owned),
+        tool_calls,
+        stop_reason,
+    })
+}
+
 /// 解析 Claude 格式的响应
 fn parse_claude_response(result: &Value) -> Result<LlmResponse, AppError> {
     let content_blocks = result["content"].as_array();
@@ -669,7 +846,9 @@ fn parse_gemini_response(result: &Value) -> Result<LlmResponse, AppError> {
         }
     }
 
-    let stop_reason = if !tool_calls.is_empty() {
+    let stop_reason = if result["candidates"][0]["finishReason"].as_str() == Some("MAX_TOKENS") {
+        StopReason::MaxTokens
+    } else if !tool_calls.is_empty() {
         StopReason::ToolCall
     } else {
         StopReason::Stop
@@ -1390,6 +1569,57 @@ async fn chat_gemini_streaming(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn model(provider: AiProvider) -> ModelConfig {
+        ModelConfig { provider, endpoint: "https://example.invalid/v1".into(), api_key: Some("fixture".into()), model: "fixture".into() }
+    }
+
+    fn has_forbidden_tool_key(value: &Value) -> bool {
+        match value {
+            Value::Object(object) => object.iter().any(|(key, value)| {
+                matches!(key.as_str(), "tools" | "tool_choice" | "function" | "functionCall" | "history")
+                    || has_forbidden_tool_key(value)
+            }),
+            Value::Array(values) => values.iter().any(has_forbidden_tool_key),
+            _ => false,
+        }
+    }
+
+    #[test]
+    fn single_turn_bodies_have_exactly_one_system_and_one_user_without_tools() {
+        let request = SingleTurnTextRequest::new("system", "user");
+        for provider in [AiProvider::Ollama, AiProvider::Claude, AiProvider::Gemini, AiProvider::OpenAI] {
+            let body = single_turn_request_body(&model(provider), &request);
+            assert!(!has_forbidden_tool_key(&body));
+            match provider {
+                AiProvider::Claude => {
+                    assert_eq!(body["system"], "system");
+                    assert_eq!(body["messages"].as_array().unwrap().len(), 1);
+                }
+                AiProvider::Gemini => {
+                    assert_eq!(body["systemInstruction"]["parts"][0]["text"], "system");
+                    assert_eq!(body["contents"].as_array().unwrap().len(), 1);
+                }
+                _ => {
+                    let messages = body["messages"].as_array().unwrap();
+                    assert_eq!(messages.len(), 2);
+                    assert_eq!(messages[0]["role"], "system");
+                    assert_eq!(messages[1]["role"], "user");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn single_turn_rejects_tools_max_tokens_and_blank_text() {
+        for response in [
+            LlmResponse { content: Some("partial".into()), tool_calls: None, stop_reason: StopReason::MaxTokens },
+            LlmResponse { content: Some("partial".into()), tool_calls: Some(vec![]), stop_reason: StopReason::ToolCall },
+            LlmResponse { content: Some("  ".into()), tool_calls: None, stop_reason: StopReason::Stop },
+        ] {
+            assert!(single_turn_text(response).is_err());
+        }
+    }
 
     #[test]
     fn test_message_user() {

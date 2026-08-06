@@ -129,3 +129,31 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 当前平台编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features` | 通过；仅有既存/未接线模块 dead-code 警告和 `block v0.1.6` future-incompat 提示。 | 通过 |
 | Rust 格式检查 | `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` | 未运行：`stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component。 | 环境限制 |
 | Windows 微信/OCR/模型实机流程 | 受控 Windows 11 x64 环境 | 本步骤没有用户触发入口、模型 transport 或已启用 production profile；未执行，不能由 macOS 单测替代。 | not-run |
+
+## 无工具单轮模型 transport 与微信专用客户端（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_wechat_model_transport.py`。脚本只读取本步骤源码，不启动 Tauri、不访问网络、真实微信、模型、知识库、数据库或用户内容。Rust 测试使用虚构模型配置与 fake transport，不发送 HTTP 请求。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 无工具单轮边界 | `python3 -B kaifa/kaifa_test/verify_wechat_model_transport.py` | 检查唯一 transport、command 委托、微信私有 client、精确 profile resolver 与运行时提交 helper；未发现 client command 或单轮 body 工具字段。 | 通过 |
+| provider body 与响应拒绝 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml 'agent::model::tests' --no-default-features` | 17/17 通过；覆盖四类 provider 的 system + user body 和工具/截断/空白拒绝。 | 通过 |
+| profile 与 client | `cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::config::tests' --no-default-features`、`cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::model_client::tests' --no-default-features` | 分别 2/2、2/2 通过；无效 profile 返回 `WX_TEXT_MODEL_UNAVAILABLE`，fake transport 仅收到固定 system + 单条 user。 | 通过 |
+| 运行时提交 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::runtime::reply_runtime_tests' --no-default-features` | 6/6 通过；未记录 transport 的 reply 不能进入 `ReplyReady`。 | 通过 |
+| M1/M2 feature 编译 | 两条 `cargo check ... --features 'wechat-contract-check,wechat-m1|wechat-m2'` | 通过；仅有既有 dead-code 警告与 `block v0.1.6` future-incompat 提示。 | 通过 |
+| Windows/真实模型流程 | 受控 Windows 11 x64 及明确启用 profile | 本步骤没有 Tauri 入口且未发送真实请求；macOS 的 fake transport 测试不替代该验证。 | not-run |
+
+## 微信模型客户端审查修改复验（2026-08-06）
+
+本次只复验步骤 10 的内部模型编排和 feature-gated client 行为。所有 Rust 测试使用虚构 profile 与 fake transport；不会启动 Tauri、访问真实模型/微信/知识库或读取用户内容。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| M1 client 行为 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::model_client::tests' --no-default-features --features wechat-m1` | 4/4 通过：成功 profile 生成与代际匹配；缺失、未知、untested/error、空 model 均为 `WX_TEXT_MODEL_UNAVAILABLE` 且 fake transport 为 0；空白、字节和 scalar 超限拒绝。 | 通过 |
+| M1 runtime 编排 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::runtime::reply_runtime_tests' --no-default-features --features wechat-m1` | 10/10 通过：每个 lease 恰好一次 transport，成功仅经 `complete_generated_reply` 进入 `ReplyReady`；transport 失败写入 `LLM_FAILED` 并释放 slot；无效 profile 零调用并释放 slot。 | 通过 |
+| M2 client 行为 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::model_client::tests' --no-default-features --features wechat-m2` | 3/3 通过：`no_hit` 与受信任 excerpt 均可生成，M2 reply 保留 binding generation。 | 通过 |
+| M1/M2 编译门禁 | 两条 `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1|wechat-m2'` | 两种 feature 组合均成功。 | 通过 |
+| 静态边界 | `python3 -B kaifa/kaifa_test/verify_wechat_model_transport.py` | 通过；额外确认 runtime 内部 M1/M2 编排、client 构造和失败终态存在，且无 Tauri client command。 | 通过 |
+| 范围内格式与空白 | `rustfmt --edition 2021 --check desktop/src-tauri/src/wechat/model_client.rs desktop/src-tauri/src/wechat/runtime.rs`；`git diff --check -- desktop/src-tauri/src/wechat/model_client.rs desktop/src-tauri/src/wechat/runtime.rs kaifa/kaifa_test/verify_wechat_model_transport.py` | 两项均成功；未格式化或修改范围外文件。 | 通过 |
+
+`cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check` 仍失败：输出包含 `agent/executor.rs`、`agent/model.rs` 及多处既有范围外格式差异。它不是本阶段范围内格式检查的通过结论，也未被本阶段格式化。

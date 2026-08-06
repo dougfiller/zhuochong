@@ -1,0 +1,31 @@
+{
+  "run_id": "20260806-1346-步骤-10抽取无工具单轮模型-transport-并实现微信专用客户端dispatch_idai",
+  "feature": "步骤 10：抽取无工具单轮模型 transport 并实现微信专用客户端；dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-10",
+  "project_root": "/Users/sky/aich8-zhuochong",
+  "created_at": "2026-08-06T05:46:29+00:00",
+  "updated_at": "2026-08-06T06:19:48+00:00",
+  "status": "active",
+  "current_phase": 5,
+  "current_thread_id": "019fd5b9-d736-79c3-9c51-a2f34eeadfe6",
+  "next_poll_at": "",
+  "threads": {
+    "1": "019fd59c-59f2-7142-82ba-eb5a750aaff9",
+    "2": "019fd5a1-9cdc-77c2-803b-268976dc104e",
+    "3": "019fd5aa-e910-7273-94ff-468d436b5fb5",
+    "4": "019fd5b1-344d-79f3-a924-236e3f970d29",
+    "5": "019fd5b9-d736-79c3-9c51-a2f34eeadfe6"
+  },
+  "artifacts": {
+    "1": "2026年08月06日13点48分-抽取无工具单轮模型transport并实现微信专用客户端.md",
+    "2": "2026年08月06日13点58分-无工具单轮模型transport与微信专用客户端.md",
+    "3": "2026年08月06日14点05分-微信模型客户端未接线审查.md"
+  },
+  "phase_status": {
+    "1": "done",
+    "2": "done",
+    "3": "done",
+    "4": "done",
+    "5": "running"
+  },
+  "notes": []
+}

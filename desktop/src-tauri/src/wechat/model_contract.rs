@@ -1,10 +1,6 @@
 use super::types::{BindingGeneration, RequestId};
 use crate::knowledge::types::RetrievedReply;
 
-#[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
-use super::types::{GeneratedReply, SuggestionGeneration};
-#[cfg(feature = "wechat-m1")]
-use super::types::M1ReplyInput;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ModelKnowledgeContext {
@@ -29,18 +25,10 @@ impl ModelKnowledgeContext {
 
     pub(crate) fn is_no_hit(&self) -> bool { self.no_hit }
 
-    #[cfg(test)]
-    fn excerpts(&self) -> &[String] { &self.excerpts }
-}
-
-#[cfg(feature = "wechat-m1")]
-pub(crate) fn generate_m1_reply(input: M1ReplyInput, suggestion: SuggestionGeneration) -> GeneratedReply {
-    GeneratedReply::m1(input.request_id().clone(), suggestion, input.text().to_owned())
-}
-
-#[cfg(feature = "wechat-m2")]
-pub(crate) fn generate_rag_reply(context: ModelKnowledgeContext, suggestion: SuggestionGeneration) -> GeneratedReply {
-    GeneratedReply::m2(context.request_id, suggestion, context.binding_generation, context.reply_text)
+    pub(super) fn request_id(&self) -> &RequestId { &self.request_id }
+    pub(super) fn reply_text(&self) -> &str { &self.reply_text }
+    pub(super) fn excerpts(&self) -> &[String] { &self.excerpts }
+    pub(super) fn binding_generation(&self) -> BindingGeneration { self.binding_generation }
 }
 
 #[cfg(all(feature = "wechat-contract-check", not(any(feature = "wechat-m1", feature = "wechat-m2"))))]
