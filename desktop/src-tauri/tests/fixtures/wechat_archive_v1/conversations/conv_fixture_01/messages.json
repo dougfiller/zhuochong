@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "wechat_archive_v1",
+  "exportId": "export_fixture_01",
+  "account": { "stableId": "acct_fixture_01" },
+  "conversation": { "stableId": "conv_fixture_01" },
+  "filters": {},
+  "messages": [
+    { "id": "msg_fixture_01", "type": "text", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:01Z", "text": "synthetic text" },
+    { "id": "msg_fixture_02", "type": "image", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:02Z", "media": "media_fixture_token" },
+    { "id": "msg_fixture_03", "type": "video", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:03Z", "media": "media_fixture_token" },
+    { "id": "msg_fixture_04", "type": "voice", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:04Z", "media": "media_fixture_token" },
+    { "id": "msg_fixture_05", "type": "file", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:05Z", "media": "media_fixture_token" },
+    { "id": "msg_fixture_06", "type": "location", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:06Z", "text": "synthetic location" },
+    { "id": "msg_fixture_07", "type": "link", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:07Z", "text": "synthetic link" },
+    { "id": "msg_fixture_08", "type": "emoji", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:08Z", "text": "synthetic emoji" },
+    { "id": "msg_fixture_09", "type": "quote", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:09Z", "text": "synthetic quote" },
+    { "id": "msg_fixture_10", "type": "reply", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:10Z", "text": "synthetic reply" },
+    { "id": "msg_fixture_11", "type": "system", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:11Z", "text": "synthetic system" },
+    { "id": "msg_fixture_12", "type": "recall", "sender": "sender_fixture", "createdAt": "2026-01-01T00:00:12Z", "text": "synthetic recall" }
+  ]
+}

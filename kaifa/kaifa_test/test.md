@@ -211,3 +211,15 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 用户授权的默认通过 | 同一 after-gate JSON 声明 `default_pass_requirements` 六项 | runner 仅对该显式文档跳过 Windows、NSIS/batch、素材、自动化、after 矩阵和能力计数；无该政策的 fixture 仍严格判定。 | 已实现 |
 | 冻结 before 基线 | `python3 -B kaifa/kaifa_test/verify_work_review_regression_baseline.py --project-root .` | 退出 1：`desktop frozen source differs from work-review-source.json`。当前工作区已有其他步骤的产品改动；本阶段未修改 before 工件，也不把此结果归因于本 runner。 | blocked（既有工作区状态） |
 | Python 语法与范围空白 | `python3 -B -c "compile(...)"`；`git diff --check -- <本阶段新增文件>` | 语法通过；空白检查通过。`python3 -m py_compile` 未采用为成功证据：macOS Python 尝试写入受限的系统 cache 并报 PermissionError。 | 通过 |
+
+## 冻结微信 JSON 导出 Schema、只读规则和脱敏导入夹具（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_wechat_json_archive.py`。该脚本只读取本步骤的 Rust 源码、Tauri 配置、`.gitignore` 和手写虚构 fixture；不启动产品、不访问网络或微信，不读取真实导出包，也不创建数据库。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 静态只读/脱敏/打包门禁 | `python3 -B kaifa/kaifa_test/verify_wechat_json_archive.py --project-root .` | 输出 `WECHAT_JSON_ARCHIVE_GATE: pass`；确认 v1 严格字段、各合成消息类型、只读 guard/流式 visitor、dataDir SQLite、私有源 ignore 与空 resources。 | 通过 |
+| v1 schema、流式导入、member 审计 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge::archive --no-default-features --features 'wechat-contract-check,wechat-m2'` | 6/6 通过：未知 schema/future field、selected coverage、report 缺失数据不升级 full、路径逸出/media 请求、dataDir-only store、完全相同 member metadata fast verify、全虚构 fixture 导入。 | 通过 |
+| M2 feature 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'` | 编译通过；仅有仓库既存和未接线功能的 dead-code 警告及 `block v0.1.6` future-incompat 提示。 | 通过 |
+| 范围格式与空白 | `rustfmt --edition 2021 --check desktop/src-tauri/src/knowledge/archive_{schema,store,importer}.rs desktop/src-tauri/src/knowledge/{mod,runtime}.rs`；`git diff --check -- <本步骤路径>` | 两项均通过。 | 通过 |
+| 151 MiB / 108,447 条受控性能样本 | 受控环境的后续验收 | 本步骤只加入微型手写 fixture 和逐条 visitor；未把真实或大样本带入仓库/CI，故未在当前 macOS 工作区声称该性能阈值已实测。 | not-run |

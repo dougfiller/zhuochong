@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "wechat_archive_v1",
+  "exportId": "export_fixture_01",
+  "account": { "stableId": "acct_fixture_01" },
+  "createdAt": "2026-01-01T00:00:00Z",
+  "missingMedia": 0,
+  "errors": []
+}

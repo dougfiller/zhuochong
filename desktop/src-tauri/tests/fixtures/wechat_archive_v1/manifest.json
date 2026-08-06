@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "wechat_archive_v1",
+  "exportedAt": "2026-01-01T00:00:00Z",
+  "exportId": "export_fixture_01",
+  "account": { "stableId": "acct_fixture_01" },
+  "source": { "kind": "user_selected" },
+  "format": { "manifestContentHash": "fixture_declared_manifest_hash" },
+  "scope": {
+    "kind": "selected",
+    "conversations": [{
+      "stableId": "conv_fixture_01",
+      "metaPath": "conversations/conv_fixture_01/meta.json",
+      "messagesPath": "conversations/conv_fixture_01/messages.json"
+    }]
+  },
+  "filters": {},
+  "options": { "includeMedia": false },
+  "stats": { "conversationCount": 1, "messageCount": 12, "missingCount": 0 },
+  "accountsAvailable": ["acct_fixture_01"],
+  "integrityFiles": [{
+    "path": "_integrity/declarations.json",
+    "declaredHash": "fixture_integrity_declaration"
+  }]
+}

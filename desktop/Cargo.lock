@@ -7464,6 +7464,7 @@ dependencies = [
  "hex",
  "hmac",
  "image 0.25.10",
+ "libc",
  "log",
  "objc",
  "once_cell",
