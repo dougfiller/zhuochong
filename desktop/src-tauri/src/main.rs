@@ -4136,6 +4136,9 @@ async fn main() {
 
     let (is_recording, is_paused) = initial_recording_state(config_load_status);
 
+    // 独立知识库的失败不会阻止现有 Work Review/M1 启动；所有知识调用保持 KB_NOT_READY。
+    let knowledge_store = knowledge::KnowledgeStore::open_or_unavailable(&data_dir);
+
     // 创建应用状态，使用 Arc 包装以便在多个地方共享
     let app_state = Arc::new(Mutex::new(AppState {
         config,
@@ -4191,7 +4194,7 @@ async fn main() {
         .manage(app_lifecycle_state.clone())
         .manage(wechat::WechatReplyRuntime::default())
         .manage(wechat::CaptureCoordinator::default())
-        .manage(knowledge::KnowledgeStore::default())
+        .manage(knowledge_store)
         // 系统托盘在 setup 中创建 (Tauri v2)
         .on_window_event(|window, event| {
             if window.label() != MAIN_WINDOW_LABEL {

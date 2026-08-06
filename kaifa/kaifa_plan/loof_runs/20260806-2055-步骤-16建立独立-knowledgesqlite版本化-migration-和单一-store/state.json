@@ -1,0 +1,35 @@
+{
+  "run_id": "20260806-2055-步骤-16建立独立-knowledgesqlite版本化-migration-和单一-store",
+  "feature": "步骤 16：建立独立 knowledge.sqlite、版本化 migration 和单一 Store；dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-16。实现独立 knowledge.sqlite schema、KnowledgeStore 单写多读、versioned migrations/PRAGMA 验证、类型化 staging/candidate/active/deletion APIs 和覆盖新建/重开/非法schema/外键级联/busy/损坏库的测试；不修改 Work Review Database::init_tables()，保留当前前台微信和M2 fail-closed边界。",
+  "project_root": "/Users/sky/aich8-zhuochong",
+  "created_at": "2026-08-06T12:55:56+00:00",
+  "updated_at": "2026-08-06T13:42:23+00:00",
+  "status": "active",
+  "current_phase": 5,
+  "current_thread_id": "019fd74f-5cf1-7841-a51c-f169c74c0826",
+  "next_poll_at": "",
+  "threads": {
+    "1": "019fd725-906b-7c22-be35-54dc78036c6f",
+    "2": "019fd728-8995-7db1-b898-b3d234aa3844",
+    "3": "019fd731-a230-76b3-898f-087d2b51a9a3",
+    "4": "019fd74b-daac-7111-9df9-c7903354ba33",
+    "5": "019fd74f-5cf1-7841-a51c-f169c74c0826"
+  },
+  "artifacts": {
+    "1": "2026年08月06日20点57分-建立独立knowledge.sqlite版本化migration和单一Store.md",
+    "2": "2026年08月06日21点06分-建立独立knowledge.sqlite版本化migration和单一Store.md",
+    "3": "2026年08月06日21点10分-知识库代际重导入与验收缺口.md"
+  },
+  "phase_status": {
+    "1": "done",
+    "2": "done",
+    "3": "done",
+    "4": "done",
+    "5": "running"
+  },
+  "notes": [
+    "2026-08-06T12:57:16+00:00 phase 1 gate failed: done file is missing",
+    "2026-08-06T13:02:52+00:00 phase 2 gate failed: done file is missing",
+    "2026-08-06T13:06:18+00:00 phase 2 gate failed: done file is missing"
+  ]
+}

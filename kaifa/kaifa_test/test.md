@@ -223,3 +223,15 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | M2 feature 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'` | 编译通过；仅有仓库既存和未接线功能的 dead-code 警告及 `block v0.1.6` future-incompat 提示。 | 通过 |
 | 范围格式与空白 | `rustfmt --edition 2021 --check desktop/src-tauri/src/knowledge/archive_{schema,store,importer}.rs desktop/src-tauri/src/knowledge/{mod,runtime}.rs`；`git diff --check -- <本步骤路径>` | 两项均通过。 | 通过 |
 | 151 MiB / 108,447 条受控性能样本 | 受控环境的后续验收 | 本步骤只加入微型手写 fixture 和逐条 visitor；未把真实或大样本带入仓库/CI，故未在当前 macOS 工作区声称该性能阈值已实测。 | not-run |
+
+## 独立 knowledge.sqlite、版本化 migration 和单一 Store（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_knowledge_store.py`。它只读取 Rust 源码与内嵌 migration，绝不打开用户 dataDir、Work Review 数据库、微信导出或网络连接。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| Store/migration 静态边界 | `python3 -B kaifa/kaifa_test/verify_knowledge_store.py --project-root .` | 输出 `KNOWLEDGE_STORE_GATE: pass`；确认单一 Store、writer/reader、版本化 migration、WAL/外键/FTS5、active/candidate/denial 边界、导入器无生产连接，以及 `main.rs` 使用既有 dataDir 初始化。 | 通过 |
+| 新建、重开与候选隔离 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features` | 18/18 通过；虚构临时库验证 schema migration、重复打开 catalog 单行稳定、candidate 在 activate 前不可读、activate 后 catalog 递增、future version 不被覆盖。 | 通过 |
+| JSON archive 回归 | 同一 `knowledge::` 定向测试 | 通过；导入器仅将脱敏 DTO 交给 Store，原路径和内容不写库，重复导入命中 member audit fast-verify。 | 通过 |
+| M2 feature 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'` | 通过；仅输出仓库未接线模块的 dead-code 警告和 `block v0.1.6` future-incompat 提示。 | 通过 |
+| Windows/OCR/UAT | 受控 Windows 11 x64 | 本步骤没有修改 Windows OCR 或前台微信流程；macOS SQLite 单测不替代 Windows 证据。 | not-run |

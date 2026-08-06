@@ -219,3 +219,23 @@ cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features -
 
 - `verify_wechat_json_archive.py` 是新增的只读静态门禁：检查精确 v1 schema、手写脱敏 fixture 的消息类型覆盖、导入 guard 的流式入口、派生 dataDir SQLite、私有源 ignore 和空 Tauri resources；不会创建文件或读取真实导出目录。
 - Rust 定向测试只使用系统临时 `data_dir` 和 `acct_fixture_01` 等虚构 fixture 标识，验证 unknown schema/path traversal/media 请求 fail-closed、selected 不升级 full、派生库只写 dataDir、完全相同成员 metadata fast verify 不重开 messages 流。
+
+## 独立 knowledge.sqlite、版本化 migration 和单一 Store（2026-08-06）
+
+```bash
+# 仅读取本步骤源码与 migration 资源，不创建或打开用户数据库。
+python3 -B kaifa/kaifa_test/verify_knowledge_store.py --project-root .
+
+# 只运行独立知识库、archive DTO 与 fail-closed 的 Rust 单测。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features
+
+# 检查 M2 feature 编译；不会启动 Tauri、访问网络、微信、模型或用户数据。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# 仅检查本步骤文件的 Rust 格式和空白错误。
+rustfmt --edition 2021 --check desktop/src-tauri/src/knowledge/{mod,runtime,migrations,store,archive_store,archive_importer}.rs desktop/src-tauri/src/main.rs
+git diff --check -- desktop/src-tauri/src/knowledge desktop/src-tauri/src/main.rs kaifa/kaifa_test/verify_knowledge_store.py
+```
+
+- `verify_knowledge_store.py` 是纯静态门禁：检查独立 migration 资源、Store 的唯一连接入口、读写 API、WAL/外键/FTS5/版本验证、active/candidate/denial 边界、导入器没有 `Connection`，以及启动时以现有 `data_dir` 管理 Store。它不读取或创建任何真实聊天数据。
+- Rust 测试只在系统临时目录创建虚构 SQLite 文件，覆盖新库、candidate 不可见直到原子 activate、未来版本 fail-closed、archive 导入只读与脱敏；不会访问 Work Review `workreview.db`。

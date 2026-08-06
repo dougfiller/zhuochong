@@ -4,8 +4,8 @@ use super::archive_schema::{
 };
 use super::archive_store::{
     coverage_signature, member_path_token, CompletenessVerdict, ImportFingerprint, MemberAudit,
-    WechatArchiveStore,
 };
+use super::store::KnowledgeStore;
 use crate::wechat::types::ContractError;
 use serde::de::{DeserializeSeed, Error as DeError, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
@@ -234,19 +234,19 @@ pub(crate) struct ArchiveImportSummary {
     pub(crate) fast_verified: bool,
 }
 
-pub(crate) struct WechatJsonArchiveImporter {
+pub(crate) struct WechatJsonArchiveImporter<'a> {
     guard: WechatArchiveReadGuard,
-    derived_store: WechatArchiveStore,
+    store: &'a KnowledgeStore,
 }
 
-impl WechatJsonArchiveImporter {
+impl<'a> WechatJsonArchiveImporter<'a> {
     pub(crate) fn open(
         source_root: impl AsRef<Path>,
-        data_dir: impl AsRef<Path>,
+        store: &'a KnowledgeStore,
     ) -> Result<Self, ContractError> {
         Ok(Self {
             guard: WechatArchiveReadGuard::open(source_root)?,
-            derived_store: WechatArchiveStore::open(data_dir.as_ref())?,
+            store,
         })
     }
 
@@ -283,7 +283,7 @@ impl WechatJsonArchiveImporter {
                 ),
             ),
         };
-        if self.derived_store.fast_verify(&fingerprint, &before)? {
+        if self.store.fast_verify_archive(&fingerprint, &before)? {
             return Ok(ArchiveImportSummary {
                 import_id: "fast_verified".into(),
                 schema,
@@ -333,16 +333,12 @@ impl WechatJsonArchiveImporter {
             return Err(ContractError::KbSourceUnsupported);
         }
         let verdict = usable_verdict(coverage, &report);
-        let import_id = format!("import_{}", uuid::Uuid::new_v4().simple());
-        self.derived_store.record_import(
-            &import_id,
+        let import_id = self.store.record_archive_import(
             &fingerprint,
             coverage,
             verdict,
             &safe_scope_filters_json(&manifest),
             &safe_integrity_json(&manifest),
-            conversation_count,
-            message_count,
             &after,
         )?;
         Ok(ArchiveImportSummary {
@@ -705,7 +701,8 @@ mod tests {
             .unwrap()
             .map(|entry| entry.unwrap().file_name())
             .collect();
-        let mut importer = WechatJsonArchiveImporter::open(&source, &data_dir).unwrap();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let mut importer = WechatJsonArchiveImporter::open(&source, &store).unwrap();
         let first = importer.import().unwrap();
         assert_eq!(first.coverage, CoverageKind::Selected);
         assert_eq!(first.verdict, CompletenessVerdict::FilteredSelected);
@@ -743,7 +740,8 @@ mod tests {
     #[test]
     fn source_path_is_not_persisted_in_the_derived_database() {
         let data_dir = temp_dir();
-        let mut importer = WechatJsonArchiveImporter::open(fixture_root(), &data_dir).unwrap();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let mut importer = WechatJsonArchiveImporter::open(fixture_root(), &store).unwrap();
         importer.import().unwrap();
         let database = data_dir.join("wechat_knowledge/knowledge.sqlite");
         let content = fs::read(database).unwrap();
@@ -778,12 +776,15 @@ mod tests {
         .unwrap();
 
         let data_dir = temp_dir();
-        let mut importer = WechatJsonArchiveImporter::open(&source, &data_dir).unwrap();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let mut importer = WechatJsonArchiveImporter::open(&source, &store).unwrap();
         assert_eq!(importer.import(), Err(ContractError::KbSourceUnsupported));
         let database =
             rusqlite::Connection::open(data_dir.join("wechat_knowledge/knowledge.sqlite")).unwrap();
         let imports: u64 = database
-            .query_row("SELECT COUNT(*) FROM archive_imports", [], |row| row.get(0))
+            .query_row("SELECT COUNT(*) FROM knowledge_sources", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(imports, 0);
         let _ = fs::remove_dir_all(source);
