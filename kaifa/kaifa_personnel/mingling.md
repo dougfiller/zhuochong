@@ -85,3 +85,14 @@ git diff --check -- desktop/src-tauri/src/monitor.rs desktop/src-tauri/src/wecha
 - `cargo test ... wechat::` 当前通过 23/23，覆盖空 production catalog、合成冻结 profile 精确匹配、标题不能补救 exe/DPI 不符、ROI 非法拒绝和 HWND/边界变化的 `WX_REQUEST_STALE`。
 - macOS 的 `cargo check ... --no-default-features` 通过。当前仅安装 `aarch64-apple-darwin` target，未取得 Windows 微信、冻结 exe 证据或目标 Windows UAT；production profile 因此保持空，Windows 发布验收仍为 blocked。
 - `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` 未成功运行：`stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component；未安装工具链以避免改变开发环境。
+
+## 临时微信截图裁剪与隐藏恢复（2026-08-06）
+
+```bash
+python3 -B kaifa/kaifa_test/verify_wechat_ephemeral_capture.py
+cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::capture::tests --no-default-features
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features
+```
+
+- 静态门禁只读取源码，检查内存帧、物理原点裁剪、无焦点恢复、worker join 和协调器接线；不启动应用、不访问网络或读取任何微信内容。
+- Windows 真机的 GDI/WGC 成功、失败、超时、取消与窗口恢复仍待受控 Windows 11 环境验证；当前 macOS 结果不替代该验证。

@@ -1,5 +1,6 @@
 mod fixtures;
 mod model_contract;
+pub(crate) mod capture;
 pub(crate) mod commands;
 pub(crate) mod config;
 pub(crate) mod profiles;

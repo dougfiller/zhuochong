@@ -80,6 +80,33 @@ impl WechatWindowIdentity {
             && self.profile_id == other.profile_id
             && self.profile_version == other.profile_version
     }
+
+    pub(crate) fn bounds_px(&self) -> WindowBounds {
+        self.bounds_px
+    }
+
+    pub(crate) fn dpi(&self) -> u32 {
+        self.dpi
+    }
+
+    pub(crate) fn chat_roi(&self) -> NormalizedRoi {
+        self.chat_roi
+    }
+
+    pub(crate) fn header_identity_roi(&self) -> NormalizedRoi {
+        self.header_identity_roi
+    }
+
+    pub(crate) fn capture_target_window(&self) -> crate::monitor::ActiveWindow {
+        crate::monitor::ActiveWindow {
+            app_name: "WeChat".to_string(),
+            window_title: String::new(),
+            browser_url: None,
+            executable_path: None,
+            window_bounds: Some(self.bounds_px),
+            is_minimized: false,
+        }
+    }
 }
 
 pub(crate) fn validate_foreground(

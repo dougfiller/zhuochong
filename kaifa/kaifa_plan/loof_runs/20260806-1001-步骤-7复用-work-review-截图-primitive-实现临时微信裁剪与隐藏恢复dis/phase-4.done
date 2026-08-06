@@ -1,0 +1,5 @@
+status=done
+phase=4
+run_id=20260806-1001-步骤-7复用-work-review-截图-primitive-实现临时微信裁剪与隐藏恢复dis
+completed_at=2026-08-06T02:40:51+00:00
+note=用户决定本 run 的 Windows 实机成功、失败、超时、取消 UAT 直接不测试；kaifa_test/test.md 已标记 not-run（用户豁免），不代表 Windows 运行时通过。代码修复与 macOS 定向检查已完成。

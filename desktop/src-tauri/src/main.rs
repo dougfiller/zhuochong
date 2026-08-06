@@ -2661,11 +2661,14 @@ async fn background_screenshot_task(state: Arc<Mutex<AppState>>, app: AppHandle)
 
                     // 截屏到内存，保存为临时文件供 OCR 使用
                     let screenshot_result = if screenshots_enabled {
-                        let state_guard = state.lock().unwrap_or_else(|e| e.into_inner());
-                        state_guard
-                            .screenshot_service
-                            .capture_for_window(Some(&active_window))
-                            .ok()
+                        let _capture_permit = app.state::<wechat::CaptureCoordinator>().try_acquire();
+                        let screenshot_service = {
+                            let state_guard = state.lock().unwrap_or_else(|e| e.into_inner());
+                            state_guard.screenshot_service.clone()
+                        };
+                        _capture_permit.and_then(|_permit| {
+                            screenshot_service.capture_for_window(Some(&active_window)).ok()
+                        })
                     } else {
                         None
                     };
@@ -2886,15 +2889,19 @@ async fn background_screenshot_task(state: Arc<Mutex<AppState>>, app: AppHandle)
                 } else {
                     // === 新建路径：正常截屏并保存 ===
                     if screenshots_enabled {
-                        let screenshot_result = {
-                            let state_guard = state.lock().unwrap_or_else(|e| e.into_inner());
-                            state_guard
-                                .screenshot_service
-                                .capture_for_window(Some(&active_window))
-                        };
+                        let screenshot_result = app
+                            .state::<wechat::CaptureCoordinator>()
+                            .try_acquire()
+                            .map(|_permit| {
+                                let screenshot_service = {
+                                    let state_guard = state.lock().unwrap_or_else(|e| e.into_inner());
+                                    state_guard.screenshot_service.clone()
+                                };
+                                screenshot_service.capture_for_window(Some(&active_window))
+                            });
 
-                        match screenshot_result {
-                            Ok(screenshot_result) => {
+                        match screenshot_result.transpose() {
+                            Ok(Some(screenshot_result)) => {
                                 // ===== 空闲检测第二阶段：截图哈希确认 =====
                                 let screenshot_idle = if input_idle {
                                     let hash = screenshot::ScreenshotService::calculate_image_hash(
@@ -3100,6 +3107,10 @@ async fn background_screenshot_task(state: Arc<Mutex<AppState>>, app: AppHandle)
                                         None
                                     }
                                 }
+                            }
+                            Ok(None) => {
+                                log::debug!("微信截图事务进行中，跳过本轮 Work Review 截图");
+                                None
                             }
                             Err(e) => {
                                 log::error!("截屏失败: {e}");

@@ -90,3 +90,14 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | diff 空白检查 | `git diff --check -- desktop/src-tauri/src/monitor.rs desktop/src-tauri/src/wechat desktop/src-tauri/Cargo.toml kaifa/kaifa_test` | 通过。 |
 | Windows 编译与实机 probe/UAT | 目标 Windows 11 x64 + 精确微信版本、主题、DPI 和拓扑 | blocked；当前主机只有 `aarch64-apple-darwin` target，未取得真实路径/哈希/ProductVersion/ROI/probe 报告。production catalog 故意为空。 |
 | Rust 格式检查 | `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` | 环境限制；未安装 `cargo-fmt`/`rustfmt` component。 |
+
+## 临时微信截图裁剪与隐藏恢复（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_wechat_ephemeral_capture.py`。脚本只检查源码；单元测试使用合成 RGBA 帧，不启动 Tauri、不访问网络、不读取微信、聊天、数据库或真实截图。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 私有无落盘边界 | `python3 -B kaifa/kaifa_test/verify_wechat_ephemeral_capture.py` | 检查内存 frame、原点平移、guard restore、worker join、coordinator 接线；拒绝 focus/unminimize/reveal/PNG API | 通过 |
+| 负坐标与越界裁剪 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::capture::tests --no-default-features` | 两项合成测试：副屏负原点先平移；帧外窗口与非法 ROI fail-closed | 通过 |
+| 当前平台编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features` | macOS 编译通过；保留既有 dead-code 与 `block v0.1.6` future-incompat 提示 | 通过 |
+| Windows 实机路径 | Windows 11 x64 + 受支持微信 profile 的成功/失败/超时/取消测试 | 用户决定本 run 不执行 Windows 实机测试；此项不提供运行时通过证据 | not-run（用户豁免） |

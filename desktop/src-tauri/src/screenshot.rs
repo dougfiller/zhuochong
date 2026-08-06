@@ -7,7 +7,6 @@ use crate::linux_session::{LinuxDesktopEnvironment, LinuxDesktopSession};
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 use image::DynamicImage;
-#[cfg(target_os = "macos")]
 use image::RgbaImage;
 use image::{imageops::FilterType, ColorType};
 #[cfg(any(target_os = "linux", test))]
@@ -156,6 +155,7 @@ pub struct ScreenshotResult {
 }
 
 /// 截屏服务配置
+#[derive(Clone)]
 pub struct ScreenshotConfig {
     /// 最大宽度（超过此宽度会按比例缩放）
     pub max_width: u32,
@@ -189,7 +189,48 @@ impl From<&StorageConfig> for ScreenshotConfig {
     }
 }
 
+/// A physical-pixel monitor frame. This stays backend-only and is deliberately
+/// separate from the persisted Work Review screenshot result.
+#[derive(Debug, Clone)]
+pub(crate) struct CapturedMonitorFrame {
+    pixels_rgba: Vec<u8>,
+    width_px: u32,
+    height_px: u32,
+    origin_px: (i32, i32),
+}
+
+impl CapturedMonitorFrame {
+    pub(crate) fn new(
+        pixels_rgba: Vec<u8>,
+        width_px: u32,
+        height_px: u32,
+        origin_px: (i32, i32),
+    ) -> Option<Self> {
+        let expected_len = width_px.checked_mul(height_px)?.checked_mul(4)? as usize;
+        (pixels_rgba.len() == expected_len).then_some(Self {
+            pixels_rgba,
+            width_px,
+            height_px,
+            origin_px,
+        })
+    }
+
+    pub(crate) fn dimensions(&self) -> (u32, u32) {
+        (self.width_px, self.height_px)
+    }
+
+    pub(crate) fn origin_px(&self) -> (i32, i32) {
+        self.origin_px
+    }
+
+    pub(crate) fn into_rgba(self) -> RgbaImage {
+        RgbaImage::from_raw(self.width_px, self.height_px, self.pixels_rgba)
+            .expect("CapturedMonitorFrame validates RGBA length")
+    }
+}
+
 /// 截屏服务
+#[derive(Clone)]
 pub struct ScreenshotService {
     data_dir: PathBuf,
     config: ScreenshotConfig,
@@ -246,7 +287,7 @@ impl ScreenshotService {
 
         if should_capture_all_displays(&self.config) {
             return match self.capture_with_gdi(None) {
-                Ok((pixels, width, height)) => self.persist_rgba_capture(
+                Ok((pixels, width, height, _origin)) => self.persist_rgba_capture(
                     &pixels,
                     width,
                     height,
@@ -260,7 +301,7 @@ impl ScreenshotService {
 
         // 优先使用 GDI BitBlt（静默，无边框闪烁）
         match self.capture_with_gdi(active_window) {
-            Ok((pixels, width, height)) => {
+            Ok((pixels, width, height, _origin)) => {
                 return self.persist_rgba_capture(
                     &pixels,
                     width,
@@ -291,6 +332,27 @@ impl ScreenshotService {
                     "截图失败（GDI 和 WGC 均不可用）: {e}"
                 )));
             }
+        }
+    }
+
+    /// Captures a monitor frame only in memory for the private WeChat path.
+    /// Unlike the Work Review path, this never creates a screenshot or OCR file.
+    #[cfg(target_os = "windows")]
+    pub(crate) fn capture_ephemeral_for_window(
+        &self,
+        active_window: &crate::monitor::ActiveWindow,
+    ) -> Result<CapturedMonitorFrame> {
+        match self.capture_with_gdi(Some(active_window)) {
+            Ok((pixels_rgba, width_px, height_px, origin_px)) => CapturedMonitorFrame::new(
+                pixels_rgba,
+                width_px,
+                height_px,
+                origin_px,
+            )
+            .ok_or_else(|| AppError::Screenshot("无效的内存截图帧".to_string())),
+            // `windows-capture` 1.5 exposes this application's WGC frame only through
+            // `save_as_image`. Do not route this private path through its PNG API.
+            Err(error) => Err(error),
         }
     }
 
@@ -473,7 +535,7 @@ impl ScreenshotService {
     fn capture_with_gdi(
         &self,
         active_window: Option<&crate::monitor::ActiveWindow>,
-    ) -> Result<(Vec<u8>, u32, u32)> {
+    ) -> Result<(Vec<u8>, u32, u32, (i32, i32))> {
         use std::ptr::null_mut;
         use winapi::um::wingdi::{
             BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits,
@@ -604,7 +666,7 @@ impl ScreenshotService {
                 source_x,
                 source_y
             );
-            Ok((pixels, width, height))
+            Ok((pixels, width, height, (source_x, source_y)))
         }
     }
 
