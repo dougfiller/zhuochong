@@ -69,3 +69,19 @@ cargo test --manifest-path desktop/Cargo.toml -p work-review-core config --quiet
 - `verify_wechat_knowledge_skeleton.py` 是静态接线门禁：核对三项独立 managed state、三个安全 command、空实现错误码、loopback validator 与 `AppConfig` 的默认/normalize 接线；不读取用户配置或内容。
 - 两条 Tauri 定向单测分别证明未知微信 profile fail-closed、非 loopback embedding endpoint 被拒绝且没有网络调用。
 - core config 定向测试覆盖旧配置缺字段的默认值，以及留存、最近目录、topK、token budget 和 token counter 的安全归一化。
+
+## 前台微信识别和版本化布局兼容性档案（2026-08-06）
+
+以下命令只验证本步骤的静态 fail-closed 门禁和 Rust 纯校验；不会启动 Tauri、访问网络、读取微信数据库、UI Automation、截图、OCR、检索或模型。
+
+```bash
+python3 -B kaifa/kaifa_test/verify_windows_wechat_profile.py --project-root .
+cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat:: --no-default-features
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features
+git diff --check -- desktop/src-tauri/src/monitor.rs desktop/src-tauri/src/wechat desktop/src-tauri/Cargo.toml kaifa/kaifa_test
+```
+
+- `verify_windows_wechat_profile.py` 确认嵌入式 `windows-wechat-v1.json` 的 profile 集合为空；探针证据未取得时不能意外启用 profile，并静态检查 schema、ROI/SHA-256、错误码和无采集/OCR/模型边界。
+- `cargo test ... wechat::` 当前通过 23/23，覆盖空 production catalog、合成冻结 profile 精确匹配、标题不能补救 exe/DPI 不符、ROI 非法拒绝和 HWND/边界变化的 `WX_REQUEST_STALE`。
+- macOS 的 `cargo check ... --no-default-features` 通过。当前仅安装 `aarch64-apple-darwin` target，未取得 Windows 微信、冻结 exe 证据或目标 Windows UAT；production profile 因此保持空，Windows 发布验收仍为 blocked。
+- `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` 未成功运行：`stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component；未安装工具链以避免改变开发环境。

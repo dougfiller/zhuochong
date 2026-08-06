@@ -2,9 +2,11 @@ mod fixtures;
 mod model_contract;
 pub(crate) mod commands;
 pub(crate) mod config;
+pub(crate) mod profiles;
 pub(crate) mod runtime;
 pub(crate) mod state_machine;
 pub(crate) mod types;
+pub(crate) mod window_identity;
 
 pub(crate) use runtime::{CaptureCoordinator, WechatReplyRuntime};
 

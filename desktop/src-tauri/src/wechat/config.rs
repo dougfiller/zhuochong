@@ -1,21 +1,6 @@
 use crate::config::{TextModelProfile, WechatConfig};
+use super::profiles::CompatibilityCatalog;
 use serde::Serialize;
-
-#[derive(Clone, Copy)]
-struct CompatibilityProfile {
-    id: &'static str,
-    label: &'static str,
-    version: &'static str,
-    signature_material: &'static str,
-}
-
-const COMPATIBILITY_CATALOG: &[CompatibilityProfile] = &[CompatibilityProfile {
-    id: "wechat-windows-v1",
-    label: "WeChat for Windows (prepared)",
-    version: "1",
-    // The catalog, not config.json, owns the verification material and window constraints.
-    signature_material: "catalog-only-v1",
-}];
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,22 +11,24 @@ pub(crate) struct CompatibilityProfileOption {
 }
 
 pub(crate) fn profile_options() -> Vec<CompatibilityProfileOption> {
-    COMPATIBILITY_CATALOG
-        .iter()
+    let Ok(catalog) = CompatibilityCatalog::embedded() else {
+        return Vec::new();
+    };
+    catalog
+        .enabled_profiles()
         .map(|profile| CompatibilityProfileOption {
             id: profile.id.to_string(),
-            label: profile.label.to_string(),
-            version: profile.version.to_string(),
+            label: format!("WeChat for Windows ({})", profile.id),
+            version: profile.profile_version.to_string(),
         })
         .collect()
 }
 
 pub(crate) fn profile_is_trusted(id: Option<&str>) -> bool {
-    id.is_some_and(|id| {
-        COMPATIBILITY_CATALOG.iter().any(|profile| {
-            profile.id == id && !profile.signature_material.trim().is_empty()
-        })
-    })
+    let Ok(catalog) = CompatibilityCatalog::embedded() else {
+        return false;
+    };
+    id.is_some_and(|id| catalog.enabled_profiles().any(|profile| profile.id == id))
 }
 
 pub(crate) fn model_profile_is_available(config: &WechatConfig, profiles: &[TextModelProfile]) -> bool {
@@ -53,4 +40,15 @@ pub(crate) fn model_profile_is_available(config: &WechatConfig, profiles: &[Text
             && profile.test_status.eq_ignore_ascii_case("success")
             && !profile.model_config.model.trim().is_empty()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unprobed_embedded_catalog_exposes_no_selectable_profile() {
+        assert!(profile_options().is_empty());
+        assert!(!profile_is_trusted(Some("wechat-windows-v1")));
+    }
 }

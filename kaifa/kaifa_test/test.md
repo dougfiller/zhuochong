@@ -77,3 +77,16 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 旧 config/default/normalize | `cargo test --manifest-path desktop/Cargo.toml -p work-review-core config --quiet` | 通过；45 项通过，覆盖旧字段缺失、空 recent dir、留存和安全范围归一化。 |
 | 设置页生产构建 | `cd desktop && npm run build` | 通过；Vite 5.4.21 转换 242 个模块并完成生产构建。 |
 | Rust 格式检查 | `cargo fmt --manifest-path desktop/Cargo.toml --check` | 环境限制；当前 `stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component，未将此检查伪报为通过。 |
+
+## 前台微信识别和版本化布局兼容性档案（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_windows_wechat_profile.py`。脚本只读取受版本控制的 catalog 与 Rust 源码；不会启动应用、访问网络、读取真实微信、聊天正文、数据库或截图。
+
+| 验收项 | 命令/方法 | 实际结果 |
+| --- | --- | --- |
+| 空 production catalog | `python3 -B kaifa/kaifa_test/verify_windows_wechat_profile.py --project-root .` | 通过；schema 1 的 `windows-wechat-v1.json` 无 enabled profile，静态检查确认严格 schema、ROI/SHA-256、稳定错误码和无采集/OCR/模型边界。 |
+| profile/identity 契约 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat:: --no-default-features` | 通过；23/23。新增用例覆盖精确匹配、标题不能放行、非法/disabled profile 拒绝、最小化/几何失败和二次读取 stale。 |
+| 非 Windows 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features` | 通过；仅既存 dead-code 警告与 `block v0.1.6` future-incompat 提示。 |
+| diff 空白检查 | `git diff --check -- desktop/src-tauri/src/monitor.rs desktop/src-tauri/src/wechat desktop/src-tauri/Cargo.toml kaifa/kaifa_test` | 通过。 |
+| Windows 编译与实机 probe/UAT | 目标 Windows 11 x64 + 精确微信版本、主题、DPI 和拓扑 | blocked；当前主机只有 `aarch64-apple-darwin` target，未取得真实路径/哈希/ProductVersion/ROI/probe 报告。production catalog 故意为空。 |
+| Rust 格式检查 | `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` | 环境限制；未安装 `cargo-fmt`/`rustfmt` component。 |

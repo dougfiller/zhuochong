@@ -1250,6 +1250,258 @@ pub fn get_active_window_fast() -> Result<ActiveWindow> {
     get_active_window_with_options(false)
 }
 
+/// Reads private, fail-closed evidence for the future WeChat capture gate.
+/// It deliberately does not change the public ActiveWindow DTO used by Work Review.
+#[cfg(target_os = "windows")]
+pub(crate) fn read_foreground_window_evidence() -> Result<crate::wechat::window_identity::ForegroundWindowEvidence> {
+    use crate::wechat::window_identity::{
+        DisplayEvidence, ExecutableEvidence, ForegroundWindowEvidence, WindowInstanceToken,
+    };
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+    use winapi::um::winuser::{
+        GetDpiForWindow, GetForegroundWindow, GetWindowRect, GetWindowTextW,
+        GetWindowThreadProcessId, IsIconic,
+    };
+
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.is_null() {
+            return Err(AppError::Unknown("前台窗口不可用".into()));
+        }
+
+        let mut pid = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == 0 || IsIconic(hwnd) != 0 {
+            return Err(AppError::Unknown("前台窗口不支持".into()));
+        }
+
+        let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        if GetWindowRect(hwnd, &mut rect) == 0 {
+            return Err(AppError::Unknown("窗口几何不可用".into()));
+        }
+        let width = (rect.right - rect.left).max(0) as u32;
+        let height = (rect.bottom - rect.top).max(0) as u32;
+        let dpi = GetDpiForWindow(hwnd);
+        if width == 0 || height == 0 || dpi == 0 {
+            return Err(AppError::Unknown("窗口 DPI 或几何不可用".into()));
+        }
+
+        let normalized_path = get_process_image_path(pid)
+            .ok_or_else(|| AppError::Unknown("进程路径不可用".into()))?;
+        let file_name = std::path::Path::new(&normalized_path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned)
+            .ok_or_else(|| AppError::Unknown("进程文件名不可用".into()))?;
+        let sha256 = sha256_file(&normalized_path)
+            .ok_or_else(|| AppError::Unknown("进程文件哈希不可用".into()))?;
+        let product_version = windows_product_version(&normalized_path)
+            .ok_or_else(|| AppError::Unknown("进程版本不可用".into()))?;
+        let display = foreground_display_evidence(hwnd)
+            .ok_or_else(|| AppError::Unknown("显示器拓扑不可用".into()))?;
+        let windows_build = windows_build()
+            .ok_or_else(|| AppError::Unknown("Windows 版本不可用".into()))?;
+        let theme = foreground_window_theme(hwnd)
+            .ok_or_else(|| AppError::Unknown("窗口主题不可用".into()))?;
+
+        let mut title: [u16; 512] = [0; 512];
+        let title_len = GetWindowTextW(hwnd, title.as_mut_ptr(), title.len() as i32);
+        let title_hint = if title_len > 0 {
+            OsString::from_wide(&title[..title_len as usize]).to_string_lossy().to_string()
+        } else {
+            String::new()
+        };
+
+        Ok(ForegroundWindowEvidence {
+            instance: WindowInstanceToken::new(hwnd as usize, pid, process_started_at(pid)),
+            pid,
+            executable: ExecutableEvidence::new(normalized_path, file_name, sha256, product_version),
+            bounds_px: WindowBounds { x: rect.left, y: rect.top, width, height },
+            dpi,
+            is_minimized: false,
+            display,
+            windows_build,
+            theme: Some(theme),
+            title_hint,
+        })
+    }
+}
+
+#[cfg(any(test, target_os = "windows"))]
+fn theme_from_immersive_dark_mode(value: i32) -> &'static str {
+    if value == 0 { "light" } else { "dark" }
+}
+
+/// Reads the foreground HWND's documented DWM immersive-dark-mode attribute.
+/// A missing attribute remains unknown and is rejected by the profile gate.
+#[cfg(target_os = "windows")]
+fn foreground_window_theme(hwnd: winapi::shared::windef::HWND) -> Option<String> {
+    use winapi::um::dwmapi::DwmGetWindowAttribute;
+
+    const DWMWA_USE_IMMERSIVE_DARK_MODE: u32 = 20;
+    let mut immersive_dark_mode = 0i32;
+    let status = unsafe {
+        DwmGetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            &mut immersive_dark_mode as *mut i32 as *mut std::ffi::c_void,
+            std::mem::size_of::<i32>() as u32,
+        )
+    };
+    (status == 0).then(|| theme_from_immersive_dark_mode(immersive_dark_mode).to_owned())
+}
+
+#[cfg(test)]
+mod wechat_theme_tests {
+    use super::theme_from_immersive_dark_mode;
+
+    #[test]
+    fn immersive_dark_mode_values_map_to_profile_themes() {
+        assert_eq!(theme_from_immersive_dark_mode(0), "light");
+        assert_eq!(theme_from_immersive_dark_mode(1), "dark");
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_build() -> Option<String> {
+    use winapi::um::sysinfoapi::{GetVersionExW, OSVERSIONINFOW};
+
+    unsafe {
+        let mut version: OSVERSIONINFOW = std::mem::zeroed();
+        version.dwOSVersionInfoSize = std::mem::size_of::<OSVERSIONINFOW>() as u32;
+        (GetVersionExW(&mut version) != 0).then(|| version.dwBuildNumber.to_string())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn foreground_display_evidence(hwnd: winapi::shared::windef::HWND) -> Option<crate::wechat::window_identity::DisplayEvidence> {
+    use crate::wechat::window_identity::DisplayEvidence;
+    use winapi::um::winuser::{
+        GetMonitorInfoW, GetSystemMetrics, MonitorFromWindow, MONITORINFO, MONITORINFOF_PRIMARY,
+        MONITOR_DEFAULTTONEAREST, SM_CMONITORS,
+    };
+
+    unsafe {
+        let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        if monitor.is_null() {
+            return None;
+        }
+        let mut info: MONITORINFO = std::mem::zeroed();
+        info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+        if GetMonitorInfoW(monitor, &mut info) == 0 {
+            return None;
+        }
+        let monitors = GetSystemMetrics(SM_CMONITORS);
+        if monitors <= 0 {
+            return None;
+        }
+        Some(DisplayEvidence {
+            monitors: monitors as u32,
+            target_monitor: if info.dwFlags & MONITORINFOF_PRIMARY != 0 {
+                "primary".into()
+            } else {
+                "secondary".into()
+            },
+        })
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn process_started_at(pid: u32) -> Option<u64> {
+    use winapi::shared::minwindef::FILETIME;
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::um::processthreadsapi::{GetProcessTimes, OpenProcess};
+
+    unsafe {
+        let handle = OpenProcess(0x1000, 0, pid);
+        if handle.is_null() {
+            return None;
+        }
+        let mut created: FILETIME = std::mem::zeroed();
+        let mut exit: FILETIME = std::mem::zeroed();
+        let mut kernel: FILETIME = std::mem::zeroed();
+        let mut user: FILETIME = std::mem::zeroed();
+        let ok = GetProcessTimes(handle, &mut created, &mut exit, &mut kernel, &mut user);
+        CloseHandle(handle);
+        (ok != 0).then(|| ((created.dwHighDateTime as u64) << 32) | created.dwLowDateTime as u64)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn sha256_file(path: &str) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 32 * 1024];
+    loop {
+        let read = file.read(&mut buffer).ok()?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Some(hex::encode(hasher.finalize()))
+}
+
+#[cfg(target_os = "windows")]
+fn windows_product_version(path: &str) -> Option<String> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use winapi::shared::minwindef::{DWORD, LPVOID};
+    use winapi::um::winver::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
+
+    let wide_path: Vec<u16> = OsStr::new(path).encode_wide().chain(Some(0)).collect();
+    unsafe {
+        let mut ignored: DWORD = 0;
+        let size = GetFileVersionInfoSizeW(wide_path.as_ptr(), &mut ignored);
+        if size == 0 {
+            return None;
+        }
+        let mut data = vec![0_u8; size as usize];
+        if GetFileVersionInfoW(wide_path.as_ptr(), 0, size, data.as_mut_ptr() as LPVOID) == 0 {
+            return None;
+        }
+        let mut translation: LPVOID = std::ptr::null_mut();
+        let mut translation_len: u32 = 0;
+        let query: Vec<u16> = "\\VarFileInfo\\Translation".encode_utf16().chain(Some(0)).collect();
+        if VerQueryValueW(
+            data.as_mut_ptr() as LPVOID,
+            query.as_ptr(),
+            &mut translation,
+            &mut translation_len,
+        ) == 0
+            || translation_len < 4
+        {
+            return None;
+        }
+        let words = translation as *const u16;
+        let language = *words;
+        let code_page = *words.add(1);
+        let version_query = format!("\\StringFileInfo\\{language:04x}{code_page:04x}\\ProductVersion");
+        let version_query: Vec<u16> = version_query.encode_utf16().chain(Some(0)).collect();
+        let mut version: LPVOID = std::ptr::null_mut();
+        let mut version_len: u32 = 0;
+        if VerQueryValueW(
+            data.as_mut_ptr() as LPVOID,
+            version_query.as_ptr(),
+            &mut version,
+            &mut version_len,
+        ) == 0
+            || version.is_null()
+            || version_len == 0
+        {
+            return None;
+        }
+        let value = std::slice::from_raw_parts(version as *const u16, version_len as usize);
+        let value = String::from_utf16_lossy(value).trim_end_matches('\0').trim().to_owned();
+        (!value.is_empty()).then_some(value)
+    }
+}
+
 #[cfg(target_os = "windows")]
 fn get_active_window_with_options(include_browser_url: bool) -> Result<ActiveWindow> {
     use std::ffi::OsString;
