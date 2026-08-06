@@ -4565,6 +4565,7 @@ async fn main() {
             commands::get_config,
             commands::save_config,
             wechat::commands::get_wechat_settings_status,
+            wechat::commands::generate_wechat_reply,
             wechat::commands::list_wechat_reply_traces,
             wechat::commands::delete_wechat_reply_content,
             wechat::commands::request_wechat_suggestion_copy,

@@ -30,7 +30,9 @@ export default {
       wechatSuggestionDismiss: 'Dismiss',
       wechatSuggestionCopying: 'Copying…',
       wechatSuggestionCopyFailed: 'Copy failed. Please try again.',
+      wechatGenerate: 'Generate WeChat reply', wechatGenerating: 'Generating…', wechatPrepareCountdown: 'Switch back to WeChat ({count})', wechatPrepareCancel: 'Cancel', wechatManualReview: 'Review, copy, paste, and send it yourself.',
     },
+    wechat: { errors: { busy: 'Wait for the current suggestion to finish or close before trying again.', notForeground: 'Switch back to a supported one-to-one WeChat chat, then click again.', profileUnsupported: 'Check the supported Windows/WeChat compatibility profile in WeChat settings.', captureFailed: 'Keep WeChat in the foreground without changing its layout, then try again.', ocrFailed: 'Make sure the one-to-one chat has readable recent text, then try again.', groupUnsupported: 'Switch to a supported one-to-one chat.', modelUnavailable: 'Verify the selected text model in model settings.', requestCancelled: 'The request was cancelled or expired. Click explicitly again.', modelFailed: 'No suggestion was generated this time. Try again later.', generic: 'WeChat reply generation failed. Please try again later.' } },
     chart: {
       currentlySelected: 'Currently selected',
     },
@@ -490,10 +492,10 @@ export default {
       },
     },
     settingsWechat: {
-      title: 'WeChat reply preparation', loading: 'Loading safe status…', notReady: 'Preparation only. This step does not monitor, capture, paste, or send messages.', profile: 'Compatibility profile', profileUnset: 'Not selected', model: 'Text model profile', modelUnset: 'Not selected', retention: 'Allow retention setting', retentionDays: 'Retention days', noAutomation: 'Auto trigger stays off; no chat content is written in this step.',
+      title: 'WeChat reply preparation', loading: 'Loading safe status…', notReady: 'Preparation only. This step does not monitor, capture, paste, or send messages.', profile: 'Compatibility profile', profileUnset: 'Not selected', model: 'Text model profile', modelUnset: 'Not selected', retention: 'Allow retention setting', retentionDays: 'Retention days', noAutomation: 'Auto trigger stays off; no chat content is written in this step.', ready: 'The selected profile and text model are ready for a manual request.', needsSetup: 'Set a trusted compatibility profile and verified text model first.', autoTriggerOff: 'Auto trigger: off (read-only)', deleteContent: 'Delete retained content', deleteConfirm: 'Delete this feature’s retained restricted content? This does not delete ordinary Work Review data.', deleteSuccess: 'Deleted {deleted} request directories; {failed} entries were not deleted.', deleteFailed: 'Could not delete retained content. Please try again later.', phase: { idle: 'Request status: idle', validating: 'Request status: validating', capturing: 'Request status: capturing temporarily', ocr: 'Request status: recognizing', generating: 'Request status: generating', replyReady: 'Request status: suggestion ready' },
     },
     settingsKnowledge: {
-      title: 'M2 knowledge base preparation', loading: 'Loading safe status…', notReady: 'The knowledge base is not ready. No import, indexing, embedding, or retrieval runs here.', scope: 'Knowledge scope', scopeUnset: 'Not selected', scopeConversation: 'This conversation', scopeSelected: 'Selected conversations', scopeGlobal: 'User-selected global scope', topK: 'Top K', tokenBudget: 'Token budget', sameConversationBoost: 'Same-conversation boost', localEmbedding: 'Local loopback embedding', endpoint: 'Endpoint', embeddingModel: 'Model', sourceSummary: '{count} source metadata entries (not imported)',
+      title: 'M2 knowledge base preparation', loading: 'Loading safe status…', notReady: 'The knowledge base is not ready. No import, indexing, embedding, or retrieval runs here.', m1NoM2: 'M2 is not enabled or ready. The current WeChat suggestion does not use the knowledge base.', scope: 'Knowledge scope', scopeUnset: 'Not selected', scopeConversation: 'This conversation', scopeSelected: 'Selected conversations', scopeGlobal: 'User-selected global scope', topK: 'Top K', tokenBudget: 'Token budget', sameConversationBoost: 'Same-conversation boost', localEmbedding: 'Local loopback embedding', endpoint: 'Endpoint', embeddingModel: 'Model', sourceSummary: '{count} source metadata entries (not imported)',
     },
     settingsGeneral: {
       title: 'General',

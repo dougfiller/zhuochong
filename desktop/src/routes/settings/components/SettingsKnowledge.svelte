@@ -19,6 +19,7 @@
 <div class="settings-card mb-5">
   <h3 class="settings-card-title">{t('settingsKnowledge.title')}</h3>
   <p class="settings-card-desc">{t('settingsKnowledge.notReady')}</p>
+  <p class="mb-4 text-sm text-amber-700 dark:text-amber-200" role="status">{t('settingsKnowledge.m1NoM2')}</p>
   <div class="space-y-4">
     <label class="block text-sm font-medium">
       {t('settingsKnowledge.scope')}

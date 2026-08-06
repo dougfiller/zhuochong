@@ -6,6 +6,7 @@ use super::ocr::{
 use super::runtime::{BeginReplySnapshot, CaptureCoordinator, ReplyLease, WechatReplyRuntime};
 use super::state_machine::ReplyMode;
 use super::state_machine::ReplyState;
+#[cfg(any(target_os = "windows", test))]
 use super::trace::ReplyTraceStore;
 #[cfg(target_os = "windows")]
 use super::types::CapturedWechat;
@@ -13,6 +14,8 @@ use super::types::{
     BindingGeneration, BindingObservationVersion, CaptureVersion, ContractError, GeneratedReply,
     M1ReplyInput, OcrReadyReply,
 };
+#[cfg(target_os = "windows")]
+use crate::avatar_engine;
 use crate::AppState;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -98,16 +101,37 @@ async fn finish_captured_m1_reply(
         .await
 }
 
-/// Private M1-only orchestration. It has no Tauri command, frontend input, or
-/// presentation side effect; the returned reply is the only value that leaves
-/// this module.
+/// Publishes an already accepted M1 reply, emits its constrained avatar payload,
+/// and releases the private lease. The caller supplies the existing event sink
+/// so this terminal tail can be verified without Windows capture dependencies.
+fn publish_m1_reply_and_finish(
+    runtime: &WechatReplyRuntime,
+    lease: ReplyLease,
+    reply: &GeneratedReply,
+    emit: impl FnOnce(&crate::avatar_engine::AvatarBubblePayload),
+) -> Result<(), ContractError> {
+    let payload = match runtime.publish_generated_suggestion(reply) {
+        Ok(payload) => payload,
+        Err(error) => {
+            let _ = runtime.cancel_reply(&lease);
+            let _ = runtime.finish_reply(lease);
+            return Err(error);
+        }
+    };
+    emit(&payload);
+    runtime.finish_reply(lease)
+}
+
+/// Private M1-only orchestration. The lease never leaves this module: a
+/// generated reply is published to the existing avatar event and then released
+/// before the command returns.
 #[cfg(target_os = "windows")]
 pub(crate) async fn generate_wechat_reply(
     app: tauri::AppHandle,
     state: Arc<Mutex<AppState>>,
     runtime: &WechatReplyRuntime,
     coordinator: &CaptureCoordinator,
-) -> Result<GeneratedReply, ContractError> {
+) -> Result<(), ContractError> {
     let (config, profiles, screenshot_service, data_dir) = {
         let state = state
             .lock()
@@ -170,7 +194,7 @@ pub(crate) async fn generate_wechat_reply(
         WechatOcrDispatcher::new(WindowsMemoryPrimary, super::ocr::DisabledLocalFallback);
     let mut audit = DiscardOcrAudit;
     let ocr = dispatcher.recognize(&slices, &identity, captured, &mut audit);
-    finish_captured_m1_reply(
+    let reply = finish_captured_m1_reply(
         runtime,
         coordinator,
         &lease,
@@ -180,7 +204,10 @@ pub(crate) async fn generate_wechat_reply(
         profiles,
         &WechatReplyModelClient::new(),
     )
-    .await
+    .await?;
+    publish_m1_reply_and_finish(runtime, lease, &reply, |payload| {
+        avatar_engine::emit_avatar_bubble(&app, payload);
+    })
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -189,7 +216,7 @@ pub(crate) async fn generate_wechat_reply(
     _state: Arc<Mutex<AppState>>,
     _runtime: &WechatReplyRuntime,
     _coordinator: &CaptureCoordinator,
-) -> Result<GeneratedReply, ContractError> {
+) -> Result<(), ContractError> {
     Err(ContractError::WxWindowUnsupported)
 }
 
@@ -337,7 +364,23 @@ mod tests {
         assert!(trace.contains(&lease.request_id().to_string()));
         assert!(trace.contains("\"captureVersion\":1"));
 
-        runtime.finish_reply(lease).unwrap();
+        let request_id = lease.request_id().clone();
+        let suggestion_generation = lease.suggestion_generation();
+        let observed = Arc::new(Mutex::new(Vec::new()));
+        let observer = observed.clone();
+        let observed_runtime = runtime.clone();
+        publish_m1_reply_and_finish(&runtime, lease, &reply, move |payload| {
+            assert_eq!(
+                observed_runtime.request_suggestion_copy(&request_id, suggestion_generation, None,),
+                Ok("建议回复".into())
+            );
+            observer.lock().unwrap().push(payload.kind.clone());
+        })
+        .unwrap();
+        assert_eq!(
+            observed.lock().unwrap().as_slice(),
+            &[crate::avatar_engine::AvatarBubbleKind::WechatSuggestion]
+        );
         assert!(runtime
             .begin_reply(m1_snapshot(), ReplyTraceStore::new(&directory))
             .is_ok());
@@ -451,6 +494,50 @@ mod tests {
             Err(ContractError::WxRequestStale),
         );
         assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert!(runtime
+            .begin_reply(m1_snapshot(), ReplyTraceStore::new(&directory))
+            .is_ok());
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[tokio::test]
+    async fn publish_tail_does_not_emit_when_publish_fails_and_releases_the_slot() {
+        let directory = std::env::temp_dir().join(format!("wechat-flow-{}", uuid::Uuid::new_v4()));
+        let runtime = WechatReplyRuntime::default();
+        let (lease, coordinator) = begin_capturing(&runtime, &directory);
+        let version = CaptureVersion::new(1);
+        let client = WechatReplyModelClient::with_transport(Arc::new(FakeTransport {
+            calls: Arc::new(AtomicUsize::new(0)),
+            reply: Some("建议回复".into()),
+        }));
+        let (config, profiles) = selected_model_snapshot();
+        let _reply = finish_captured_m1_reply(
+            &runtime,
+            &coordinator,
+            &lease,
+            version,
+            Ok(ocr_for(&lease, version)),
+            config,
+            profiles,
+            &client,
+        )
+        .await
+        .unwrap();
+        let stale_reply = GeneratedReply::m1(
+            lease.request_id().clone(),
+            crate::wechat::types::SuggestionGeneration::new(999),
+            "stale".into(),
+        );
+
+        let emitted = Arc::new(AtomicUsize::new(0));
+        let observer = emitted.clone();
+        assert_eq!(
+            publish_m1_reply_and_finish(&runtime, lease, &stale_reply, move |_| {
+                observer.fetch_add(1, Ordering::SeqCst);
+            }),
+            Err(ContractError::WxRequestStale)
+        );
+        assert_eq!(emitted.load(Ordering::SeqCst), 0);
         assert!(runtime
             .begin_reply(m1_snapshot(), ReplyTraceStore::new(&directory))
             .is_ok());

@@ -95,6 +95,30 @@ impl Default for WechatReplyRuntime {
 }
 
 impl WechatReplyRuntime {
+    /// A deliberately small public status view for settings UI. It has no
+    /// request identifier, reply body, trace location, or error detail.
+    pub(crate) fn request_phase(&self) -> &'static str {
+        let Ok(inner) = self.inner.lock() else {
+            return "idle";
+        };
+        let Some(active) = inner.active.as_ref() else {
+            return "idle";
+        };
+        match active.state.state() {
+            ReplyState::Validating => "validating",
+            ReplyState::Capturing => "capturing",
+            ReplyState::Ocr => "ocr",
+            ReplyState::ReplyReady => "replyReady",
+            ReplyState::Idle
+            | ReplyState::Retrieving
+            | ReplyState::Generating
+            | ReplyState::Copied
+            | ReplyState::Dismissed
+            | ReplyState::Cancelled
+            | ReplyState::Failed => "generating",
+        }
+    }
+
     /// Claims the authoritative slot and makes `validating` durable before
     /// exposing a lease. A busy request is never created or traced.
     pub(crate) fn begin_reply(

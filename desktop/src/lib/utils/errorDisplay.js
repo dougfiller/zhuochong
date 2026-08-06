@@ -18,6 +18,36 @@ const TECHNICAL_PATTERNS = [
   /^\s*at\s+\S+\s+\(/m, // 堆栈行
 ];
 
+const WECHAT_ERROR_KEYS = {
+  WX_BUSY: 'wechat.errors.busy',
+  WX_NOT_FOREGROUND: 'wechat.errors.notForeground',
+  WX_PROFILE_UNSUPPORTED: 'wechat.errors.profileUnsupported',
+  WX_WINDOW_UNSUPPORTED: 'wechat.errors.profileUnsupported',
+  WX_CAPTURE_FAILED: 'wechat.errors.captureFailed',
+  WX_CAPTURE_TIMEOUT: 'wechat.errors.captureFailed',
+  WX_OCR_EMPTY: 'wechat.errors.ocrFailed',
+  WX_OCR_UNAVAILABLE: 'wechat.errors.ocrFailed',
+  WX_OCR_FAILED: 'wechat.errors.ocrFailed',
+  WX_GROUP_CHAT_UNSUPPORTED: 'wechat.errors.groupUnsupported',
+  WX_TEXT_MODEL_UNAVAILABLE: 'wechat.errors.modelUnavailable',
+  WX_REQUEST_CANCELLED: 'wechat.errors.requestCancelled',
+  WX_REQUEST_STALE: 'wechat.errors.requestCancelled',
+  LLM_FAILED: 'wechat.errors.modelFailed',
+};
+
+/**
+ * Maps only stable WeChat contract tokens to localized, actionable copy.
+ * Raw Tauri errors are never suitable for this UI because they can contain
+ * implementation details.
+ */
+export function formatWechatUserError(error, fallback, translate) {
+  const text = String(error instanceof Error ? error.message : error ?? '');
+  const code = Object.keys(WECHAT_ERROR_KEYS).find((candidate) =>
+    new RegExp(`(?:^|[^A-Z0-9_])${candidate}(?:$|[^A-Z0-9_])`).test(text),
+  );
+  return code ? translate(WECHAT_ERROR_KEYS[code]) : fallback;
+}
+
 /**
  * 把任意错误转成适合展示给用户的文本。
  *

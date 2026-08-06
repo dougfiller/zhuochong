@@ -9,6 +9,11 @@
   export let onDismissWechatSuggestion = () => {};
   export let copyPending = false;
   export let copyError = '';
+  export let onStartWechatGeneration = () => {};
+  export let onCancelWechatGeneration = () => {};
+  export let prepareSeconds = 0;
+  export let generatePending = false;
+  export let generateError = '';
 
   $: bubbleMessage = formatBubbleMessage(bubble?.message);
   $: panelStyle =
@@ -32,7 +37,7 @@
     : 'width: min(82vw, 336px); min-width: 160px; max-width: min(82vw, 336px);';
 </script>
 
-{#if bubble}
+{#if bubble || !isWechatSuggestion}
   <div class="absolute inset-0 z-20 overflow-visible pointer-events-none">
     <div class={`avatar-popover-anchor absolute ${flipLeft ? 'left-[6%]' : 'right-[6%]'} top-[8px]`}>
       <div class="relative overflow-visible">
@@ -48,6 +53,7 @@
               on:click={onClose}
             ></button>
           {/if}
+          {#if bubble}
           <div
             class="pointer-events-none absolute inset-[1px] rounded-[15px] border"
             style={innerPanelStyle}
@@ -70,6 +76,7 @@
           >
             {bubbleMessage}
           </div>
+          {/if}
           {#if isWechatSuggestion}
             {#if copyError}
               <p class="relative mt-2 text-[11px] font-medium text-rose-700" role="alert">{copyError}</p>
@@ -94,6 +101,21 @@
                 {copyPending ? t('avatar.wechatSuggestionCopying') : t('avatar.wechatSuggestionCopy')}
               </button>
             </div>
+          {:else}
+            {#if generateError}
+              <p class="relative mt-2 text-[11px] font-medium text-rose-700" role="alert">{generateError}</p>
+            {/if}
+            <div class="relative mt-2 flex items-center justify-end gap-2">
+              {#if prepareSeconds}
+                <span class="text-[11px] font-medium text-slate-600">{t('avatar.wechatPrepareCountdown', { count: prepareSeconds })}</span>
+                <button type="button" class="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700" on:click|stopPropagation={onCancelWechatGeneration}>{t('avatar.wechatPrepareCancel')}</button>
+              {:else}
+                <button type="button" class="rounded-md bg-sky-600 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={generatePending} on:click|stopPropagation={onStartWechatGeneration}>
+                  {generatePending ? t('avatar.wechatGenerating') : t('avatar.wechatGenerate')}
+                </button>
+              {/if}
+            </div>
+            <p class="relative mt-2 text-[10px] leading-snug text-slate-500">{t('avatar.wechatManualReview')}</p>
           {/if}
         </div>
         <div

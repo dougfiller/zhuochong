@@ -183,3 +183,17 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 生产构建 | `cd desktop && npm run build` | Vite 5.4.21 构建完成。 | 通过 |
 | 当前主机 feature 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1'` | 通过；仅既有 feature-gated dead-code 警告。 | 通过 |
 | Windows 微信/步骤 13 用户入口 | 受控 Windows 11 与后续显式生成入口 | 本步骤未实现用户触发入口、真实微信闭环或自动粘贴/发送；macOS 测试不替代该验证。 | not-run |
+
+## 显式触发微信回复、设置隐私与安全错误反馈（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_wechat_explicit_trigger.py`。它仅读取本步骤源码，拒绝任何用户输入 DTO 或 Rust clipboard API；不启动应用、不访问网络、微信、模型、知识库、数据库或用户内容。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 显式入口与私有收尾边界 | `python3 -B kaifa/kaifa_test/verify_wechat_explicit_trigger.py --project-root .` | 通过；唯一无输入 command、3 秒可取消倒计时、`publish → avatar event → finish` 收尾及稳定错误白名单均存在。 | 通过 |
+| 前端倒计时、错误回退和设置接线 | `cd desktop && node --test src/lib/utils/errorDisplay.test.js src/routes/avatar/WechatExplicitTrigger.test.js src/lib/components/Avatar/avatarWindow.test.js src/routes/settings/SettingsWechatKnowledge.test.js` | 49/49 通过；未知错误回退通用文案，取消不会 invoke，设置仍使用统一 camelCase 保存链路。 | 通过 |
+| 前端生产构建 | `cd desktop && npm run build` | Vite 5.4.21 构建完成（243 modules）。 | 通过 |
+| M1 command/flow 单测 | 两条 `cargo test ... wechat::commands|wechat::reply_flow --features 'wechat-contract-check,wechat-m1'` | 分别 1/1、5/5 通过；flow 覆盖 `publish → avatar event → finish` 的私有收尾、publish 失败不 emit 和 slot 可复用；沿用 fake transport/临时 trace，不发送真实请求。 | 通过 |
+| M1/M2 feature 门禁 | 两条 `cargo check ... --features 'wechat-contract-check,wechat-m1|wechat-m2'` | 均通过；M2 不会调用 M1 显式入口，未启用 M1 时返回 `WX_WINDOW_UNSUPPORTED`。 | 通过 |
+| 范围格式与空白 | `rustfmt --edition 2021 --check ...`；`git diff --check -- ...` | 通过；仅检查本步骤 Rust/前端/测试范围。 | 通过 |
+| Windows target 编译与真机纵向闭环 | `cargo check --target x86_64-pc-windows-msvc ...`；受控 Windows 11、冻结微信 profile、已验证文本模型 | 当前 host 已安装 `x86_64-pc-windows-msvc` target；交叉编译在既有 `libsqlite3-sys` C 构建阶段因缺少 Windows C 工具链/`stdlib.h` 受阻，未到达本项目 Windows 分支。production catalog 仍为空，未执行 Windows 真机验收；macOS/fake 结果不能替代。 | blocked |

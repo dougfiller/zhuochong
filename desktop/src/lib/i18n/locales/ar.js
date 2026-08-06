@@ -30,7 +30,9 @@ export default {
       wechatSuggestionDismiss: 'إغلاق',
       wechatSuggestionCopying: 'جارٍ النسخ…',
       wechatSuggestionCopyFailed: 'تعذر النسخ. حاول مرة أخرى.',
+      wechatGenerate: 'إنشاء رد WeChat', wechatGenerating: 'جارٍ الإنشاء…', wechatPrepareCountdown: 'ارجع إلى WeChat ({count})', wechatPrepareCancel: 'إلغاء', wechatManualReview: 'راجع الرد وانسخه والصقه وأرسله بنفسك.',
     },
+    wechat: { errors: { busy: 'انتظر حتى يكتمل الاقتراح الحالي أو أغلِقه ثم حاول مجدداً.', notForeground: 'ارجع إلى دردشة WeChat فردية مدعومة ثم انقر مجدداً.', profileUnsupported: 'تحقق من ملف توافق Windows/WeChat المدعوم في إعدادات WeChat.', captureFailed: 'أبقِ WeChat في المقدمة ولا تغيّر تخطيط النافذة ثم حاول مجدداً.', ocrFailed: 'تأكد من وجود نص حديث مقروء في الدردشة الفردية ثم حاول مجدداً.', groupUnsupported: 'انتقل إلى دردشة فردية مدعومة.', modelUnavailable: 'تحقق من نموذج النص المحدد في إعدادات النموذج.', requestCancelled: 'أُلغي الطلب أو انتهت صلاحيته. انقر بوضوح مرة أخرى.', modelFailed: 'لم يُنشأ اقتراح هذه المرة. حاول لاحقاً.', generic: 'تعذر إنشاء رد WeChat. حاول لاحقاً.' } },
     chart: {
       currentlySelected: 'المحدد حالياً',
     },
@@ -487,10 +489,10 @@ export default {
       },
     },
     settingsWechat: {
-      title: 'إعداد ردود ويتشات', loading: 'جارٍ تحميل الحالة الآمنة…', notReady: 'إعداد فقط. هذه الخطوة لا تراقب أو تلتقط أو تلصق أو ترسل رسائل.', profile: 'ملف التوافق', profileUnset: 'غير محدد', model: 'ملف نموذج النص', modelUnset: 'غير محدد', retention: 'السماح بإعداد الاحتفاظ', retentionDays: 'أيام الاحتفاظ', noAutomation: 'يبقى التشغيل التلقائي معطلاً؛ ولا تُكتب محادثات في هذه الخطوة.',
+      title: 'إعداد ردود ويتشات', loading: 'جارٍ تحميل الحالة الآمنة…', notReady: 'إعداد فقط. هذه الخطوة لا تراقب أو تلتقط أو تلصق أو ترسل رسائل.', profile: 'ملف التوافق', profileUnset: 'غير محدد', model: 'ملف نموذج النص', modelUnset: 'غير محدد', retention: 'السماح بإعداد الاحتفاظ', retentionDays: 'أيام الاحتفاظ', noAutomation: 'يبقى التشغيل التلقائي معطلاً؛ ولا تُكتب محادثات في هذه الخطوة.', ready: 'ملف التوافق ونموذج النص المحددان جاهزان لطلب يدوي.', needsSetup: 'عيّن ملف توافق موثوقاً ونموذج نص تم التحقق منه أولاً.', autoTriggerOff: 'التشغيل التلقائي: متوقف (للقراءة فقط)', deleteContent: 'حذف المحتوى المحتفَظ به', deleteConfirm: 'هل تريد حذف المحتوى المقيد المحتفَظ به لهذه الميزة؟ لن يحذف هذا بيانات Work Review العادية.', deleteSuccess: 'حُذف {deleted} من أدلة الطلبات؛ ولم تُحذف {failed} من العناصر.', deleteFailed: 'تعذر حذف المحتوى المحتفَظ به. حاول لاحقاً.', phase: { idle: 'حالة الطلب: خامل', validating: 'حالة الطلب: جارٍ التحقق', capturing: 'حالة الطلب: جارٍ الالتقاط المؤقت', ocr: 'حالة الطلب: جارٍ التعرّف', generating: 'حالة الطلب: جارٍ الإنشاء', replyReady: 'حالة الطلب: الاقتراح جاهز' },
     },
     settingsKnowledge: {
-      title: 'إعداد قاعدة معرفة M2', loading: 'جارٍ تحميل الحالة الآمنة…', notReady: 'قاعدة المعرفة غير جاهزة؛ لا يتم استيراد أو فهرسة أو تضمين أو استرجاع هنا.', scope: 'نطاق المعرفة', scopeUnset: 'غير محدد', scopeConversation: 'هذه المحادثة', scopeSelected: 'محادثات مختارة', scopeGlobal: 'نطاق عام يختاره المستخدم', topK: 'Top K', tokenBudget: 'ميزانية الرموز', sameConversationBoost: 'تعزيز المحادثة نفسها', localEmbedding: 'تضمين محلي loopback', endpoint: 'نقطة النهاية', embeddingModel: 'النموذج', sourceSummary: '{count} إدخال بيانات وصفية للمصدر (غير مستورد)',
+      title: 'إعداد قاعدة معرفة M2', loading: 'جارٍ تحميل الحالة الآمنة…', notReady: 'قاعدة المعرفة غير جاهزة؛ لا يتم استيراد أو فهرسة أو تضمين أو استرجاع هنا.', m1NoM2: 'لم يتم تمكين M2 أو أنه غير جاهز. اقتراح WeChat الحالي لا يستخدم قاعدة المعرفة.', scope: 'نطاق المعرفة', scopeUnset: 'غير محدد', scopeConversation: 'هذه المحادثة', scopeSelected: 'محادثات مختارة', scopeGlobal: 'نطاق عام يختاره المستخدم', topK: 'Top K', tokenBudget: 'ميزانية الرموز', sameConversationBoost: 'تعزيز المحادثة نفسها', localEmbedding: 'تضمين محلي loopback', endpoint: 'نقطة النهاية', embeddingModel: 'النموذج', sourceSummary: '{count} إدخال بيانات وصفية للمصدر (غير مستورد)',
     },
     settingsGeneral: {
       title: 'عام',

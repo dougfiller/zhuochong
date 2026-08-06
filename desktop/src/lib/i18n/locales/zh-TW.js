@@ -30,7 +30,9 @@ export default {
       wechatSuggestionDismiss: '關閉',
       wechatSuggestionCopying: '複製中…',
       wechatSuggestionCopyFailed: '複製失敗，請重試。',
+      wechatGenerate: '產生微信回覆', wechatGenerating: '產生中…', wechatPrepareCountdown: '請切回微信（{count}）', wechatPrepareCancel: '取消', wechatManualReview: '請自行檢查、複製、貼上並傳送。',
     },
+    wechat: { errors: { busy: '請等待目前建議完成或關閉後再試。', notForeground: '請切回已支援的微信單聊後重新點擊。', profileUnsupported: '請在微信設定檢查已支援的 Windows/微信相容性設定檔。', captureFailed: '請保持微信在前景且不要改變視窗版面後重試。', ocrFailed: '請確認單聊中有可讀的近期文字後重試。', groupUnsupported: '請切換至已支援的單聊。', modelUnavailable: '請在模型設定驗證已選擇的文字模型。', requestCancelled: '請求已取消或過期，請重新明確點擊。', modelFailed: '本次未產生建議，請稍後重試。', generic: '產生微信回覆失敗，請稍後重試。' } },
     chart: {
       currentlySelected: '目前所選',
     },
@@ -480,10 +482,10 @@ export default {
       },
     },
     settingsWechat: {
-      title: '微信回覆準備', loading: '正在讀取安全狀態…', notReady: '僅為準備設定。本步驟不會監聽、擷取、貼上或傳送訊息。', profile: '相容性設定檔', profileUnset: '未選擇', model: '文字模型設定檔', modelUnset: '未選擇', retention: '允許設定保留', retentionDays: '保留天數', noAutomation: '自動觸發保持關閉；本步驟不會寫入聊天內容。',
+      title: '微信回覆準備', loading: '正在讀取安全狀態…', notReady: '僅為準備設定。本步驟不會監聽、擷取、貼上或傳送訊息。', profile: '相容性設定檔', profileUnset: '未選擇', model: '文字模型設定檔', modelUnset: '未選擇', retention: '允許設定保留', retentionDays: '保留天數', noAutomation: '自動觸發保持關閉；本步驟不會寫入聊天內容。', ready: '所選相容性設定檔與文字模型可用於手動請求。', needsSetup: '請先完成受信任相容性設定檔與已驗證文字模型設定。', autoTriggerOff: '自動觸發：關閉（唯讀）', deleteContent: '刪除已保留內容', deleteConfirm: '確定刪除此功能已保留的受限內容嗎？此操作不會刪除一般 Work Review 資料。', deleteSuccess: '已刪除 {deleted} 個請求目錄；{failed} 項未刪除。', deleteFailed: '刪除已保留內容失敗，請稍後重試。', phase: { idle: '請求狀態：閒置', validating: '請求狀態：正在驗證', capturing: '請求狀態：正在暫時擷取', ocr: '請求狀態：正在辨識', generating: '請求狀態：正在產生', replyReady: '請求狀態：建議已就緒' },
     },
     settingsKnowledge: {
-      title: 'M2 知識庫準備', loading: '正在讀取安全狀態…', notReady: '知識庫尚未就緒；這裡不執行匯入、索引、嵌入或檢索。', scope: '知識範圍', scopeUnset: '未選擇', scopeConversation: '目前會話', scopeSelected: '已選會話', scopeGlobal: '使用者選擇的全域範圍', topK: 'Top K', tokenBudget: 'Token 預算', sameConversationBoost: '同會話加權', localEmbedding: '本機 loopback 嵌入', endpoint: '端點', embeddingModel: '模型', sourceSummary: '{count} 條來源中繼資料（尚未匯入）',
+      title: 'M2 知識庫準備', loading: '正在讀取安全狀態…', notReady: '知識庫尚未就緒；這裡不執行匯入、索引、嵌入或檢索。', m1NoM2: 'M2 未啟用或尚未就緒；目前微信建議不使用知識庫。', scope: '知識範圍', scopeUnset: '未選擇', scopeConversation: '目前會話', scopeSelected: '已選會話', scopeGlobal: '使用者選擇的全域範圍', topK: 'Top K', tokenBudget: 'Token 預算', sameConversationBoost: '同會話加權', localEmbedding: '本機 loopback 嵌入', endpoint: '端點', embeddingModel: '模型', sourceSummary: '{count} 條來源中繼資料（尚未匯入）',
     },
     settingsGeneral: {
       title: '基本設定',

@@ -7,6 +7,7 @@
   import AvatarCanvas from '../../lib/components/Avatar/AvatarCanvas.svelte';
   import AvatarFollowupCard from '../../lib/components/Avatar/AvatarFollowupCard.svelte';
   import AvatarPopover from '../../lib/components/Avatar/AvatarPopover.svelte';
+  import { formatWechatUserError } from '../../lib/utils/errorDisplay.js';
   import { applyLocaleToDocument, initializeLocale, locale, t } from '$lib/i18n/index.js';
   import {
     getAvatarMotionStepDelay,
@@ -54,6 +55,11 @@
   let ordinaryBubbleTimer = null;
   let copyPending = false;
   let copyError = '';
+  const WECHAT_PREPARE_SECONDS = 3;
+  let wechatPrepareSeconds = 0;
+  let wechatGeneratePending = false;
+  let wechatGenerateError = '';
+  let wechatPrepareTimer = null;
   let followup = null;
   let focusSession = null;
   let focusTimer = null;
@@ -458,6 +464,49 @@
       return;
     }
     clearBubble();
+  }
+
+  function clearWechatPrepareTimer() {
+    clearInterval(wechatPrepareTimer);
+    wechatPrepareTimer = null;
+  }
+
+  function cancelWechatGeneration() {
+    clearWechatPrepareTimer();
+    wechatPrepareSeconds = 0;
+    wechatGeneratePending = false;
+  }
+
+  async function runWechatGeneration() {
+    wechatGeneratePending = true;
+    try {
+      await invoke('generate_wechat_reply');
+      wechatGenerateError = '';
+    } catch (error) {
+      wechatGenerateError = formatWechatUserError(
+        error,
+        t('wechat.errors.generic'),
+        t,
+      );
+    } finally {
+      wechatGeneratePending = false;
+    }
+  }
+
+  function startWechatGeneration() {
+    if (wechatPrepareSeconds || wechatGeneratePending || wechatSuggestionBubble) {
+      return;
+    }
+    wechatGenerateError = '';
+    wechatPrepareSeconds = WECHAT_PREPARE_SECONDS;
+    wechatPrepareTimer = setInterval(() => {
+      wechatPrepareSeconds -= 1;
+      if (wechatPrepareSeconds > 0) {
+        return;
+      }
+      clearWechatPrepareTimer();
+      runWechatGeneration();
+    }, 1000);
   }
 
   function getFollowupPersonaLabelKey(persona) {
@@ -953,6 +1002,7 @@
       clearTimeout(motionTimer);
       clearTimeout(sizeCorrectionTimer);
       clearTimeout(resizeGuardTimer);
+      clearWechatPrepareTimer();
       clearFocusTimer();
       if (handleVisibilityChange) document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (handleContextMenu) document.removeEventListener('contextmenu', handleContextMenu);
@@ -979,6 +1029,11 @@
       onDismissWechatSuggestion={dismissWechatSuggestion}
       {copyPending}
       {copyError}
+      onStartWechatGeneration={startWechatGeneration}
+      onCancelWechatGeneration={cancelWechatGeneration}
+      prepareSeconds={wechatPrepareSeconds}
+      generatePending={wechatGeneratePending}
+      generateError={wechatGenerateError}
     />
   </div>
 

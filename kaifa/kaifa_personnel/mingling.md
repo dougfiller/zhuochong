@@ -167,3 +167,24 @@ git diff --check -- desktop/src-tauri/src/wechat/mod.rs desktop/src-tauri/src/we
 - `request_wechat_suggestion_copy(input)`：仅在 runtime 的 `requestId + suggestionGeneration + bindingGeneration` 与当前展示建议完全一致时返回正文；该命令不写剪贴板。
 - `confirm_wechat_suggestion_copy(input)` 与 `dismiss_wechat_suggestion(input)`：仅在同一三元组仍有效时清除建议，并向既有 `avatar` 窗口发送受限的微信建议失效事件。没有新增窗口、快捷键、自动化、Rust clipboard 或输入/发送能力。
 - 本步骤没有新增可执行脚本。前端针对性测试使用仓库既有命令 `cd desktop && node --test src/lib/components/Avatar/avatarWindow.test.js src/lib/components/Avatar/avatarOutline.test.js`；该项目没有 `npm test` script。
+
+## 显式触发微信回复、设置隐私与安全错误反馈（2026-08-06）
+
+```bash
+# 只读源码边界检查；不启动应用、不访问网络、微信、模型或用户内容。
+python3 -B kaifa/kaifa_test/verify_wechat_explicit_trigger.py --project-root .
+
+# 前端定向测试与生产构建。
+cd desktop && node --test src/lib/utils/errorDisplay.test.js src/routes/avatar/WechatExplicitTrigger.test.js src/lib/components/Avatar/avatarWindow.test.js src/routes/settings/SettingsWechatKnowledge.test.js
+cd desktop && npm run build
+
+# 仅运行本步骤相关的 Rust 单测与 M1/M2 feature 编译门禁。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::commands --no-default-features --features 'wechat-contract-check,wechat-m1'
+cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::reply_flow --no-default-features --features 'wechat-contract-check,wechat-m1'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+```
+
+- `verify_wechat_explicit_trigger.py` 是新增的纯静态门禁：确认唯一无输入 command、私有 publish/emit/finish 顺序、3 秒可取消倒计时、白名单错误格式化，且拒绝前端输入 DTO 与 clipboard Rust API；不会读取用户内容或创建文件。
+- Rust command 只在 `wechat-m1` 时调用私有流程；M2 或未启用 M1 时固定返回 `WX_WINDOW_UNSUPPORTED`，不会降级为 M2 或通用 Agent。
+- 这些检查不替代受控 Windows 11 的真实微信/profile/模型纵向验收；当前 macOS 不产生 Windows 真机成功证据。
