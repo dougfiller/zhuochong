@@ -69,6 +69,23 @@ pub struct AvatarInputPayload {
     pub last_mouse_input_at_ms: u64,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum AvatarBubbleKind {
+    #[default]
+    Standard,
+    WechatSuggestion,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AvatarBubbleActions {
+    #[serde(default)]
+    pub copy: bool,
+    #[serde(default)]
+    pub dismiss: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AvatarBubblePayload {
@@ -80,6 +97,16 @@ pub struct AvatarBubblePayload {
     pub duration_ms: Option<u64>,
     #[serde(default)]
     pub clear: bool,
+    #[serde(default)]
+    pub kind: AvatarBubbleKind,
+    #[serde(default)]
+    pub request_id: Option<String>,
+    #[serde(default)]
+    pub suggestion_generation: Option<u64>,
+    #[serde(default)]
+    pub binding_generation: Option<u64>,
+    #[serde(default)]
+    pub actions: AvatarBubbleActions,
 }
 
 impl AvatarBubblePayload {
@@ -90,6 +117,11 @@ impl AvatarBubblePayload {
             persistent: false,
             duration_ms: Some(4200),
             clear: false,
+            kind: AvatarBubbleKind::Standard,
+            request_id: None,
+            suggestion_generation: None,
+            binding_generation: None,
+            actions: AvatarBubbleActions::default(),
         }
     }
 
@@ -100,6 +132,11 @@ impl AvatarBubblePayload {
             persistent: false,
             duration_ms: Some(4200),
             clear: false,
+            kind: AvatarBubbleKind::Standard,
+            request_id: None,
+            suggestion_generation: None,
+            binding_generation: None,
+            actions: AvatarBubbleActions::default(),
         }
     }
 
@@ -110,6 +147,11 @@ impl AvatarBubblePayload {
             persistent: true,
             duration_ms: None,
             clear: false,
+            kind: AvatarBubbleKind::Standard,
+            request_id: None,
+            suggestion_generation: None,
+            binding_generation: None,
+            actions: AvatarBubbleActions::default(),
         }
     }
 
@@ -120,6 +162,53 @@ impl AvatarBubblePayload {
             persistent: false,
             duration_ms: None,
             clear: true,
+            kind: AvatarBubbleKind::Standard,
+            request_id: None,
+            suggestion_generation: None,
+            binding_generation: None,
+            actions: AvatarBubbleActions::default(),
+        }
+    }
+
+    pub fn wechat_suggestion(
+        message: impl Into<String>,
+        request_id: String,
+        suggestion_generation: u64,
+        binding_generation: Option<u64>,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            tone: "info".to_string(),
+            persistent: true,
+            duration_ms: None,
+            clear: false,
+            kind: AvatarBubbleKind::WechatSuggestion,
+            request_id: Some(request_id),
+            suggestion_generation: Some(suggestion_generation),
+            binding_generation,
+            actions: AvatarBubbleActions {
+                copy: true,
+                dismiss: true,
+            },
+        }
+    }
+
+    pub fn clear_wechat_suggestion(
+        request_id: String,
+        suggestion_generation: u64,
+        binding_generation: Option<u64>,
+    ) -> Self {
+        Self {
+            message: String::new(),
+            tone: "info".to_string(),
+            persistent: false,
+            duration_ms: None,
+            clear: true,
+            kind: AvatarBubbleKind::WechatSuggestion,
+            request_id: Some(request_id),
+            suggestion_generation: Some(suggestion_generation),
+            binding_generation,
+            actions: AvatarBubbleActions::default(),
         }
     }
 }
@@ -195,7 +284,7 @@ pub fn derive_avatar_state_with_rules(
             avatar_opacity: AVATAR_OPACITY_DEFAULT,
             avatar_preset: AVATAR_PRESET_DEFAULT.to_string(),
             avatar_persona: "assistant".to_string(),
-        avatar_body_hidden: false,
+            avatar_body_hidden: false,
         };
     }
 
@@ -210,7 +299,7 @@ pub fn derive_avatar_state_with_rules(
             avatar_opacity: AVATAR_OPACITY_DEFAULT,
             avatar_preset: AVATAR_PRESET_DEFAULT.to_string(),
             avatar_persona: "assistant".to_string(),
-        avatar_body_hidden: false,
+            avatar_body_hidden: false,
         };
     }
 
@@ -430,7 +519,8 @@ pub fn sync_avatar_window(
             };
             let effective_position =
                 remembered_avatar_position(had_existing_window, current_position, saved_position);
-            let (x, y) = default_avatar_position(app, normalized_scale, effective_position, body_hidden);
+            let (x, y) =
+                default_avatar_position(app, normalized_scale, effective_position, body_hidden);
             resize_avatar_window(&window, normalized_scale, expanded, body_hidden);
             let _ = window.set_always_on_top(true);
             let _ = window.set_visible_on_all_workspaces(true);
@@ -663,7 +753,14 @@ fn monitor_bounds_for_point(app: &AppHandle, x: i32, y: i32) -> Option<Rect> {
             width: size.width as i32,
             height: size.height as i32,
         };
-        if point_in_rect(x as i64, y as i64, bounds.x as i64, bounds.y as i64, bounds.width as i64, bounds.height as i64) {
+        if point_in_rect(
+            x as i64,
+            y as i64,
+            bounds.x as i64,
+            bounds.y as i64,
+            bounds.width as i64,
+            bounds.height as i64,
+        ) {
             let work_area = monitor.work_area();
             return Some(Rect {
                 x: work_area.position.x,
@@ -825,10 +922,29 @@ mod tests {
     use super::{
         avatar_window_size, clamp_avatar_position, clamp_avatar_position_with_size,
         default_avatar_state, derive_avatar_state, derive_avatar_state_with_rules, point_in_rect,
-        remembered_avatar_position, resolve_avatar_position, Rect, AVATAR_WINDOW_HEIGHT,
-        AVATAR_WINDOW_WIDTH,
+        remembered_avatar_position, resolve_avatar_position, AvatarBubbleActions, AvatarBubbleKind,
+        AvatarBubblePayload, Rect, AVATAR_WINDOW_HEIGHT, AVATAR_WINDOW_WIDTH,
     };
     use crate::config::AppCategoryRule;
+
+    #[test]
+    fn legacy_bubbles_deserialize_as_standard_and_suggestions_are_restricted() {
+        let legacy: AvatarBubblePayload =
+            serde_json::from_str(r#"{"message":"提醒","tone":"info","persistent":true}"#).unwrap();
+        assert_eq!(legacy.kind, AvatarBubbleKind::Standard);
+        assert_eq!(legacy.actions, AvatarBubbleActions::default());
+
+        let payload = AvatarBubblePayload::wechat_suggestion(
+            "仅建议正文",
+            "00000000-0000-0000-0000-000000000001".into(),
+            1,
+            None,
+        );
+        let value = serde_json::to_value(payload).unwrap();
+        assert_eq!(value["kind"], "wechatSuggestion");
+        assert!(value.get("knowledgeStore").is_none());
+        assert!(value.get("modelClient").is_none());
+    }
 
     #[test]
     fn point_in_rect_边界判定() {
@@ -1165,8 +1281,13 @@ mod tests {
         let saved = (2200, 800);
         let (compact_w, compact_h) = avatar_window_size(0.9, false, false);
 
-        let (x, y) =
-            clamp_avatar_position_with_size(secondary_bounds, saved.0, saved.1, compact_w, compact_h);
+        let (x, y) = clamp_avatar_position_with_size(
+            secondary_bounds,
+            saved.0,
+            saved.1,
+            compact_w,
+            compact_h,
+        );
 
         // 仍在副屏内（x >= 1440），且未被错误地拉回主屏原点附近
         assert!(
@@ -1194,7 +1315,10 @@ mod tests {
             clamp_avatar_position_with_size(primary_bounds, saved.0, saved.1, compact_w, compact_h);
 
         // 用主屏 bounds 时副屏 x=2200 会被钳到主屏右边缘 —— 这是要避免的行为
-        assert_eq!(x, primary_bounds.x + primary_bounds.width - compact_w as i32);
+        assert_eq!(
+            x,
+            primary_bounds.x + primary_bounds.width - compact_w as i32
+        );
         assert_ne!((x, y), saved);
     }
 
@@ -1213,6 +1337,12 @@ mod tests {
         let (x, y) = resolve_avatar_position(fallback_bounds, None, Some(orphan_saved), 0.9, false);
 
         let (w, h) = avatar_window_size(0.9, false, false);
-        assert_eq!((x, y), (fallback_bounds.x + fallback_bounds.width - w as i32, fallback_bounds.y + fallback_bounds.height - h as i32));
+        assert_eq!(
+            (x, y),
+            (
+                fallback_bounds.x + fallback_bounds.width - w as i32,
+                fallback_bounds.y + fallback_bounds.height - h as i32
+            )
+        );
     }
 }

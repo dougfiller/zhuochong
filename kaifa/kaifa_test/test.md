@@ -170,3 +170,16 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | M1/M2 feature 门禁 | 两条 `cargo check ... --features 'wechat-contract-check,wechat-m1|wechat-m2'` | 均编译成功；M2 不编译 reply flow。 | 通过 |
 | 范围内格式与空白 | `rustfmt --edition 2021 --check ...runtime.rs ...reply_flow.rs`；`git diff --check -- ...` | 两项通过；未格式化范围外既有文件。 | 通过 |
 | Windows 真机闭环 | 受控 Windows 11 x64、启用的精确微信 profile 和虚构/受控模型 | 当前 macOS 未安装 Windows target，且 production profile 仍为空；本机测试不能替代真机验证。 | not-run |
+
+## 桌宠微信建议复制/关闭与代际校验（2026-08-06）
+
+本步骤未新增检测脚本；Rust 测试只使用 runtime 的虚构建议与系统临时 trace，前端测试只读取组件源码，不启动 Tauri、不访问微信、模型、知识库、网络或剪贴板。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 三元组与代际 fail-closed | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::runtime --no-default-features --features 'wechat-contract-check,wechat-m1'` | 18/18 通过；覆盖 M1 binding 必须省略、伪造 binding、重复确认、新请求替换和 M2 binding 失效后的 `WX_REQUEST_STALE`。 | 通过 |
+| 旧 payload 与受限 DTO | 同一 Rust 测试中的 `avatar_engine` 单测 | 旧普通 payload 默认 `standard`；微信事件只携带消息、三元组与动作标志。 | 通过 |
+| 桌宠前端优先级与操作边界 | `cd desktop && node --test src/lib/components/Avatar/avatarWindow.test.js src/lib/components/Avatar/avatarOutline.test.js` | 53/53 通过；建议压过 focus/普通气泡，普通 clear 不清建议，复制仅在后端成功回包后调用 Web Clipboard，普通 persistent 仍可关闭。 | 通过 |
+| 生产构建 | `cd desktop && npm run build` | Vite 5.4.21 构建完成。 | 通过 |
+| 当前主机 feature 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1'` | 通过；仅既有 feature-gated dead-code 警告。 | 通过 |
+| Windows 微信/步骤 13 用户入口 | 受控 Windows 11 与后续显式生成入口 | 本步骤未实现用户触发入口、真实微信闭环或自动粘贴/发送；macOS 测试不替代该验证。 | not-run |

@@ -26,6 +26,10 @@ export default {
     avatar: {
       sceneAlt: 'صورة {name}',
       dismissReminder: 'إخفاء التذكير',
+      wechatSuggestionCopy: 'نسخ',
+      wechatSuggestionDismiss: 'إغلاق',
+      wechatSuggestionCopying: 'جارٍ النسخ…',
+      wechatSuggestionCopyFailed: 'تعذر النسخ. حاول مرة أخرى.',
     },
     chart: {
       currentlySelected: 'المحدد حالياً',

@@ -26,6 +26,10 @@ export default {
     avatar: {
       sceneAlt: '{name} 桌寵',
       dismissReminder: '關閉提醒',
+      wechatSuggestionCopy: '複製',
+      wechatSuggestionDismiss: '關閉',
+      wechatSuggestionCopying: '複製中…',
+      wechatSuggestionCopyFailed: '複製失敗，請重試。',
     },
     chart: {
       currentlySelected: '目前所選',

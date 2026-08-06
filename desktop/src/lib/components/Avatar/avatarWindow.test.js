@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { freezeFocusSession, restoreFocusSession } from './focusSessionTiming.js';
 
 function readCommandsSource() {
   // commands.rs 已按领域拆分为 commands/*.rs，这里拼接所有子模块以保持断言语义不变。
@@ -8,6 +9,29 @@ function readCommandsSource() {
   const files = readdirSync(dir).filter((f) => f.endsWith('.rs'));
   return files.map((f) => readFileSync(new URL(f, dir), 'utf8')).join('\n');
 }
+
+test('微信建议覆盖期间应冻结专注剩余时长，并在关闭后从冻结点继续', () => {
+  const focusSession = {
+    projectKey: 'project-a',
+    title: '写测试',
+    endsAtMs: 25 * 60 * 1000,
+  };
+  const remainingMs = freezeFocusSession(focusSession, 20 * 60 * 1000);
+
+  const resumedSession = restoreFocusSession(
+    focusSession,
+    remainingMs,
+    30 * 60 * 1000,
+  );
+
+  assert.equal(remainingMs, 5 * 60 * 1000);
+  assert.equal(resumedSession.endsAtMs, 35 * 60 * 1000);
+  assert.equal(freezeFocusSession(resumedSession, 30 * 60 * 1000), 5 * 60 * 1000);
+});
+
+test('微信建议覆盖期间主动停止专注后不应恢复会话', () => {
+  assert.equal(restoreFocusSession(null, 5 * 60 * 1000, 30 * 60 * 1000), null);
+});
 
 test('桌宠窗口应强制网页根节点透明，避免轮廓外出现白底', () => {
   const source = readFileSync(new URL('../../../routes/avatar/AvatarWindow.svelte', import.meta.url), 'utf8');

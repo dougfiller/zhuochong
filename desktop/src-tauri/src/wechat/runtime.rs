@@ -13,6 +13,7 @@ use super::types::{
     BindingGeneration, BindingObservationVersion, CaptureVersion, ContractError, GeneratedReply,
     OcrReadyReply, RequestId, SuggestionGeneration,
 };
+use crate::avatar_engine::AvatarBubblePayload;
 #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
 use crate::config::{TextModelProfile, WechatConfig};
 use crate::knowledge::types::RetrievedReply;
@@ -30,6 +31,21 @@ pub(crate) struct WechatReplyRuntime {
 struct RuntimeInner {
     next_suggestion_generation: u64,
     active: Option<ActiveReply>,
+    presented_suggestion: Option<PresentedSuggestion>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PresentedSuggestionState {
+    Ready,
+    CopyAuthorized,
+}
+
+struct PresentedSuggestion {
+    request_id: RequestId,
+    suggestion_generation: SuggestionGeneration,
+    binding_generation: Option<BindingGeneration>,
+    text: String,
+    state: PresentedSuggestionState,
 }
 
 struct ActiveReply {
@@ -72,6 +88,7 @@ impl Default for WechatReplyRuntime {
             inner: Arc::new(Mutex::new(RuntimeInner {
                 next_suggestion_generation: 0,
                 active: None,
+                presented_suggestion: None,
             })),
         }
     }
@@ -92,6 +109,7 @@ impl WechatReplyRuntime {
         if inner.active.is_some() {
             return Err(ContractError::WxBusy);
         }
+        inner.presented_suggestion = None;
         let suggestion_generation =
             SuggestionGeneration::new(inner.next_suggestion_generation.saturating_add(1));
         let request_id = RequestId::new();
@@ -305,6 +323,7 @@ impl WechatReplyRuntime {
         if result.is_err() {
             inner.active = None;
         }
+        inner.presented_suggestion = None;
         result
     }
 
@@ -329,6 +348,9 @@ impl WechatReplyRuntime {
             ReplyState::ReplyReady | ReplyState::Failed | ReplyState::Cancelled
         ) {
             return Err(ContractError::WxContractViolation);
+        }
+        if active.state.state() != ReplyState::ReplyReady {
+            inner.presented_suggestion = None;
         }
         inner.active = None;
         Ok(())
@@ -427,6 +449,143 @@ impl WechatReplyRuntime {
         }
         active.state = candidate;
         Ok(())
+    }
+
+    /// Publishes only a reply that this runtime has already accepted for the
+    /// current `replyReady` lease. The returned DTO contains no model, OCR,
+    /// retrieval, trace, or storage capability.
+    pub(crate) fn publish_generated_suggestion(
+        &self,
+        reply: &GeneratedReply,
+    ) -> Result<AvatarBubblePayload, ContractError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| ContractError::WxContractViolation)?;
+        let active = inner.active.as_ref().ok_or(ContractError::WxRequestStale)?;
+        let binding =
+            (active.state.mode() == ReplyMode::M2).then_some(active.state.binding_generation());
+        if active.state.state() != ReplyState::ReplyReady
+            || !reply.is_current(
+                active.state.request_id(),
+                active.state.suggestion_generation(),
+                binding,
+            )
+        {
+            return Err(ContractError::WxRequestStale);
+        }
+        let presented = PresentedSuggestion {
+            request_id: active.state.request_id().clone(),
+            suggestion_generation: active.state.suggestion_generation(),
+            binding_generation: binding,
+            text: reply.text().to_owned(),
+            state: PresentedSuggestionState::Ready,
+        };
+        let payload = AvatarBubblePayload::wechat_suggestion(
+            presented.text.clone(),
+            presented.request_id.to_string(),
+            presented.suggestion_generation.value(),
+            presented.binding_generation.map(BindingGeneration::value),
+        );
+        inner.presented_suggestion = Some(presented);
+        Ok(payload)
+    }
+
+    pub(crate) fn request_suggestion_copy(
+        &self,
+        request_id: &RequestId,
+        suggestion_generation: SuggestionGeneration,
+        binding_generation: Option<BindingGeneration>,
+    ) -> Result<String, ContractError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| ContractError::WxContractViolation)?;
+        let suggestion = inner
+            .presented_suggestion
+            .as_mut()
+            .ok_or(ContractError::WxRequestStale)?;
+        if !presented_matches(
+            suggestion,
+            request_id,
+            suggestion_generation,
+            binding_generation,
+        ) {
+            return Err(ContractError::WxRequestStale);
+        }
+        suggestion.state = PresentedSuggestionState::CopyAuthorized;
+        Ok(suggestion.text.clone())
+    }
+
+    pub(crate) fn confirm_suggestion_copy(
+        &self,
+        request_id: &RequestId,
+        suggestion_generation: SuggestionGeneration,
+        binding_generation: Option<BindingGeneration>,
+    ) -> Result<(), ContractError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| ContractError::WxContractViolation)?;
+        let Some(suggestion) = inner.presented_suggestion.as_ref() else {
+            return Err(ContractError::WxRequestStale);
+        };
+        if !presented_matches(
+            suggestion,
+            request_id,
+            suggestion_generation,
+            binding_generation,
+        ) || suggestion.state != PresentedSuggestionState::CopyAuthorized
+        {
+            return Err(ContractError::WxRequestStale);
+        }
+        inner.presented_suggestion = None;
+        Ok(())
+    }
+
+    pub(crate) fn dismiss_suggestion(
+        &self,
+        request_id: &RequestId,
+        suggestion_generation: SuggestionGeneration,
+        binding_generation: Option<BindingGeneration>,
+    ) -> Result<(), ContractError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| ContractError::WxContractViolation)?;
+        let Some(suggestion) = inner.presented_suggestion.as_ref() else {
+            return Err(ContractError::WxRequestStale);
+        };
+        if !presented_matches(
+            suggestion,
+            request_id,
+            suggestion_generation,
+            binding_generation,
+        ) {
+            return Err(ContractError::WxRequestStale);
+        }
+        inner.presented_suggestion = None;
+        Ok(())
+    }
+
+    /// M2 binding owners call this after they advance their binding generation.
+    /// M1 suggestions have no binding and are deliberately unaffected.
+    pub(crate) fn invalidate_presented_suggestion_for_binding(
+        &self,
+        binding_generation: BindingGeneration,
+    ) -> Result<bool, ContractError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| ContractError::WxContractViolation)?;
+        let should_clear = inner
+            .presented_suggestion
+            .as_ref()
+            .is_some_and(|suggestion| suggestion.binding_generation == Some(binding_generation));
+        if should_clear {
+            inner.presented_suggestion = None;
+        }
+        Ok(should_clear)
     }
 
     #[cfg(feature = "wechat-m1")]
@@ -657,6 +816,17 @@ impl WechatReplyRuntime {
 fn lease_matches(active: &ActiveReply, lease: &ReplyLease) -> bool {
     active.state.request_id() == lease.request_id()
         && active.state.suggestion_generation() == lease.suggestion_generation()
+}
+
+fn presented_matches(
+    suggestion: &PresentedSuggestion,
+    request_id: &RequestId,
+    suggestion_generation: SuggestionGeneration,
+    binding_generation: Option<BindingGeneration>,
+) -> bool {
+    suggestion.request_id == *request_id
+        && suggestion.suggestion_generation == suggestion_generation
+        && suggestion.binding_generation == binding_generation
 }
 
 fn event_for(
@@ -1210,6 +1380,7 @@ mod reply_runtime_tests {
     use super::*;
     #[cfg(feature = "wechat-m1")]
     use crate::agent::model::{SingleTurnTextRequest, SingleTurnTextTransport};
+    use crate::avatar_engine::AvatarBubbleKind;
     #[cfg(feature = "wechat-m1")]
     use crate::config::{AiProvider, ModelConfig, TextModelProfile, WechatConfig};
     #[cfg(feature = "wechat-m1")]
@@ -1229,6 +1400,122 @@ mod reply_runtime_tests {
             capture_version: Some(CaptureVersion::new(6)),
             timeout: Duration::from_secs(5),
         }
+    }
+
+    fn ready_m1_suggestion(
+        runtime: &WechatReplyRuntime,
+        trace: ReplyTraceStore,
+    ) -> (ReplyLease, GeneratedReply) {
+        let lease = runtime.begin_reply(snapshot(), trace).unwrap();
+        runtime
+            .transition(
+                &lease,
+                ReplyState::Validating,
+                ReplyState::Capturing,
+                None,
+                None,
+            )
+            .unwrap();
+        runtime
+            .transition(&lease, ReplyState::Capturing, ReplyState::Ocr, None, None)
+            .unwrap();
+        runtime
+            .transition(&lease, ReplyState::Ocr, ReplyState::Generating, None, None)
+            .unwrap();
+        runtime.record_model_transport_call(&lease).unwrap();
+        let reply = GeneratedReply::m1(
+            lease.request_id().clone(),
+            lease.suggestion_generation(),
+            "受限建议正文".into(),
+        );
+        runtime.complete_generated_reply(&lease, &reply).unwrap();
+        (lease, reply)
+    }
+
+    #[test]
+    fn presented_m1_suggestion_requires_the_exact_triplet_and_confirms_once() {
+        let directory =
+            std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let runtime = WechatReplyRuntime::default();
+        let (lease, reply) = ready_m1_suggestion(&runtime, ReplyTraceStore::new(&directory));
+        let payload = runtime.publish_generated_suggestion(&reply).unwrap();
+
+        assert_eq!(payload.kind, AvatarBubbleKind::WechatSuggestion);
+        assert!(payload.actions.copy && payload.actions.dismiss);
+        assert!(payload.binding_generation.is_none());
+        assert_eq!(
+            runtime.request_suggestion_copy(
+                lease.request_id(),
+                lease.suggestion_generation(),
+                Some(BindingGeneration::new(4)),
+            ),
+            Err(ContractError::WxRequestStale)
+        );
+        assert_eq!(
+            runtime
+                .request_suggestion_copy(lease.request_id(), lease.suggestion_generation(), None)
+                .unwrap(),
+            "受限建议正文"
+        );
+        runtime
+            .confirm_suggestion_copy(lease.request_id(), lease.suggestion_generation(), None)
+            .unwrap();
+        assert_eq!(
+            runtime.request_suggestion_copy(
+                lease.request_id(),
+                lease.suggestion_generation(),
+                None
+            ),
+            Err(ContractError::WxRequestStale)
+        );
+        runtime.finish_reply(lease).unwrap();
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn new_reply_and_m2_binding_invalidation_fail_closed_for_presented_suggestions() {
+        let directory =
+            std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let runtime = WechatReplyRuntime::default();
+        let (lease, reply) = ready_m1_suggestion(&runtime, ReplyTraceStore::new(&directory));
+        runtime.publish_generated_suggestion(&reply).unwrap();
+        runtime.finish_reply(lease.clone()).unwrap();
+        runtime
+            .begin_reply(snapshot(), ReplyTraceStore::new(&directory))
+            .unwrap();
+        assert_eq!(
+            runtime.request_suggestion_copy(
+                lease.request_id(),
+                lease.suggestion_generation(),
+                None
+            ),
+            Err(ContractError::WxRequestStale)
+        );
+
+        let request_id = RequestId::new();
+        let binding = BindingGeneration::new(9);
+        runtime.inner.lock().unwrap().presented_suggestion = Some(PresentedSuggestion {
+            request_id: request_id.clone(),
+            suggestion_generation: SuggestionGeneration::new(12),
+            binding_generation: Some(binding),
+            text: "M2 建议".into(),
+            state: PresentedSuggestionState::Ready,
+        });
+        assert!(!runtime
+            .invalidate_presented_suggestion_for_binding(BindingGeneration::new(8))
+            .unwrap());
+        assert!(runtime
+            .invalidate_presented_suggestion_for_binding(binding)
+            .unwrap());
+        assert_eq!(
+            runtime.request_suggestion_copy(
+                &request_id,
+                SuggestionGeneration::new(12),
+                Some(binding)
+            ),
+            Err(ContractError::WxRequestStale)
+        );
+        let _ = std::fs::remove_dir_all(directory);
     }
 
     #[cfg(feature = "wechat-m1")]

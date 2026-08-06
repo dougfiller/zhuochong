@@ -23,6 +23,7 @@ mod dingtalk_bot;
 mod error;
 mod feishu_bot;
 mod idle_detector;
+mod knowledge;
 mod linux_session;
 mod localhost_api;
 mod monitor;
@@ -34,10 +35,9 @@ mod screen_lock;
 mod screenshot;
 mod storage;
 mod telegram_bot;
-mod wecom_bot;
 mod wechat;
+mod wecom_bot;
 mod work_intelligence;
-mod knowledge;
 
 use config::{config_backup_path, AppConfig, AvatarFollowupItem, ConfigLoadStatus};
 use database::Database;
@@ -323,7 +323,11 @@ pub(crate) fn refresh_tray_menu(app: &AppHandle) {
     let _ = tray_menu.show.set_text(tray_label("show", &locale));
     let _ = tray_menu
         .recording_toggle
-        .set_text(tray_recording_toggle_label(is_recording, is_paused, &locale));
+        .set_text(tray_recording_toggle_label(
+            is_recording,
+            is_paused,
+            &locale,
+        ));
     let _ = tray_menu
         .lightweight_mode
         .set_text(tray_label("lightweight", &locale));
@@ -348,7 +352,9 @@ async fn set_app_locale(
         _ => "zh-CN",
     };
     let config = {
-        let mut s = state.lock().map_err(|e| crate::error::AppError::Unknown(e.to_string()))?;
+        let mut s = state
+            .lock()
+            .map_err(|e| crate::error::AppError::Unknown(e.to_string()))?;
         s.config.locale = normalized.to_string();
         s.config.clone()
     };
@@ -1083,7 +1089,11 @@ pub(crate) fn resolve_activity_classification(
             .ok()
             .and_then(|m| m.get(&cache_key).cloned());
         if let Some((cached_base, semantic)) = cached {
-            if config.custom_categories.iter().any(|c| c.key == cached_base) {
+            if config
+                .custom_categories
+                .iter()
+                .any(|c| c.key == cached_base)
+            {
                 base_category = cached_base;
                 cached_semantic = Some(semantic);
             }
@@ -2661,13 +2671,16 @@ async fn background_screenshot_task(state: Arc<Mutex<AppState>>, app: AppHandle)
 
                     // 截屏到内存，保存为临时文件供 OCR 使用
                     let screenshot_result = if screenshots_enabled {
-                        let _capture_permit = app.state::<wechat::CaptureCoordinator>().try_acquire();
+                        let _capture_permit =
+                            app.state::<wechat::CaptureCoordinator>().try_acquire();
                         let screenshot_service = {
                             let state_guard = state.lock().unwrap_or_else(|e| e.into_inner());
                             state_guard.screenshot_service.clone()
                         };
                         _capture_permit.and_then(|_permit| {
-                            screenshot_service.capture_for_window(Some(&active_window)).ok()
+                            screenshot_service
+                                .capture_for_window(Some(&active_window))
+                                .ok()
                         })
                     } else {
                         None
@@ -2894,7 +2907,8 @@ async fn background_screenshot_task(state: Arc<Mutex<AppState>>, app: AppHandle)
                             .try_acquire()
                             .map(|_permit| {
                                 let screenshot_service = {
-                                    let state_guard = state.lock().unwrap_or_else(|e| e.into_inner());
+                                    let state_guard =
+                                        state.lock().unwrap_or_else(|e| e.into_inner());
                                     state_guard.screenshot_service.clone()
                                 };
                                 screenshot_service.capture_for_window(Some(&active_window))
@@ -3539,8 +3553,7 @@ async fn remote_upload_backfill_task(state: Arc<Mutex<AppState>>) {
             if !local_path.exists() {
                 continue; // 本地文件已被保留策略清理，无从补传
             }
-            match remote_upload::upload_screenshot(&remote_cfg, &local_path, &relative_path).await
-            {
+            match remote_upload::upload_screenshot(&remote_cfg, &local_path, &relative_path).await {
                 Ok(url) => {
                     let updated = {
                         let guard = state.lock().unwrap_or_else(|e| e.into_inner());
@@ -3550,9 +3563,9 @@ async fn remote_upload_backfill_task(state: Arc<Mutex<AppState>>) {
                     };
                     match updated {
                         Ok(()) => uploaded += 1,
-                        Err(e) => log::warn!(
-                            "补传后写回 screenshot_url 失败（活动 {activity_id}）: {e}"
-                        ),
+                        Err(e) => {
+                            log::warn!("补传后写回 screenshot_url 失败（活动 {activity_id}）: {e}")
+                        }
                     }
                 }
                 Err(e) => log::warn!("补传截图失败（活动 {activity_id}）: {e}"),
@@ -3573,9 +3586,8 @@ async fn remote_upload_backfill_task(state: Arc<Mutex<AppState>>) {
 /// 采集循环里的 resolve_activity_classification 只读查询。
 pub(crate) fn entity_category_cache(
 ) -> &'static std::sync::RwLock<std::collections::HashMap<String, (String, String)>> {
-    static CACHE: OnceCell<
-        std::sync::RwLock<std::collections::HashMap<String, (String, String)>>,
-    > = OnceCell::new();
+    static CACHE: OnceCell<std::sync::RwLock<std::collections::HashMap<String, (String, String)>>> =
+        OnceCell::new();
     CACHE.get_or_init(|| std::sync::RwLock::new(std::collections::HashMap::new()))
 }
 
@@ -3757,7 +3769,9 @@ async fn entity_classify_task(state: Arc<Mutex<AppState>>) {
             let app_lower = app.to_lowercase();
             let key = format!("app:{app_lower}");
             if cached_keys.contains(&key)
-                || app_rule_names.iter().any(|r| app_lower.contains(r.as_str()))
+                || app_rule_names
+                    .iter()
+                    .any(|r| app_lower.contains(r.as_str()))
             {
                 continue;
             }
@@ -3827,7 +3841,9 @@ async fn entity_classify_task(state: Arc<Mutex<AppState>>) {
 
             let persisted = {
                 let guard = state.lock().unwrap_or_else(|e| e.into_inner());
-                guard.database.upsert_entity_category(&key, &base, &semantic)
+                guard
+                    .database
+                    .upsert_entity_category(&key, &base, &semantic)
             };
             if let Err(e) = persisted {
                 log::warn!("写入实体分类缓存失败({key}): {e}");
@@ -4214,7 +4230,10 @@ async fn main() {
             // config never triggers destructive cleanup during startup.
             if let Some(state) = app.try_state::<Arc<Mutex<AppState>>>() {
                 let (data_dir, retention_enabled, retention_days, can_cleanup) = {
-                    let state = state.inner().lock().unwrap_or_else(|error| error.into_inner());
+                    let state = state
+                        .inner()
+                        .lock()
+                        .unwrap_or_else(|error| error.into_inner());
                     (
                         state.data_dir.clone(),
                         state.config.wechat.content_retention_enabled,
@@ -4347,14 +4366,18 @@ async fn main() {
                 tray_recording_toggle_label(true, false, &tray_locale),
             )
             .build(app)?;
-            let lightweight_mode =
-                CheckMenuItemBuilder::with_id(TRAY_MENU_LIGHTWEIGHT_MODE_ID, tray_label("lightweight", &tray_locale))
-                    .checked(false)
-                    .build(app)?;
-            let avatar_toggle =
-                CheckMenuItemBuilder::with_id(TRAY_MENU_AVATAR_TOGGLE_ID, tray_label("avatar", &tray_locale))
-                    .checked(avatar_enabled)
-                    .build(app)?;
+            let lightweight_mode = CheckMenuItemBuilder::with_id(
+                TRAY_MENU_LIGHTWEIGHT_MODE_ID,
+                tray_label("lightweight", &tray_locale),
+            )
+            .checked(false)
+            .build(app)?;
+            let avatar_toggle = CheckMenuItemBuilder::with_id(
+                TRAY_MENU_AVATAR_TOGGLE_ID,
+                tray_label("avatar", &tray_locale),
+            )
+            .checked(avatar_enabled)
+            .build(app)?;
             let quit =
                 MenuItemBuilder::with_id(TRAY_MENU_QUIT_ID, tray_label("quit", &tray_locale))
                     .build(app)?;
@@ -4544,6 +4567,9 @@ async fn main() {
             wechat::commands::get_wechat_settings_status,
             wechat::commands::list_wechat_reply_traces,
             wechat::commands::delete_wechat_reply_content,
+            wechat::commands::request_wechat_suggestion_copy,
+            wechat::commands::confirm_wechat_suggestion_copy,
+            wechat::commands::dismiss_wechat_suggestion,
             knowledge::commands::get_knowledge_settings_status,
             knowledge::commands::validate_knowledge_local_embedding,
             commands::get_update_settings,
@@ -4643,12 +4669,11 @@ async fn main() {
             tauri::RunEvent::Reopen {
                 has_visible_windows,
                 ..
-            }
-                if !has_visible_windows => {
-                    if let Err(e) = reveal_main_window(&_app_handle.clone(), None) {
-                        log::warn!("Dock 恢复主窗口失败: {e}");
-                    }
+            } if !has_visible_windows => {
+                if let Err(e) = reveal_main_window(&_app_handle.clone(), None) {
+                    log::warn!("Dock 恢复主窗口失败: {e}");
                 }
+            }
             _ => {}
         });
 }
@@ -4797,10 +4822,18 @@ mod tests {
 
     #[test]
     fn 只有未切换的连续活动可以合并() {
-        assert!(should_merge_contiguous_activity(false, "Code", 1_500, 1_000));
-        assert!(!should_merge_contiguous_activity(true, "Code", 1_500, 1_000));
-        assert!(!should_merge_contiguous_activity(false, "Unknown", 1_500, 1_000));
-        assert!(!should_merge_contiguous_activity(false, "Code", 1_601, 1_000));
+        assert!(should_merge_contiguous_activity(
+            false, "Code", 1_500, 1_000
+        ));
+        assert!(!should_merge_contiguous_activity(
+            true, "Code", 1_500, 1_000
+        ));
+        assert!(!should_merge_contiguous_activity(
+            false, "Unknown", 1_500, 1_000
+        ));
+        assert!(!should_merge_contiguous_activity(
+            false, "Code", 1_601, 1_000
+        ));
         assert!(!should_merge_contiguous_activity(false, "Code", 999, 1_000));
     }
 
@@ -5036,8 +5069,15 @@ mod tests {
 
     #[test]
     fn 停止录制时桌宠应回到待命状态() {
-        let decision =
-            avatar_activity_decision(true, false, false, 0.82, "minimal-office", "assistant", false);
+        let decision = avatar_activity_decision(
+            true,
+            false,
+            false,
+            0.82,
+            "minimal-office",
+            "assistant",
+            false,
+        );
 
         assert!(!decision.should_continue);
         assert_eq!(
@@ -5158,8 +5198,14 @@ mod tests {
 
     #[test]
     fn 托盘录制按钮文案应与状态一致() {
-        assert_eq!(tray_recording_toggle_label(false, false, "zh-CN"), "开始录制");
-        assert_eq!(tray_recording_toggle_label(true, false, "zh-CN"), "暂停录制");
+        assert_eq!(
+            tray_recording_toggle_label(false, false, "zh-CN"),
+            "开始录制"
+        );
+        assert_eq!(
+            tray_recording_toggle_label(true, false, "zh-CN"),
+            "暂停录制"
+        );
         assert_eq!(tray_recording_toggle_label(true, true, "zh-CN"), "恢复录制");
     }
 
@@ -5406,9 +5452,7 @@ mod tests {
 
     #[test]
     fn 配置损坏时应跳过键鼠采集() {
-        assert!(!should_initialize_avatar_input(
-            ConfigLoadStatus::Corrupted
-        ));
+        assert!(!should_initialize_avatar_input(ConfigLoadStatus::Corrupted));
 
         for status in [
             ConfigLoadStatus::Loaded,

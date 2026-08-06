@@ -26,6 +26,10 @@ export default {
     avatar: {
       sceneAlt: '{name} 桌宠',
       dismissReminder: '关闭提醒',
+      wechatSuggestionCopy: '复制',
+      wechatSuggestionDismiss: '关闭',
+      wechatSuggestionCopying: '复制中…',
+      wechatSuggestionCopyFailed: '复制失败，请重试。',
     },
     chart: {
       currentlySelected: '当前选中',

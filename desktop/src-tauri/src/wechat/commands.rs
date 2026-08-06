@@ -1,14 +1,17 @@
-use super::config::{model_profile_is_available, profile_is_trusted, profile_options, CompatibilityProfileOption};
+use super::config::{
+    model_profile_is_available, profile_is_trusted, profile_options, CompatibilityProfileOption,
+};
 use super::content::{ContentDeleteResult, WechatContentStore};
 use super::trace::{ReplyTraceStore, TraceQuery, WechatReplyTracePage};
 use super::WechatReplyRuntime;
-use chrono::{DateTime, Utc};
+use crate::avatar_engine::{self, AvatarBubblePayload};
 use crate::config::WechatConfig;
 use crate::error::AppError;
 use crate::AppState;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{AppHandle, State};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +21,94 @@ pub(crate) struct TraceQueryInput {
     occurred_before: Option<String>,
     cursor: Option<String>,
     limit: Option<u16>,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct WechatSuggestionActionInput {
+    request_id: String,
+    suggestion_generation: u64,
+    binding_generation: Option<u64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WechatSuggestionCopyResult {
+    text: String,
+}
+
+impl WechatSuggestionActionInput {
+    fn versions(
+        &self,
+    ) -> Result<
+        (
+            super::types::RequestId,
+            super::types::SuggestionGeneration,
+            Option<super::types::BindingGeneration>,
+        ),
+        super::types::ContractError,
+    > {
+        if self.suggestion_generation == 0 || self.binding_generation == Some(0) {
+            return Err(super::types::ContractError::WxTraceInvalidQuery);
+        }
+        Ok((
+            super::types::RequestId::parse(&self.request_id)?,
+            super::types::SuggestionGeneration::new(self.suggestion_generation),
+            self.binding_generation
+                .map(super::types::BindingGeneration::new),
+        ))
+    }
+
+    fn clear_payload(&self) -> AvatarBubblePayload {
+        AvatarBubblePayload::clear_wechat_suggestion(
+            self.request_id.clone(),
+            self.suggestion_generation,
+            self.binding_generation,
+        )
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn request_wechat_suggestion_copy(
+    input: WechatSuggestionActionInput,
+    runtime: State<'_, WechatReplyRuntime>,
+) -> Result<WechatSuggestionCopyResult, AppError> {
+    let (request_id, suggestion_generation, binding_generation) =
+        input.versions().map_err(contract_error)?;
+    runtime
+        .request_suggestion_copy(&request_id, suggestion_generation, binding_generation)
+        .map(|text| WechatSuggestionCopyResult { text })
+        .map_err(contract_error)
+}
+
+#[tauri::command]
+pub(crate) async fn confirm_wechat_suggestion_copy(
+    input: WechatSuggestionActionInput,
+    runtime: State<'_, WechatReplyRuntime>,
+    app: AppHandle,
+) -> Result<(), AppError> {
+    let (request_id, suggestion_generation, binding_generation) =
+        input.versions().map_err(contract_error)?;
+    runtime
+        .confirm_suggestion_copy(&request_id, suggestion_generation, binding_generation)
+        .map_err(contract_error)?;
+    avatar_engine::emit_avatar_bubble(&app, &input.clear_payload());
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn dismiss_wechat_suggestion(
+    input: WechatSuggestionActionInput,
+    runtime: State<'_, WechatReplyRuntime>,
+    app: AppHandle,
+) -> Result<(), AppError> {
+    let (request_id, suggestion_generation, binding_generation) =
+        input.versions().map_err(contract_error)?;
+    runtime
+        .dismiss_suggestion(&request_id, suggestion_generation, binding_generation)
+        .map_err(contract_error)?;
+    avatar_engine::emit_avatar_bubble(&app, &input.clear_payload());
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -38,8 +129,13 @@ pub(crate) async fn get_wechat_settings_status(
     state: State<'_, Arc<Mutex<AppState>>>,
 ) -> Result<WechatSettingsStatus, AppError> {
     let (config, profiles) = {
-        let state = state.lock().map_err(|error| AppError::Unknown(error.to_string()))?;
-        (state.config.wechat.clone(), state.config.text_model_profiles.clone())
+        let state = state
+            .lock()
+            .map_err(|error| AppError::Unknown(error.to_string()))?;
+        (
+            state.config.wechat.clone(),
+            state.config.text_model_profiles.clone(),
+        )
     };
     Ok(status_for(&config, &profiles))
 }
@@ -51,12 +147,29 @@ pub(crate) async fn list_wechat_reply_traces(
     input: TraceQueryInput,
     state: State<'_, Arc<Mutex<AppState>>>,
 ) -> Result<WechatReplyTracePage, AppError> {
-    let data_dir = state.lock().map_err(|error| AppError::Unknown(error.to_string()))?.data_dir.clone();
-    let request_id = input.request_id.as_deref().map(super::types::RequestId::parse).transpose().map_err(contract_error)?;
-    let occurred_after = parse_timestamp(input.occurred_after.as_deref()).map_err(contract_error)?;
-    let occurred_before = parse_timestamp(input.occurred_before.as_deref()).map_err(contract_error)?;
+    let data_dir = state
+        .lock()
+        .map_err(|error| AppError::Unknown(error.to_string()))?
+        .data_dir
+        .clone();
+    let request_id = input
+        .request_id
+        .as_deref()
+        .map(super::types::RequestId::parse)
+        .transpose()
+        .map_err(contract_error)?;
+    let occurred_after =
+        parse_timestamp(input.occurred_after.as_deref()).map_err(contract_error)?;
+    let occurred_before =
+        parse_timestamp(input.occurred_before.as_deref()).map_err(contract_error)?;
     ReplyTraceStore::new(data_dir)
-        .list(TraceQuery { request_id, occurred_after, occurred_before, cursor: input.cursor, limit: input.limit.unwrap_or(50) })
+        .list(TraceQuery {
+            request_id,
+            occurred_after,
+            occurred_before,
+            cursor: input.cursor,
+            limit: input.limit.unwrap_or(50),
+        })
         .map_err(contract_error)
 }
 
@@ -64,21 +177,38 @@ pub(crate) async fn list_wechat_reply_traces(
 pub(crate) async fn delete_wechat_reply_content(
     state: State<'_, Arc<Mutex<AppState>>>,
 ) -> Result<ContentDeleteResult, AppError> {
-    let data_dir = state.lock().map_err(|error| AppError::Unknown(error.to_string()))?.data_dir.clone();
-    WechatContentStore::new(data_dir).delete_all().map_err(contract_error)
+    let data_dir = state
+        .lock()
+        .map_err(|error| AppError::Unknown(error.to_string()))?
+        .data_dir
+        .clone();
+    WechatContentStore::new(data_dir)
+        .delete_all()
+        .map_err(contract_error)
 }
 
-fn parse_timestamp(value: Option<&str>) -> Result<Option<DateTime<Utc>>, super::types::ContractError> {
+fn parse_timestamp(
+    value: Option<&str>,
+) -> Result<Option<DateTime<Utc>>, super::types::ContractError> {
     value
-        .map(|value| DateTime::parse_from_rfc3339(value).map(|time| time.with_timezone(&Utc)).map_err(|_| super::types::ContractError::WxTraceInvalidQuery))
+        .map(|value| {
+            DateTime::parse_from_rfc3339(value)
+                .map(|time| time.with_timezone(&Utc))
+                .map_err(|_| super::types::ContractError::WxTraceInvalidQuery)
+        })
         .transpose()
 }
 
 fn contract_error(error: super::types::ContractError) -> AppError {
-    AppError::Unknown(serde_json::to_string(&error).unwrap_or_else(|_| "\"WX_CONTRACT_VIOLATION\"".into()))
+    AppError::Unknown(
+        serde_json::to_string(&error).unwrap_or_else(|_| "\"WX_CONTRACT_VIOLATION\"".into()),
+    )
 }
 
-fn status_for(config: &WechatConfig, profiles: &[crate::config::TextModelProfile]) -> WechatSettingsStatus {
+fn status_for(
+    config: &WechatConfig,
+    profiles: &[crate::config::TextModelProfile],
+) -> WechatSettingsStatus {
     let selected_profile_valid = profile_is_trusted(config.compatibility_profile_id.as_deref());
     let selected_model_valid = model_profile_is_available(config, profiles);
     let not_ready_reason = if !selected_profile_valid {

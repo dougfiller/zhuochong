@@ -13,6 +13,10 @@
     getAvatarStateBubble,
     getAvatarTransitionMeta,
   } from '../../lib/components/Avatar/avatarStateMeta.js';
+  import {
+    freezeFocusSession,
+    restoreFocusSession,
+  } from '../../lib/components/Avatar/focusSessionTiming.js';
 
   const appWindow = getCurrentWebviewWindow();
   const nativeWindow = getCurrentWindow();
@@ -40,15 +44,22 @@
     lastKeyboardInputAtMs: 0,
     lastMouseInputAtMs: 0,
   };
-  let bubbleSource = null;
+  let ordinaryBubble = null;
+  let ordinaryBubbleExpiresAt = null;
+  let ordinaryBubbleRemainingMs = null;
+  let wechatSuggestionBubble = null;
   // 气泡边缘锚点：窗口靠近屏幕右侧时气泡向左展开，避免靠右下角时被裁剪（#137 诉求一）
   let bubbleFlipLeft = false;
   let bubble = null;
-  let bubbleTimer = null;
+  let ordinaryBubbleTimer = null;
+  let copyPending = false;
+  let copyError = '';
   let followup = null;
   let focusSession = null;
   let focusTimer = null;
   let focusNowMs = 0;
+  let focusPaused = false;
+  let focusRemainingMs = null;
   let lastStateBubbleAt = 0;
   let transitionClass = '';
   let transitionTimer = null;
@@ -250,9 +261,9 @@
     // focusNowMs must appear in the reactive expression so Svelte
     // re-evaluates every second when the timer ticks.
     void focusNowMs;
-    return buildFocusBubblePayload(focusSession);
+    return focusPaused ? null : buildFocusBubblePayload(focusSession);
   })();
-  $: bubble = localizeBubblePayload(focusBubble || bubbleSource, currentLocale);
+  $: bubble = localizeBubblePayload(wechatSuggestionBubble || focusBubble || ordinaryBubble, currentLocale);
   $: followupCopy = buildFollowupCopy(followup);
   $: syncAvatarExpansion(followup != null);
 
@@ -294,34 +305,154 @@
     }, 120);
   }
 
+  function pauseOrdinaryBubble() {
+    if (!ordinaryBubble || ordinaryBubble?.persistent || ordinaryBubbleExpiresAt === null) {
+      return;
+    }
+    ordinaryBubbleRemainingMs = Math.max(0, ordinaryBubbleExpiresAt - Date.now());
+    clearTimeout(ordinaryBubbleTimer);
+    ordinaryBubbleTimer = null;
+    ordinaryBubbleExpiresAt = null;
+  }
+
+  function resumeOrdinaryBubble() {
+    if (!ordinaryBubble || ordinaryBubble?.persistent || ordinaryBubbleTimer || focusSession || wechatSuggestionBubble) {
+      return;
+    }
+    const remainingMs = ordinaryBubbleRemainingMs ?? ordinaryBubble?.durationMs ?? 4200;
+    if (remainingMs <= 0) {
+      clearBubble();
+      return;
+    }
+    ordinaryBubbleRemainingMs = null;
+    ordinaryBubbleExpiresAt = Date.now() + remainingMs;
+    ordinaryBubbleTimer = setTimeout(() => {
+      clearBubble();
+    }, remainingMs);
+  }
+
+  function pauseFocusSession() {
+    if (!focusSession || focusPaused) {
+      return;
+    }
+    focusRemainingMs = freezeFocusSession(focusSession, Date.now());
+    focusPaused = true;
+    clearFocusTimer();
+  }
+
+  function resumeFocusSession() {
+    if (!focusSession || !focusPaused) {
+      return;
+    }
+    const resumedSession = restoreFocusSession(focusSession, focusRemainingMs, Date.now());
+    focusPaused = false;
+    focusRemainingMs = null;
+    if (!resumedSession) {
+      focusSession = null;
+      focusNowMs = 0;
+      resumeOrdinaryBubble();
+      return;
+    }
+    focusSession = resumedSession;
+    ensureFocusTicking();
+  }
+
   function clearBubble() {
-    bubbleSource = null;
-    clearTimeout(bubbleTimer);
-    bubbleTimer = null;
+    ordinaryBubble = null;
+    ordinaryBubbleExpiresAt = null;
+    ordinaryBubbleRemainingMs = null;
+    clearTimeout(ordinaryBubbleTimer);
+    ordinaryBubbleTimer = null;
+  }
+
+  function isWechatSuggestion(payload) {
+    return payload?.kind === 'wechatSuggestion';
+  }
+
+  function sameWechatSuggestion(left, right) {
+    return left?.requestId === right?.requestId
+      && left?.suggestionGeneration === right?.suggestionGeneration
+      && left?.bindingGeneration === right?.bindingGeneration;
   }
 
   function showBubble(payload) {
+    if (isWechatSuggestion(payload)) {
+      if (payload.clear) {
+        if (sameWechatSuggestion(wechatSuggestionBubble, payload)) {
+          wechatSuggestionBubble = null;
+          copyPending = false;
+          copyError = '';
+          resumeFocusSession();
+          resumeOrdinaryBubble();
+        }
+        return;
+      }
+      wechatSuggestionBubble = payload;
+      copyPending = false;
+      copyError = '';
+      pauseOrdinaryBubble();
+      pauseFocusSession();
+      return;
+    }
+
     if (payload?.clear) {
       clearBubble();
       return;
     }
 
-    if (focusSession && !payload?.persistent) {
+    ordinaryBubble = payload;
+    ordinaryBubbleRemainingMs = payload?.persistent ? null : payload?.durationMs ?? 4200;
+    clearTimeout(ordinaryBubbleTimer);
+    ordinaryBubbleTimer = null;
+    ordinaryBubbleExpiresAt = null;
+    resumeOrdinaryBubble();
+  }
+
+  function wechatSuggestionInput() {
+    if (!wechatSuggestionBubble) {
+      return null;
+    }
+    return {
+      requestId: wechatSuggestionBubble.requestId,
+      suggestionGeneration: wechatSuggestionBubble.suggestionGeneration,
+      bindingGeneration: wechatSuggestionBubble.bindingGeneration,
+    };
+  }
+
+  async function copyWechatSuggestion() {
+    const input = wechatSuggestionInput();
+    if (!input || copyPending) {
       return;
     }
+    copyPending = true;
+    copyError = '';
+    try {
+      const result = await invoke('request_wechat_suggestion_copy', { input });
+      await navigator.clipboard.writeText(result.text);
+      await invoke('confirm_wechat_suggestion_copy', { input });
+    } catch (_error) {
+      copyError = t('avatar.wechatSuggestionCopyFailed');
+    } finally {
+      copyPending = false;
+    }
+  }
 
-    bubbleSource = payload;
-    clearTimeout(bubbleTimer);
-
-    if (!payload?.persistent) {
-      bubbleTimer = setTimeout(() => {
-        bubbleSource = null;
-        bubbleTimer = null;
-      }, payload?.durationMs ?? 4200);
+  async function dismissWechatSuggestion() {
+    const input = wechatSuggestionInput();
+    if (!input || copyPending) {
+      return;
+    }
+    try {
+      await invoke('dismiss_wechat_suggestion', { input });
+    } catch (_error) {
+      // A stale dismiss must not affect a newer suggestion.
     }
   }
 
   function dismissBubble() {
+    if (wechatSuggestionBubble) {
+      return;
+    }
     if (focusSession) {
       stopFocusSession(true);
       return;
@@ -434,7 +565,10 @@
     const completedSession = focusSession;
     focusSession = null;
     focusNowMs = 0;
+    focusPaused = false;
+    focusRemainingMs = null;
     clearFocusTimer();
+    resumeOrdinaryBubble();
     if (!completedSession) {
       return;
     }
@@ -448,7 +582,7 @@
 
   function ensureFocusTicking() {
     clearFocusTimer();
-    if (!focusSession) {
+    if (!focusSession || focusPaused) {
       return;
     }
     focusNowMs = Date.now();
@@ -466,9 +600,11 @@
     }
     focusSession = null;
     focusNowMs = 0;
+    focusPaused = false;
+    focusRemainingMs = null;
     clearFocusTimer();
+    resumeOrdinaryBubble();
     if (showEndedBubble) {
-      clearBubble();
       const theme = getFollowupTheme(state.avatarPersona);
       showBubble({
         message: t(theme.focusStoppedKey),
@@ -485,12 +621,14 @@
       }
 
       clearFollowup();
+      pauseOrdinaryBubble();
       focusSession = {
         projectKey: payload.projectKey,
         title: payload.title,
         endsAtMs: Date.now() + 25 * 60 * 1000,
       };
-      clearBubble();
+      focusPaused = false;
+      focusRemainingMs = null;
       ensureFocusTicking();
       const theme = getFollowupTheme(payload.persona);
       showBubble({
@@ -809,7 +947,7 @@
     })();
 
     return () => {
-      clearTimeout(bubbleTimer);
+      clearTimeout(ordinaryBubbleTimer);
       clearTimeout(transitionTimer);
       clearTimeout(positionSaveTimer);
       clearTimeout(motionTimer);
@@ -833,7 +971,15 @@
 
 <div role="presentation" class="relative h-screen w-screen overflow-visible bg-transparent select-none" on:mousedown={(e) => { if (e.target.closest('button, a, section, .avatar-popover-anchor, [role="button"]')) return; startAvatarDrag(e); }}>
   <div class="absolute inset-x-0 top-0 h-[86px] overflow-visible">
-    <AvatarPopover {bubble} flipLeft={bubbleFlipLeft} onClose={dismissBubble} />
+    <AvatarPopover
+      {bubble}
+      flipLeft={bubbleFlipLeft}
+      onClose={dismissBubble}
+      onCopyWechatSuggestion={copyWechatSuggestion}
+      onDismissWechatSuggestion={dismissWechatSuggestion}
+      {copyPending}
+      {copyError}
+    />
   </div>
 
   <AvatarFollowupCard

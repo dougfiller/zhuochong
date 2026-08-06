@@ -161,3 +161,9 @@ git diff --check -- desktop/src-tauri/src/wechat/mod.rs desktop/src-tauri/src/we
 
 - `verify_wechat_reply_flow.py` 仅读取本步骤源码，确认 M1-only module gate、lease request id 贯穿 capture、capture-version 原子写入 OCR trace、OCR-only M1 input、stale-capture gate 和 runtime-owned model call；同时拒绝 command、M2/RAG、气泡、剪贴板、输入控制和 HTTP 依赖。
 - Rust 定向测试只使用系统临时目录 trace 与 fake transport；不创建真实截图或请求。两个 feature 编译分别确认 M1 含私有 reply flow，而 M2 不引用它。
+
+## 桌宠微信建议复制/关闭与代际校验（2026-08-06）
+
+- `request_wechat_suggestion_copy(input)`：仅在 runtime 的 `requestId + suggestionGeneration + bindingGeneration` 与当前展示建议完全一致时返回正文；该命令不写剪贴板。
+- `confirm_wechat_suggestion_copy(input)` 与 `dismiss_wechat_suggestion(input)`：仅在同一三元组仍有效时清除建议，并向既有 `avatar` 窗口发送受限的微信建议失效事件。没有新增窗口、快捷键、自动化、Rust clipboard 或输入/发送能力。
+- 本步骤没有新增可执行脚本。前端针对性测试使用仓库既有命令 `cd desktop && node --test src/lib/components/Avatar/avatarWindow.test.js src/lib/components/Avatar/avatarOutline.test.js`；该项目没有 `npm test` script。

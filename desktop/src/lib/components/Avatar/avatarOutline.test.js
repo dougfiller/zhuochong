@@ -152,8 +152,34 @@ test('休息提醒气泡应支持常驻显示和手动关闭', () => {
   assert.match(source, /aria-label=\{t\('avatar\.dismissReminder'\)\}/);
   assert.match(source, /class="absolute inset-0 rounded-\[16px\]"/);
   assert.match(source, /bubble-tail-dot absolute \$\{flipLeft/);
-  assert.match(windowSource, /<AvatarPopover \{bubble\} flipLeft=\{bubbleFlipLeft\} onClose=\{dismissBubble\} \/>/);
-  assert.match(windowSource, /if \(!payload\?\.persistent\)/);
+  assert.match(windowSource, /<AvatarPopover[\s\S]*\{bubble\}[\s\S]*flipLeft=\{bubbleFlipLeft\}[\s\S]*onClose=\{dismissBubble\}/);
+  assert.match(windowSource, /ordinaryBubbleRemainingMs = payload\?\.persistent \? null : payload\?\.durationMs \?\? 4200/);
+});
+
+test('微信建议气泡只能经受限命令复制或关闭，且不被普通 clear 覆盖', () => {
+  const popoverSource = readFileSync(new URL('./AvatarPopover.svelte', import.meta.url), 'utf8');
+  const windowSource = readFileSync(new URL('../../../routes/avatar/AvatarWindow.svelte', import.meta.url), 'utf8');
+  const engineSource = readFileSync(new URL('../../../../src-tauri/src/avatar_engine.rs', import.meta.url), 'utf8');
+  const commandsSource = readFileSync(new URL('../../../../src-tauri/src/wechat/commands.rs', import.meta.url), 'utf8');
+
+  assert.match(windowSource, /wechatSuggestionBubble \|\| focusBubble \|\| ordinaryBubble/);
+  assert.match(windowSource, /payload\?\.kind === 'wechatSuggestion'/);
+  assert.match(windowSource, /if \(isWechatSuggestion\(payload\)\)/);
+  assert.match(windowSource, /navigator\.clipboard\.writeText\(result\.text\)/);
+  assert.match(windowSource, /request_wechat_suggestion_copy/);
+  assert.match(windowSource, /confirm_wechat_suggestion_copy/);
+  assert.match(windowSource, /dismiss_wechat_suggestion/);
+  assert.match(windowSource, /pauseOrdinaryBubble/);
+  assert.match(windowSource, /resumeOrdinaryBubble/);
+  assert.match(popoverSource, /bubble\?\.persistent && !isWechatSuggestion/);
+  assert.match(popoverSource, /max-height: 220px; overflow-y: auto;/);
+  assert.match(popoverSource, /on:click\|stopPropagation=\{onCopyWechatSuggestion\}/);
+  assert.match(popoverSource, /on:click\|stopPropagation=\{onDismissWechatSuggestion\}/);
+  assert.match(engineSource, /enum AvatarBubbleKind[\s\S]*WechatSuggestion/);
+  assert.match(engineSource, /pub fn clear_wechat_suggestion/);
+  assert.match(commandsSource, /deny_unknown_fields/);
+  assert.match(commandsSource, /request_suggestion_copy/);
+  assert.match(commandsSource, /confirm_suggestion_copy/);
 });
 
 test('英文桌宠气泡文案应保留单词间空格', () => {

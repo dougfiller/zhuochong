@@ -26,6 +26,10 @@ export default {
     avatar: {
       sceneAlt: '{name} avatar',
       dismissReminder: 'Dismiss reminder',
+      wechatSuggestionCopy: 'Copy',
+      wechatSuggestionDismiss: 'Dismiss',
+      wechatSuggestionCopying: 'Copying…',
+      wechatSuggestionCopyFailed: 'Copy failed. Please try again.',
     },
     chart: {
       currentlySelected: 'Currently selected',
