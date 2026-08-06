@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "gate_id": "m1-regression-gate-20260806",
+  "baseline": {
+    "baseline_id": "work-review-v1.1.0-before-wechat-rag-20260805",
+    "source_commit": "500f9d2cb3027392cfcc32ad18395dfe348fb4a1",
+    "source_manifest_sha256": "31dd2192f602ee0b4d6f659311186d2230416e42357744ac8c57e778f20cb14a"
+  },
+  "candidate": {"git_commit": null, "nsis_sha256": null, "batch_id": null},
+  "automated": [],
+  "required_ac_ids": ["AC-WX-01", "AC-WX-02", "AC-WX-03", "AC-WX-04", "AC-WX-05", "AC-WX-06", "AC-PET-01", "AC-PET-02"],
+  "after_matrix": [
+    {"id": "BASE-01", "before_ref": "BASE-01", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-02", "before_ref": "BASE-02", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-03", "before_ref": "BASE-03", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-04", "before_ref": "BASE-04", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-05", "before_ref": "BASE-05", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-06", "before_ref": "BASE-06", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-07", "before_ref": "BASE-07", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-08", "before_ref": "BASE-08", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-09", "before_ref": "BASE-09", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-10", "before_ref": "BASE-10", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-AUTO-FE", "before_ref": "BASE-AUTO-FE", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-AUTO-BUILD", "before_ref": "BASE-AUTO-BUILD", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-AUTO-RUST-CHECK", "before_ref": "BASE-AUTO-RUST-CHECK", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-AUTO-RUST-CLIPPY", "before_ref": "BASE-AUTO-RUST-CLIPPY", "status": "blocked", "evidence_ids": []},
+    {"id": "BASE-AUTO-RUST-TEST", "before_ref": "BASE-AUTO-RUST-TEST", "status": "blocked", "evidence_ids": []},
+    {"id": "AC-WX-01", "before_ref": "AC-WX-01", "status": "blocked", "evidence_ids": []},
+    {"id": "AC-WX-02", "before_ref": "AC-WX-02", "status": "blocked", "evidence_ids": []},
+    {"id": "AC-WX-03", "before_ref": "AC-WX-03", "status": "blocked", "evidence_ids": []},
+    {"id": "AC-WX-04", "before_ref": "AC-WX-04", "status": "blocked", "evidence_ids": []},
+    {"id": "AC-WX-05", "before_ref": "AC-WX-05", "status": "blocked", "evidence_ids": []},
+    {"id": "AC-WX-06", "before_ref": "AC-WX-06", "status": "blocked", "evidence_ids": []},
+    {"id": "AC-PET-01", "before_ref": "AC-PET-01", "status": "blocked", "evidence_ids": []},
+    {"id": "AC-PET-02", "before_ref": "AC-PET-02", "status": "blocked", "evidence_ids": []},
+    {"id": "AC-KB-05", "before_ref": "AC-KB-05", "status": "conditional-not-enabled", "evidence_ids": []},
+    {"id": "AC-RAG-01", "before_ref": "AC-RAG-01", "status": "conditional-not-enabled", "evidence_ids": []}
+  ],
+  "windows": {"host": null, "wechat_profile_fingerprint": null, "candidate_commit": null, "nsis_sha256": null, "batch_id": null, "scenarios": []},
+  "capability_counters": {"candidate_commit": null, "nsis_sha256": null, "batch_id": null, "counts": {}},
+  "asset_ledger_review": {"status": "blocked", "evidence_ids": [], "candidate_commit": null, "nsis_sha256": null, "batch_id": null},
+  "verdict": "blocked",
+  "blockers": [
+    "No controlled Windows 11 x64 candidate, approved WeChat profile, or same-batch NSIS evidence was supplied.",
+    "No current automated evidence batch is linked to a candidate hash.",
+    "third-party-assets.md retains pending-verification entries without commercial authorization evidence."
+  ]
+}

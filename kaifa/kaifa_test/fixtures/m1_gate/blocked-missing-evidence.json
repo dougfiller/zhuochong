@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "gate_id": "fixture-missing-evidence",
+  "baseline": {"baseline_id": "work-review-v1.1.0-before-wechat-rag-20260805", "source_commit": "500f9d2cb3027392cfcc32ad18395dfe348fb4a1", "source_manifest_sha256": "31dd2192f602ee0b4d6f659311186d2230416e42357744ac8c57e778f20cb14a"},
+  "candidate": {"git_commit": null, "nsis_sha256": null, "batch_id": null},
+  "automated": [], "required_ac_ids": ["AC-WX-01"], "after_matrix": [],
+  "windows": {}, "capability_counters": {}, "asset_ledger_review": {"status": "blocked", "evidence_ids": []}, "verdict": "blocked"
+}

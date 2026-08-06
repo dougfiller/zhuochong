@@ -188,3 +188,19 @@ cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features -
 - `verify_wechat_explicit_trigger.py` 是新增的纯静态门禁：确认唯一无输入 command、私有 publish/emit/finish 顺序、3 秒可取消倒计时、白名单错误格式化，且拒绝前端输入 DTO 与 clipboard Rust API；不会读取用户内容或创建文件。
 - Rust command 只在 `wechat-m1` 时调用私有流程；M2 或未启用 M1 时固定返回 `WX_WINDOW_UNSUPPORTED`，不会降级为 M2 或通用 Agent。
 - 这些检查不替代受控 Windows 11 的真实微信/profile/模型纵向验收；当前 macOS 不产生 Windows 真机成功证据。
+
+## M1 自动化、Windows 实机和 Work Review 回归门禁（2026-08-06）
+
+```bash
+# 只读取脱敏 after-gate JSON；不启动产品、微信、模型或网络。
+python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --project-root .
+
+# 使用纯虚构 fixture 验证 pass、缺证据/哈希不一致 blocked、禁止能力 fail。
+python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --input kaifa/kaifa_test/fixtures/m1_gate/pass.json
+python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --input kaifa/kaifa_test/fixtures/m1_gate/blocked-missing-evidence.json
+python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --input kaifa/kaifa_test/fixtures/m1_gate/blocked-hash-mismatch.json
+python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --input kaifa/kaifa_test/fixtures/m1_gate/fail-capability.json
+```
+
+- `verify_m1_release_gate.py` 的退出码为：`0=pass`、`1=fail`、`2=blocked`。它只接受同一 candidate commit、NSIS SHA-256 和 batch ID 关联的命令、Windows、能力计数和素材台账证据。
+- 当前正式 after-gate 工件故意返回 `blocked`：没有受控 Windows 11 x64/冻结 profile/NSIS candidate 同批证据，且素材台账仍有 `pending-verification`。不得把已有 macOS 静态或 fake 测试写成 Windows 通过。

@@ -197,3 +197,16 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | M1/M2 feature 门禁 | 两条 `cargo check ... --features 'wechat-contract-check,wechat-m1|wechat-m2'` | 均通过；M2 不会调用 M1 显式入口，未启用 M1 时返回 `WX_WINDOW_UNSUPPORTED`。 | 通过 |
 | 范围格式与空白 | `rustfmt --edition 2021 --check ...`；`git diff --check -- ...` | 通过；仅检查本步骤 Rust/前端/测试范围。 | 通过 |
 | Windows target 编译与真机纵向闭环 | `cargo check --target x86_64-pc-windows-msvc ...`；受控 Windows 11、冻结微信 profile、已验证文本模型 | 当前 host 已安装 `x86_64-pc-windows-msvc` target；交叉编译在既有 `libsqlite3-sys` C 构建阶段因缺少 Windows C 工具链/`stdlib.h` 受阻，未到达本项目 Windows 分支。production catalog 仍为空，未执行 Windows 真机验收；macOS/fake 结果不能替代。 | blocked |
+
+## M1 自动化、Windows 实机和 Work Review 回归门禁（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_m1_release_gate.py`。它只读取 after-gate JSON 和虚构 fixture，不启动产品、Tauri、微信、模型、网络、NSIS 或 Windows 自动化。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 完整同批 fixture | `python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --input .../pass.json` | 输出 `M1_RELEASE_GATE: pass`，退出 0；覆盖 candidate commit、NSIS hash、batch ID、四场景、零禁止能力和素材证据关联。 | 通过 |
+| 缺证据与哈希不一致 | 分别运行 `blocked-missing-evidence.json`、`blocked-hash-mismatch.json` | 两次均输出 `blocked`、退出 2；未把空 Windows/台账或不同 NSIS hash 推断为通过。 | 通过 |
+| 禁止能力 | `fail-capability.json` | 输出 `fail`、退出 1；MCP 计数为 1 即使其他证据尚缺也不能降级为 blocked/pass。 | 通过 |
+| 当前 after-gate | `python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --project-root .` | 输出 `blocked`、退出 2；缺受控 Windows/候选/同批证据，且资产台账有待核验发行项。 | 通过（正确阻断） |
+| 冻结 before 基线 | `python3 -B kaifa/kaifa_test/verify_work_review_regression_baseline.py --project-root .` | 退出 1：`desktop frozen source differs from work-review-source.json`。当前工作区已有其他步骤的产品改动；本阶段未修改 before 工件，也不把此结果归因于本 runner。 | blocked（既有工作区状态） |
+| Python 语法与范围空白 | `python3 -B -c "compile(...)"`；`git diff --check -- <本阶段新增文件>` | 语法通过；空白检查通过。`python3 -m py_compile` 未采用为成功证据：macOS Python 尝试写入受限的系统 cache 并报 PermissionError。 | 通过 |

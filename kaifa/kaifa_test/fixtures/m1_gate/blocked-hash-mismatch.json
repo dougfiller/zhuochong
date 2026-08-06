@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "gate_id": "fixture-hash-mismatch",
+  "baseline": {"baseline_id": "work-review-v1.1.0-before-wechat-rag-20260805", "source_commit": "500f9d2cb3027392cfcc32ad18395dfe348fb4a1", "source_manifest_sha256": "31dd2192f602ee0b4d6f659311186d2230416e42357744ac8c57e778f20cb14a"},
+  "candidate": {"git_commit": "1111111111111111111111111111111111111111", "nsis_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "batch_id": "fixture-batch"},
+  "automated": [{"id": "AUTO-1", "command": "fixture command", "exit_code": 0, "status": "pass", "log_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "candidate_commit": "1111111111111111111111111111111111111111", "nsis_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "batch_id": "fixture-batch"}],
+  "required_ac_ids": [], "after_matrix": [], "windows": {}, "capability_counters": {}, "asset_ledger_review": {"status": "blocked", "evidence_ids": []}, "verdict": "blocked"
+}
