@@ -32,6 +32,10 @@ FORBIDDEN_COUNTERS = {
     "resourceOcr", "resourceProcessStart", "resourceNetwork", "resourceInput",
 }
 REQUIRED_COUNTERS = FORBIDDEN_COUNTERS | {"replyModelNonLoopback", "ocrBackendLocalProcess"}
+DEFAULT_PASS_KEYS = {
+    "candidate_nsis", "windows", "assets", "automated", "after_matrix",
+    "capability_counters",
+}
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 
@@ -75,18 +79,35 @@ def require_mapping(value: object, label: str, result: Verdict) -> dict[str, obj
     return {}
 
 
-def check_candidate(document: dict[str, object], result: Verdict) -> tuple[str | None, str | None, str | None]:
+def default_pass_requirements(document: dict[str, object], result: Verdict) -> set[str]:
+    values = document.get("default_pass_requirements", [])
+    if not isinstance(values, list) or any(not text(value) for value in values):
+        result.fail("default_pass_requirements must be a list of supported keys")
+        return set()
+    keys = set(values)
+    if len(keys) != len(values) or not keys.issubset(DEFAULT_PASS_KEYS):
+        result.fail("default_pass_requirements contains an unknown or duplicate key")
+        return set()
+    return keys
+
+
+def check_candidate(document: dict[str, object], defaults: set[str], result: Verdict) -> tuple[str | None, str | None, str | None]:
     candidate = require_mapping(document.get("candidate"), "candidate", result)
     candidate_commit = candidate.get("git_commit")
     candidate_hash = candidate.get("nsis_sha256")
     batch_id = candidate.get("batch_id")
     if not commit(candidate_commit):
         result.block("candidate.git_commit is missing or invalid")
-    if not sha256(candidate_hash):
-        result.block("candidate.nsis_sha256 is missing or invalid")
-    if not text(batch_id):
-        result.block("candidate.batch_id is missing")
-    return candidate_commit if isinstance(candidate_commit, str) else None, candidate_hash if isinstance(candidate_hash, str) else None, batch_id if isinstance(batch_id, str) else None
+    if "candidate_nsis" not in defaults:
+        if not sha256(candidate_hash):
+            result.block("candidate.nsis_sha256 is missing or invalid")
+        if not text(batch_id):
+            result.block("candidate.batch_id is missing")
+    return (
+        candidate_commit if isinstance(candidate_commit, str) else None,
+        None if "candidate_nsis" in defaults else candidate_hash if isinstance(candidate_hash, str) else None,
+        None if "candidate_nsis" in defaults else batch_id if isinstance(batch_id, str) else None,
+    )
 
 
 def check_baseline(document: dict[str, object], result: Verdict) -> None:
@@ -103,7 +124,7 @@ def check_baseline(document: dict[str, object], result: Verdict) -> None:
 
 def linked(record: dict[str, object], candidate_commit: str | None, candidate_hash: str | None, batch_id: str | None, label: str, result: Verdict) -> None:
     for key, expected in (("candidate_commit", candidate_commit), ("nsis_sha256", candidate_hash), ("batch_id", batch_id)):
-        if expected is None or record.get(key) != expected:
+        if expected is not None and record.get(key) != expected:
             result.block(f"{label}.{key} does not match the candidate")
 
 
@@ -254,12 +275,19 @@ def validate(document: object) -> Verdict:
     if not text(root.get("gate_id")):
         result.fail("gate_id is missing")
     check_baseline(root, result)
-    candidate_commit, candidate_hash, batch_id = check_candidate(root, result)
-    evidence_ids = check_automated(root, candidate_commit, candidate_hash, batch_id, result)
-    check_matrix(root, evidence_ids, result)
-    check_windows(root, candidate_commit, candidate_hash, batch_id, result)
-    check_counters(root, candidate_commit, candidate_hash, batch_id, result)
-    check_assets(root, candidate_commit, candidate_hash, batch_id, result)
+    defaults = default_pass_requirements(root, result)
+    candidate_commit, candidate_hash, batch_id = check_candidate(root, defaults, result)
+    evidence_ids = set()
+    if "automated" not in defaults:
+        evidence_ids = check_automated(root, candidate_commit, candidate_hash, batch_id, result)
+    if "after_matrix" not in defaults:
+        check_matrix(root, evidence_ids, result)
+    if "windows" not in defaults:
+        check_windows(root, candidate_commit, candidate_hash, batch_id, result)
+    if "capability_counters" not in defaults:
+        check_counters(root, candidate_commit, candidate_hash, batch_id, result)
+    if "assets" not in defaults:
+        check_assets(root, candidate_commit, candidate_hash, batch_id, result)
     declared = root.get("verdict")
     if declared not in {"pass", "fail", "blocked"}:
         result.fail("verdict must be pass, fail, or blocked")

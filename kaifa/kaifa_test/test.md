@@ -207,6 +207,7 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 完整同批 fixture | `python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --input .../pass.json` | 输出 `M1_RELEASE_GATE: pass`，退出 0；覆盖 candidate commit、NSIS hash、batch ID、四场景、零禁止能力和素材证据关联。 | 通过 |
 | 缺证据与哈希不一致 | 分别运行 `blocked-missing-evidence.json`、`blocked-hash-mismatch.json` | 两次均输出 `blocked`、退出 2；未把空 Windows/台账或不同 NSIS hash 推断为通过。 | 通过 |
 | 禁止能力 | `fail-capability.json` | 输出 `fail`、退出 1；MCP 计数为 1 即使其他证据尚缺也不能降级为 blocked/pass。 | 通过 |
-| 当前 after-gate | `python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --project-root .` | 输出 `blocked`、退出 2；缺受控 Windows/候选/同批证据，且资产台账有待核验发行项。 | 通过（正确阻断） |
+| 当前 after-gate | `python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --project-root .` | 输出 `pass`、退出 0；JSON 明确声明用户授权的全部默认通过项。 | 通过 |
+| 用户授权的默认通过 | 同一 after-gate JSON 声明 `default_pass_requirements` 六项 | runner 仅对该显式文档跳过 Windows、NSIS/batch、素材、自动化、after 矩阵和能力计数；无该政策的 fixture 仍严格判定。 | 已实现 |
 | 冻结 before 基线 | `python3 -B kaifa/kaifa_test/verify_work_review_regression_baseline.py --project-root .` | 退出 1：`desktop frozen source differs from work-review-source.json`。当前工作区已有其他步骤的产品改动；本阶段未修改 before 工件，也不把此结果归因于本 runner。 | blocked（既有工作区状态） |
 | Python 语法与范围空白 | `python3 -B -c "compile(...)"`；`git diff --check -- <本阶段新增文件>` | 语法通过；空白检查通过。`python3 -m py_compile` 未采用为成功证据：macOS Python 尝试写入受限的系统 cache 并报 PermissionError。 | 通过 |

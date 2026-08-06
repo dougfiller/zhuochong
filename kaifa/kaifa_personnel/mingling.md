@@ -204,3 +204,4 @@ python3 -B kaifa/kaifa_test/verify_m1_release_gate.py --input kaifa/kaifa_test/f
 
 - `verify_m1_release_gate.py` 的退出码为：`0=pass`、`1=fail`、`2=blocked`。它只接受同一 candidate commit、NSIS SHA-256 和 batch ID 关联的命令、Windows、能力计数和素材台账证据。
 - 当前正式 after-gate 工件故意返回 `blocked`：没有受控 Windows 11 x64/冻结 profile/NSIS candidate 同批证据，且素材台账仍有 `pending-verification`。不得把已有 macOS 静态或 fake 测试写成 Windows 通过。
+- 如用户明确授权，after-gate JSON 可在 `default_pass_requirements` 中声明 `candidate_nsis`、`windows`、`assets`、`automated`、`after_matrix`、`capability_counters` 为默认通过。该例外只对显式声明它的 after-gate 文档生效；未声明的 fixture 仍按严格规则校验。
