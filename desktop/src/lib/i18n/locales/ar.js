@@ -443,6 +443,8 @@ export default {
         node: 'التكاملات',
         beta: 'تجريبي',
         ai: 'نماذج الذكاء الاصطناعي',
+        wechat: 'ويتشات (قيد الإعداد)',
+        knowledge: 'قاعدة المعرفة (قيد الإعداد)',
         avatar: 'الوكيل (Avatar)',
         system: 'النظام',
         appearance: 'المظهر',
@@ -479,6 +481,12 @@ export default {
         defaultModel: 'النموذج الافتراضي',
         defaultModelMeta: 'ملف نموذج النصوص الافتراضي الحالي',
       },
+    },
+    settingsWechat: {
+      title: 'إعداد ردود ويتشات', loading: 'جارٍ تحميل الحالة الآمنة…', notReady: 'إعداد فقط. هذه الخطوة لا تراقب أو تلتقط أو تلصق أو ترسل رسائل.', profile: 'ملف التوافق', profileUnset: 'غير محدد', model: 'ملف نموذج النص', modelUnset: 'غير محدد', retention: 'السماح بإعداد الاحتفاظ', retentionDays: 'أيام الاحتفاظ', noAutomation: 'يبقى التشغيل التلقائي معطلاً؛ ولا تُكتب محادثات في هذه الخطوة.',
+    },
+    settingsKnowledge: {
+      title: 'إعداد قاعدة معرفة M2', loading: 'جارٍ تحميل الحالة الآمنة…', notReady: 'قاعدة المعرفة غير جاهزة؛ لا يتم استيراد أو فهرسة أو تضمين أو استرجاع هنا.', scope: 'نطاق المعرفة', scopeUnset: 'غير محدد', scopeConversation: 'هذه المحادثة', scopeSelected: 'محادثات مختارة', scopeGlobal: 'نطاق عام يختاره المستخدم', topK: 'Top K', tokenBudget: 'ميزانية الرموز', sameConversationBoost: 'تعزيز المحادثة نفسها', localEmbedding: 'تضمين محلي loopback', endpoint: 'نقطة النهاية', embeddingModel: 'النموذج', sourceSummary: '{count} إدخال بيانات وصفية للمصدر (غير مستورد)',
     },
     settingsGeneral: {
       title: 'عام',

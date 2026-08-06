@@ -1,7 +1,12 @@
-mod model_contract;
 mod fixtures;
+mod model_contract;
+pub(crate) mod commands;
+pub(crate) mod config;
+pub(crate) mod runtime;
 pub(crate) mod state_machine;
 pub(crate) mod types;
+
+pub(crate) use runtime::{CaptureCoordinator, WechatReplyRuntime};
 
 #[cfg(feature = "wechat-contract-probe-private-constructors")]
 mod untrusted_constructor_probe {

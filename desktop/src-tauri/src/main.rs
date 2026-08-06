@@ -4162,6 +4162,9 @@ async fn main() {
         }))
         .manage(app_state.clone())
         .manage(app_lifecycle_state.clone())
+        .manage(wechat::WechatReplyRuntime::default())
+        .manage(wechat::CaptureCoordinator::default())
+        .manage(knowledge::KnowledgeStore::default())
         // 系统托盘在 setup 中创建 (Tauri v2)
         .on_window_event(|window, event| {
             if window.label() != MAIN_WINDOW_LABEL {
@@ -4506,6 +4509,9 @@ async fn main() {
             commands::rotate_localhost_api_token,
             commands::get_config,
             commands::save_config,
+            wechat::commands::get_wechat_settings_status,
+            knowledge::commands::get_knowledge_settings_status,
+            knowledge::commands::validate_knowledge_local_embedding,
             commands::get_update_settings,
             commands::save_update_settings,
             commands::should_check_updates,

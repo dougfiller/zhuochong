@@ -861,6 +861,142 @@ pub struct NodeGatewayConfig {
     pub device_name: Option<String>,
 }
 
+/// 微信回复模块只保存用户选择；兼容性材料始终由受信任 catalog 管理。
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct WechatConfig {
+    #[serde(default, alias = "compatibility_profile_id")]
+    pub compatibility_profile_id: Option<String>,
+    #[serde(default, alias = "text_model_profile_id")]
+    pub text_model_profile_id: Option<String>,
+    #[serde(default, alias = "auto_trigger")]
+    pub auto_trigger: bool,
+    #[serde(default, alias = "content_retention_enabled")]
+    pub content_retention_enabled: bool,
+    #[serde(default, alias = "content_retention_days")]
+    pub content_retention_days: u16,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum KnowledgeScopeMode {
+    Conversation,
+    SelectedConversations,
+    GlobalUserSelected,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalEmbeddingConfig {
+    #[serde(default = "default_local_embedding_provider")]
+    pub provider: String,
+    #[serde(default = "default_local_embedding_endpoint")]
+    pub endpoint: String,
+    #[serde(default)]
+    pub model: String,
+}
+
+impl Default for LocalEmbeddingConfig {
+    fn default() -> Self {
+        Self {
+            provider: default_local_embedding_provider(),
+            endpoint: default_local_embedding_endpoint(),
+            model: String::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum KnowledgeSourceKind {
+    File,
+    Directory,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum KnowledgeSourceState {
+    Active,
+    Retired,
+    Missing,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceLineageRelation {
+    Predecessor,
+    Successor,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceLineage {
+    #[serde(alias = "source_id")]
+    pub source_id: String,
+    pub relation: SourceLineageRelation,
+    #[serde(default, alias = "verified_at")]
+    pub verified_at: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeSourceRegistration {
+    #[serde(alias = "source_id")]
+    pub source_id: String,
+    #[serde(alias = "source_kind")]
+    pub source_kind: KnowledgeSourceKind,
+    #[serde(alias = "source_path")]
+    pub source_path: String,
+    #[serde(default = "default_knowledge_schema_version", alias = "schema_version")]
+    pub schema_version: String,
+    #[serde(default)]
+    pub priority: u8,
+    #[serde(default = "default_knowledge_source_state", alias = "source_state")]
+    pub source_state: KnowledgeSourceState,
+    #[serde(default, alias = "state_updated_at")]
+    pub state_updated_at: Option<i64>,
+    #[serde(default, alias = "state_reason")]
+    pub state_reason: Option<String>,
+    #[serde(default)]
+    pub lineage: Vec<SourceLineage>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeConfig {
+    #[serde(default, alias = "recent_picker_dir")]
+    pub recent_picker_dir: Option<String>,
+    #[serde(default, alias = "scope_mode")]
+    pub scope_mode: Option<KnowledgeScopeMode>,
+    #[serde(default = "default_knowledge_top_k", alias = "top_k")]
+    pub top_k: u8,
+    #[serde(default = "default_knowledge_token_budget", alias = "token_budget")]
+    pub token_budget: u32,
+    #[serde(default = "default_knowledge_token_counter_version", alias = "token_counter_version")]
+    pub token_counter_version: String,
+    #[serde(default, alias = "same_conversation_boost")]
+    pub same_conversation_boost: bool,
+    #[serde(default, alias = "local_embedding")]
+    pub local_embedding: LocalEmbeddingConfig,
+    #[serde(default, alias = "knowledge_sources")]
+    pub knowledge_sources: Vec<KnowledgeSourceRegistration>,
+}
+
+impl Default for KnowledgeConfig {
+    fn default() -> Self {
+        Self {
+            recent_picker_dir: None,
+            scope_mode: None,
+            top_k: default_knowledge_top_k(),
+            token_budget: default_knowledge_token_budget(),
+            token_counter_version: default_knowledge_token_counter_version(),
+            same_conversation_boost: false,
+            local_embedding: LocalEmbeddingConfig::default(),
+            knowledge_sources: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeDevice {
     pub name: String,
@@ -898,6 +1034,12 @@ pub struct AppConfig {
     /// 可保存的文本模型档案
     #[serde(default)]
     pub text_model_profiles: Vec<TextModelProfile>,
+    /// 微信回复的最小安全配置；不包含窗口、ROI、正文或签名材料。
+    #[serde(default)]
+    pub wechat: WechatConfig,
+    /// M2 知识库的用户选择与元数据；不包含知识库或聊天正文。
+    #[serde(default)]
+    pub knowledge: KnowledgeConfig,
     /// 视觉模型配置
     #[serde(default = "ModelConfig::default_vision")]
     pub vision_model: ModelConfig,
@@ -1217,6 +1359,27 @@ fn default_embedding_endpoint() -> String {
 fn default_embedding_model() -> String {
     "nomic-embed-text".to_string()
 }
+fn default_local_embedding_provider() -> String {
+    "ollama_loopback".to_string()
+}
+fn default_local_embedding_endpoint() -> String {
+    "http://127.0.0.1".to_string()
+}
+fn default_knowledge_top_k() -> u8 {
+    6
+}
+fn default_knowledge_token_budget() -> u32 {
+    1200
+}
+fn default_knowledge_token_counter_version() -> String {
+    "v1".to_string()
+}
+fn default_knowledge_schema_version() -> String {
+    "v1".to_string()
+}
+fn default_knowledge_source_state() -> KnowledgeSourceState {
+    KnowledgeSourceState::Active
+}
 fn default_standard_work_hours() -> f64 {
     8.0
 }
@@ -1242,6 +1405,8 @@ impl Default for AppConfig {
             ai_mode: AiMode::Local,
             text_model: ModelConfig::default_text(),
             text_model_profiles: Vec::new(),
+            wechat: WechatConfig::default(),
+            knowledge: KnowledgeConfig::default(),
             vision_model: ModelConfig::default_vision(),
             privacy: PrivacyConfig::default(),
             app_category_rules: Vec::new(),
@@ -1399,6 +1564,8 @@ impl AppConfig {
             normalize_optional_string(self.remote_storage.webdav.public_url_base.take());
         self.node_gateway.device_name =
             normalize_optional_string(self.node_gateway.device_name.take());
+        normalize_wechat_config(&mut self.wechat);
+        normalize_knowledge_config(&mut self.knowledge);
         self.sync_text_model_profiles();
     }
 
@@ -2012,6 +2179,45 @@ fn normalize_optional_string(value: Option<String>) -> Option<String> {
     })
 }
 
+fn normalize_wechat_config(config: &mut WechatConfig) {
+    config.compatibility_profile_id = normalize_optional_string(config.compatibility_profile_id.take());
+    config.text_model_profile_id = normalize_optional_string(config.text_model_profile_id.take());
+    if !config.content_retention_enabled {
+        config.content_retention_days = 0;
+    } else {
+        config.content_retention_days = config.content_retention_days.clamp(1, 30);
+    }
+}
+
+fn normalize_knowledge_config(config: &mut KnowledgeConfig) {
+    config.recent_picker_dir = normalize_optional_string(config.recent_picker_dir.take());
+    config.top_k = config.top_k.clamp(1, 12);
+    config.token_budget = config.token_budget.clamp(256, 4096);
+    if config.token_counter_version != "v1" {
+        config.token_counter_version = default_knowledge_token_counter_version();
+    }
+    config.local_embedding.provider = config.local_embedding.provider.trim().to_string();
+    config.local_embedding.endpoint = config.local_embedding.endpoint.trim().trim_end_matches('/').to_string();
+    config.local_embedding.model = config.local_embedding.model.trim().to_string();
+
+    let mut source_ids = std::collections::HashSet::new();
+    config.knowledge_sources.retain_mut(|source| {
+        source.source_id = source.source_id.trim().to_string();
+        source.source_path = source.source_path.trim().to_string();
+        source.schema_version = source.schema_version.trim().to_string();
+        source.state_reason = normalize_optional_string(source.state_reason.take());
+        source.priority = source.priority.min(100);
+        source.lineage.retain_mut(|lineage| {
+            lineage.source_id = lineage.source_id.trim().to_string();
+            !lineage.source_id.is_empty() && lineage.source_id != source.source_id
+        });
+        !source.source_id.is_empty()
+            && !source.source_path.is_empty()
+            && !source.schema_version.is_empty()
+            && source_ids.insert(source.source_id.clone())
+    });
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::field_reassign_with_default)]
@@ -2044,6 +2250,123 @@ mod tests {
         assert_eq!(result.status, ConfigLoadStatus::Missing);
         assert!(!result.status.requires_fail_safe());
         assert!(result.status.allows_automatic_save());
+    }
+
+    #[test]
+    fn 旧配置缺少微信和知识库字段时使用安全默认值() {
+        let mut value = serde_json::to_value(AppConfig::default()).expect("默认配置应可序列化");
+        let object = value.as_object_mut().expect("配置应为对象");
+        object.remove("wechat");
+        object.remove("knowledge");
+
+        let mut config: AppConfig = serde_json::from_value(value).expect("旧配置应兼容");
+        config.normalize();
+
+        assert!(config.wechat.compatibility_profile_id.is_none());
+        assert!(!config.wechat.auto_trigger);
+        assert!(config.knowledge.scope_mode.is_none());
+        assert!(config.knowledge.recent_picker_dir.is_none());
+        assert_eq!(config.knowledge.local_embedding.model, "");
+    }
+
+    #[test]
+    fn 微信知识库camelcase_get_save往返保留设置修改() {
+        let mut payload = serde_json::to_value(AppConfig::default()).expect("默认配置应可序列化");
+        let wechat = payload["wechat"].as_object_mut().expect("微信配置应为对象");
+        wechat.insert("compatibilityProfileId".into(), serde_json::json!("wechat-desktop-v1"));
+        wechat.insert("textModelProfileId".into(), serde_json::json!("default-text-model"));
+        wechat.insert("contentRetentionEnabled".into(), serde_json::json!(true));
+        wechat.insert("contentRetentionDays".into(), serde_json::json!(7));
+        let knowledge = payload["knowledge"].as_object_mut().expect("知识库配置应为对象");
+        knowledge.insert("scopeMode".into(), serde_json::json!("conversation"));
+        knowledge.insert("topK".into(), serde_json::json!(8));
+        knowledge.insert("localEmbedding".into(), serde_json::json!({
+            "provider": "ollama_loopback",
+            "endpoint": "http://127.0.0.1:11434",
+            "model": "nomic"
+        }));
+
+        let mut config: AppConfig = serde_json::from_value(payload).expect("页面 payload 应可反序列化");
+        config.normalize();
+        assert_eq!(config.wechat.compatibility_profile_id.as_deref(), Some("wechat-desktop-v1"));
+        assert_eq!(config.wechat.text_model_profile_id.as_deref(), Some("default-text-model"));
+        assert!(config.wechat.content_retention_enabled);
+        assert_eq!(config.wechat.content_retention_days, 7);
+        assert_eq!(config.knowledge.scope_mode, Some(super::KnowledgeScopeMode::Conversation));
+        assert_eq!(config.knowledge.top_k, 8);
+        assert_eq!(config.knowledge.local_embedding.endpoint, "http://127.0.0.1:11434");
+        assert_eq!(config.knowledge.local_embedding.model, "nomic");
+    }
+
+    #[test]
+    fn 微信知识库配置使用camelcase并兼容错误预发布payload迁移() {
+        let mut payload = serde_json::to_value(AppConfig::default()).expect("默认配置应可序列化");
+        let object = payload.as_object_mut().expect("配置应为对象");
+        object.insert(
+            "wechat".into(),
+            serde_json::json!({
+                "compatibility_profile_id": "wechat-desktop-v1",
+                "text_model_profile_id": "default-text-model",
+                "content_retention_enabled": true,
+                "content_retention_days": 7,
+            }),
+        );
+        object.insert(
+            "knowledge".into(),
+            serde_json::json!({
+                "scope_mode": "conversation",
+                "top_k": 8,
+                "local_embedding": {
+                    "provider": "ollama_loopback",
+                    "endpoint": "http://127.0.0.1:11434",
+                    "model": "nomic"
+                },
+                "knowledge_sources": [{
+                    "source_id": "source-1",
+                    "source_kind": "file",
+                    "source_path": "/tmp/source.md"
+                }]
+            }),
+        );
+
+        let mut config: AppConfig = serde_json::from_value(payload).expect("错误预发布配置应迁移");
+        config.normalize();
+        assert_eq!(config.wechat.compatibility_profile_id.as_deref(), Some("wechat-desktop-v1"));
+        assert_eq!(config.wechat.text_model_profile_id.as_deref(), Some("default-text-model"));
+        assert_eq!(config.knowledge.scope_mode, Some(super::KnowledgeScopeMode::Conversation));
+        assert_eq!(config.knowledge.top_k, 8);
+        assert_eq!(config.knowledge.local_embedding.model, "nomic");
+        assert_eq!(config.knowledge.knowledge_sources.len(), 1);
+
+        let saved = serde_json::to_value(config).expect("迁移后的配置应可序列化");
+        assert!(saved["wechat"].get("compatibilityProfileId").is_some());
+        assert!(saved["knowledge"].get("scopeMode").is_some());
+        assert!(saved["knowledge"].get("topK").is_some());
+        assert!(saved["knowledge"].get("localEmbedding").is_some());
+        assert!(saved["knowledge"].get("knowledgeSources").is_some());
+        assert!(saved["wechat"].get("compatibility_profile_id").is_none());
+        assert!(saved["knowledge"].get("scope_mode").is_none());
+        assert!(saved["knowledge"].get("top_k").is_none());
+        assert!(saved["knowledge"].get("local_embedding").is_none());
+        assert!(saved["knowledge"].get("knowledge_sources").is_none());
+    }
+
+    #[test]
+    fn 微信留存和知识库选择归一化为安全范围() {
+        let mut config = AppConfig::default();
+        config.wechat.content_retention_days = 30;
+        config.wechat.content_retention_enabled = false;
+        config.knowledge.recent_picker_dir = Some("   ".into());
+        config.knowledge.top_k = 0;
+        config.knowledge.token_budget = 99999;
+        config.knowledge.token_counter_version = "unknown".into();
+        config.normalize();
+
+        assert_eq!(config.wechat.content_retention_days, 0);
+        assert!(config.knowledge.recent_picker_dir.is_none());
+        assert_eq!(config.knowledge.top_k, 1);
+        assert_eq!(config.knowledge.token_budget, 4096);
+        assert_eq!(config.knowledge.token_counter_version, "v1");
     }
 
     #[test]

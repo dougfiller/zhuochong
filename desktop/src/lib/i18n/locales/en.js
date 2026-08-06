@@ -446,6 +446,8 @@ export default {
         node: 'Integrations',
         beta: 'Beta',
         ai: 'AI Models',
+        wechat: 'WeChat (prepared)',
+        knowledge: 'Knowledge Base (prepared)',
         avatar: 'Avatar',
         system: 'System',
         appearance: 'Appearance',
@@ -482,6 +484,12 @@ export default {
         defaultModel: 'Default Model',
         defaultModelMeta: 'Current default text model profile',
       },
+    },
+    settingsWechat: {
+      title: 'WeChat reply preparation', loading: 'Loading safe status…', notReady: 'Preparation only. This step does not monitor, capture, paste, or send messages.', profile: 'Compatibility profile', profileUnset: 'Not selected', model: 'Text model profile', modelUnset: 'Not selected', retention: 'Allow retention setting', retentionDays: 'Retention days', noAutomation: 'Auto trigger stays off; no chat content is written in this step.',
+    },
+    settingsKnowledge: {
+      title: 'M2 knowledge base preparation', loading: 'Loading safe status…', notReady: 'The knowledge base is not ready. No import, indexing, embedding, or retrieval runs here.', scope: 'Knowledge scope', scopeUnset: 'Not selected', scopeConversation: 'This conversation', scopeSelected: 'Selected conversations', scopeGlobal: 'User-selected global scope', topK: 'Top K', tokenBudget: 'Token budget', sameConversationBoost: 'Same-conversation boost', localEmbedding: 'Local loopback embedding', endpoint: 'Endpoint', embeddingModel: 'Model', sourceSummary: '{count} source metadata entries (not imported)',
     },
     settingsGeneral: {
       title: 'General',

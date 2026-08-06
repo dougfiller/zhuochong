@@ -7487,6 +7487,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "uiautomation",
+ "url",
  "uuid",
  "winapi",
  "windows-capture",

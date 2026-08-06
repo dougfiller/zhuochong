@@ -64,3 +64,16 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | Rust 格式检查 | `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` | 仅检查格式 | 未运行：当前 `stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component | 环境限制 |
 
 `normal_m1.json`、`empty_ocr.json`、`group_chat.json`、`duplicate_message.json`、`unsupported_schema.json`、`ambiguous_conversations.json`、`no_hit.json` 与 `retrieval_failed.json` 仅为契约样例。后续实现必须保持它们脱敏；群聊 fixture 只可表达用户明确选择的知识范围，不扩展为实时群聊回复承诺。
+
+## 建立最小微信/知识库模块骨架并接入现有配置（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_wechat_knowledge_skeleton.py`。该脚本为纯静态检查，不会启动应用、访问网络、读取真实微信/聊天/知识库内容，或创建 `knowledge.sqlite`。
+
+| 验收项 | 命令/方法 | 实际结果 |
+| --- | --- | --- |
+| 空 runtime 与 command 接线 | `python3 -B kaifa/kaifa_test/verify_wechat_knowledge_skeleton.py` | 通过；三项独立 managed state、三个安全 DTO command、空实现错误码、loopback validator 和 config normalize 均存在。 |
+| 未知 profile fail-closed | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::commands::tests::unknown_profile_fails_closed --no-default-features` | 通过；`WX_PROFILE_UNSUPPORTED` 且 auto trigger 为 false。 |
+| 非 loopback embedding 拒绝 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge::config::tests::only_exact_loopback_http_endpoints_are_accepted --no-default-features` | 通过；DNS、云、LAN、`0.0.0.0` 和 https 均拒绝，无网络调用。 |
+| 旧 config/default/normalize | `cargo test --manifest-path desktop/Cargo.toml -p work-review-core config --quiet` | 通过；45 项通过，覆盖旧字段缺失、空 recent dir、留存和安全范围归一化。 |
+| 设置页生产构建 | `cd desktop && npm run build` | 通过；Vite 5.4.21 转换 242 个模块并完成生产构建。 |
+| Rust 格式检查 | `cargo fmt --manifest-path desktop/Cargo.toml --check` | 环境限制；当前 `stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component，未将此检查伪报为通过。 |

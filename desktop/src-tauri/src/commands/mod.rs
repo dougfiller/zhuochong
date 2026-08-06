@@ -22,6 +22,13 @@ mod updater;
 mod integration;
 mod system;
 
+#[allow(unused_imports)]
+pub(crate) use crate::knowledge::commands::{
+    get_knowledge_settings_status, validate_knowledge_local_embedding,
+};
+#[allow(unused_imports)]
+pub(crate) use crate::wechat::commands::get_wechat_settings_status;
+
 // 所有 pub command + DTO（main.rs generate_handler 的 commands::xxx 不变）
 pub use stats::*;
 pub use timeline::*;

@@ -436,6 +436,8 @@ export default {
         node: '接入管理',
         beta: 'Beta',
         ai: 'AI 模型',
+        wechat: '微信（準備中）',
+        knowledge: '知識庫（準備中）',
         avatar: '桌寵',
         system: '系統',
         appearance: '外觀',
@@ -472,6 +474,12 @@ export default {
         defaultModel: '預設模型',
         defaultModelMeta: '目前的預設文字模型檔案',
       },
+    },
+    settingsWechat: {
+      title: '微信回覆準備', loading: '正在讀取安全狀態…', notReady: '僅為準備設定。本步驟不會監聽、擷取、貼上或傳送訊息。', profile: '相容性設定檔', profileUnset: '未選擇', model: '文字模型設定檔', modelUnset: '未選擇', retention: '允許設定保留', retentionDays: '保留天數', noAutomation: '自動觸發保持關閉；本步驟不會寫入聊天內容。',
+    },
+    settingsKnowledge: {
+      title: 'M2 知識庫準備', loading: '正在讀取安全狀態…', notReady: '知識庫尚未就緒；這裡不執行匯入、索引、嵌入或檢索。', scope: '知識範圍', scopeUnset: '未選擇', scopeConversation: '目前會話', scopeSelected: '已選會話', scopeGlobal: '使用者選擇的全域範圍', topK: 'Top K', tokenBudget: 'Token 預算', sameConversationBoost: '同會話加權', localEmbedding: '本機 loopback 嵌入', endpoint: '端點', embeddingModel: '模型', sourceSummary: '{count} 條來源中繼資料（尚未匯入）',
     },
     settingsGeneral: {
       title: '基本設定',

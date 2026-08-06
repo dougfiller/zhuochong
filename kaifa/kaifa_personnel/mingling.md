@@ -54,3 +54,18 @@ cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features -
 
 后三条同样是预期失败：分别必须因私有字段、M1 无 RAG 入口、M2 无 M1 入口失败。`wechat-contract-check` 仅用于隔离发布契约检查，因此既有未选择微信 release feature 的默认 Work Review 构建保持兼容。新增 fixture 位于 `desktop/src-tauri/tests/fixtures/wechat_contract/`，只可使用手写虚构 ID、通用文字和固定值；不得填入聊天正文、联系人、截图、真实来源路径、源目录哈希或凭据。
 - `verify_work_review_baseline.py` 现在将本步骤明确列出的矩阵、结果 JSON 与五份摘要视为可审计的 `docs/baselines/` 元数据；仍拒绝该目录中的任何其他文件或目录。
+
+## 建立最小微信/知识库模块骨架并接入现有配置（2026-08-06）
+
+以下命令只检查步骤 5 的安全空骨架；不会启动 Tauri、访问网络、真实微信、聊天正文、模型或知识库数据库。
+
+```bash
+python3 -B kaifa/kaifa_test/verify_wechat_knowledge_skeleton.py
+cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::commands::tests::unknown_profile_fails_closed --no-default-features
+cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge::config::tests::only_exact_loopback_http_endpoints_are_accepted --no-default-features
+cargo test --manifest-path desktop/Cargo.toml -p work-review-core config --quiet
+```
+
+- `verify_wechat_knowledge_skeleton.py` 是静态接线门禁：核对三项独立 managed state、三个安全 command、空实现错误码、loopback validator 与 `AppConfig` 的默认/normalize 接线；不读取用户配置或内容。
+- 两条 Tauri 定向单测分别证明未知微信 profile fail-closed、非 loopback embedding endpoint 被拒绝且没有网络调用。
+- core config 定向测试覆盖旧配置缺字段的默认值，以及留存、最近目录、topK、token budget 和 token counter 的安全归一化。

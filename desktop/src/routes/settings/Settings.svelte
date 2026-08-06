@@ -14,6 +14,8 @@
   import SettingsSystem from './components/SettingsSystem.svelte';
   import SettingsPrivacy from './components/SettingsPrivacy.svelte';
   import SettingsStorage from './components/SettingsStorage.svelte';
+  import SettingsWechat from './components/SettingsWechat.svelte';
+  import SettingsKnowledge from './components/SettingsKnowledge.svelte';
   let config = null;
   let loading = true;
   let saving = false;
@@ -37,6 +39,8 @@
     { id: 'general', labelKey: 'settings.tabs.general', icon: 'general' },
     { id: 'appearance', labelKey: 'settings.tabs.appearance', icon: 'appearance' },
     { id: 'ai', labelKey: 'settings.tabs.ai', icon: 'ai' },
+    { id: 'wechat', labelKey: 'settings.tabs.wechat', icon: 'ai', beta: true },
+    { id: 'knowledge', labelKey: 'settings.tabs.knowledge', icon: 'ai', beta: true },
     { id: 'avatar', labelKey: 'settings.tabs.avatar', icon: 'avatar', beta: true },
     { id: 'privacy', labelKey: 'settings.tabs.privacy', icon: 'privacy' },
     { id: 'storage', labelKey: 'settings.tabs.storage', icon: 'storage' },
@@ -74,6 +78,18 @@
       }
       if (!config.text_model_profiles) {
         config.text_model_profiles = [];
+      }
+      if (!config.wechat || typeof config.wechat !== 'object') {
+        config.wechat = { compatibilityProfileId: null, textModelProfileId: null, autoTrigger: false, contentRetentionEnabled: false, contentRetentionDays: 0 };
+      }
+      if (!config.knowledge || typeof config.knowledge !== 'object') {
+        config.knowledge = { recentPickerDir: null, scopeMode: null, topK: 6, tokenBudget: 1200, tokenCounterVersion: 'v1', sameConversationBoost: false, localEmbedding: { provider: 'ollama_loopback', endpoint: 'http://127.0.0.1', model: '' }, knowledgeSources: [] };
+      }
+      if (!config.knowledge.localEmbedding || typeof config.knowledge.localEmbedding !== 'object') {
+        config.knowledge.localEmbedding = { provider: 'ollama_loopback', endpoint: 'http://127.0.0.1', model: '' };
+      }
+      if (!Array.isArray(config.knowledge.knowledgeSources)) {
+        config.knowledge.knowledgeSources = [];
       }
       if (typeof config.daily_report_custom_prompt !== 'string') {
         config.daily_report_custom_prompt = '';
@@ -408,6 +424,10 @@
             <p class="settings-card-desc">{t('settings.aiCardDescription')}</p>
             <SettingsAI bind:config {providers} on:change={() => dirty = true} />
           </div>
+        {:else if activeTab === 'wechat'}
+          <SettingsWechat bind:config on:change={() => dirty = true} />
+        {:else if activeTab === 'knowledge'}
+          <SettingsKnowledge bind:config on:change={() => dirty = true} />
         {:else if activeTab === 'avatar'}
           <SettingsAvatar bind:config on:change={() => dirty = true} />
         {:else if activeTab === 'privacy'}
