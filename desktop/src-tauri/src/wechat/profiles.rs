@@ -12,6 +12,7 @@ pub(crate) struct CompatibilityProfile {
     pub(crate) profile_version: String,
     pub(crate) wechat_product_version: String,
     pub(crate) windows_build: String,
+    probe_evidence_sha256: String,
     pub(crate) theme: String,
     pub(crate) display_topology: DisplayTopology,
     pub(crate) executable: ExecutableProfile,
@@ -19,6 +20,47 @@ pub(crate) struct CompatibilityProfile {
     pub(crate) window_size_px: WindowSize,
     pub(crate) chat_roi: NormalizedRoi,
     pub(crate) header_identity_roi: NormalizedRoi,
+    pub(crate) ocr_fallback_audit: Option<OcrFallbackAudit>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct OcrFallbackAudit {
+    profile_id: String,
+    profile_version: String,
+    primary: String,
+    probe_evidence_sha256: String,
+    probe_windows_build: String,
+    probe_wechat_version: String,
+    probe_theme: String,
+    probe_dpi: u32,
+    probe_monitors: u32,
+    probe_topology: String,
+    probe_outcome: String,
+    fallback_id: String,
+    fallback_sha256: String,
+    offline_no_ui_no_disk_no_command: bool,
+    reviewed_at: String,
+}
+
+impl OcrFallbackAudit {
+    pub(crate) fn is_approved_for(&self, profile: &CompatibilityProfile) -> bool {
+        self.profile_id == profile.id
+            && self.profile_version == profile.profile_version
+            && self.primary == "WindowsOCR"
+            && is_sha256(&self.probe_evidence_sha256)
+            && self.probe_evidence_sha256 == profile.probe_evidence_sha256
+            && self.probe_windows_build == profile.windows_build
+            && self.probe_wechat_version == profile.wechat_product_version
+            && self.probe_theme == profile.theme
+            && self.probe_dpi == profile.dpi
+            && self.probe_monitors == profile.display_topology.monitors
+            && self.probe_topology == profile.display_topology.target_monitor
+            && matches!(self.probe_outcome.as_str(), "unavailable" | "failed")
+            && self.fallback_id == "compiled-local-memory-v1"
+            && is_sha256(&self.fallback_sha256)
+            && self.offline_no_ui_no_disk_no_command
+            && !blank(&self.reviewed_at)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -117,6 +159,7 @@ struct RawProfile {
     chat_roi: RawNormalizedRoi,
     header_identity_roi: RawNormalizedRoi,
     probe_evidence: RawProbeEvidence,
+    ocr_fallback_audit: Option<RawOcrFallbackAudit>,
 }
 
 #[derive(Deserialize)]
@@ -161,6 +204,26 @@ struct RawProbeEvidence {
     evidence_sha256: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawOcrFallbackAudit {
+    profile_id: String,
+    profile_version: String,
+    primary: String,
+    probe_evidence_sha256: String,
+    probe_windows_build: String,
+    probe_wechat_version: String,
+    probe_theme: String,
+    probe_dpi: u32,
+    probe_monitors: u32,
+    probe_topology: String,
+    probe_outcome: String,
+    fallback_id: String,
+    fallback_sha256: String,
+    offline_no_ui_no_disk_no_command: bool,
+    reviewed_at: String,
+}
+
 impl TryFrom<RawProfile> for CompatibilityProfile {
     type Error = CatalogError;
 
@@ -189,12 +252,30 @@ impl TryFrom<RawProfile> for CompatibilityProfile {
             return Err(CatalogError::InvalidCatalog);
         }
 
-        Ok(Self {
+        let ocr_fallback_audit = raw.ocr_fallback_audit.map(|audit| OcrFallbackAudit {
+            profile_id: audit.profile_id,
+            profile_version: audit.profile_version,
+            primary: audit.primary,
+            probe_evidence_sha256: audit.probe_evidence_sha256,
+            probe_windows_build: audit.probe_windows_build,
+            probe_wechat_version: audit.probe_wechat_version,
+            probe_theme: audit.probe_theme,
+            probe_dpi: audit.probe_dpi,
+            probe_monitors: audit.probe_monitors,
+            probe_topology: audit.probe_topology,
+            probe_outcome: audit.probe_outcome,
+            fallback_id: audit.fallback_id,
+            fallback_sha256: audit.fallback_sha256,
+            offline_no_ui_no_disk_no_command: audit.offline_no_ui_no_disk_no_command,
+            reviewed_at: audit.reviewed_at,
+        });
+        let profile = Self {
             id: raw.id,
             enabled: raw.enabled,
             profile_version: raw.profile_version,
             wechat_product_version: raw.wechat_product_version,
             windows_build: raw.probe_evidence.windows_build,
+            probe_evidence_sha256: raw.probe_evidence.evidence_sha256,
             theme: raw.theme,
             display_topology: DisplayTopology {
                 monitors: raw.display_topology.monitors,
@@ -224,7 +305,16 @@ impl TryFrom<RawProfile> for CompatibilityProfile {
                 right: raw.header_identity_roi.right,
                 bottom: raw.header_identity_roi.bottom,
             },
-        })
+            ocr_fallback_audit,
+        };
+        if profile
+            .ocr_fallback_audit
+            .as_ref()
+            .is_some_and(|audit| !audit.is_approved_for(&profile))
+        {
+            return Err(CatalogError::InvalidCatalog);
+        }
+        Ok(profile)
     }
 }
 
@@ -328,5 +418,40 @@ mod tests {
     #[test]
     fn invalid_roi_profile_is_rejected() {
         assert_eq!(CompatibilityCatalog::parse(&VALID_PROFILE.replace("\"right\": 0.98", "\"right\": 0.2")), Err(CatalogError::InvalidCatalog));
+    }
+
+    #[test]
+    fn fallback_audit_must_bind_to_one_exact_failed_or_unavailable_probe() {
+        let audit = r#",
+        "ocr_fallback_audit": {
+          "profile_id": "wechat-windows-4.0.1-light-96-primary",
+          "profile_version": "1",
+          "primary": "WindowsOCR",
+          "probe_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "probe_windows_build": "22631",
+          "probe_wechat_version": "4.0.1.26",
+          "probe_theme": "light",
+          "probe_dpi": 96,
+          "probe_monitors": 1,
+          "probe_topology": "primary",
+          "probe_outcome": "unavailable",
+          "fallback_id": "compiled-local-memory-v1",
+          "fallback_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "offline_no_ui_no_disk_no_command": true,
+          "reviewed_at": "2026-08-06T00:00:00Z"
+        }"#;
+        let profile = VALID_PROFILE.replacen("\n      }]", &format!("{audit}\n      }}]"), 1);
+        assert!(CompatibilityCatalog::parse(&profile).is_ok());
+        assert_eq!(
+            CompatibilityCatalog::parse(&profile.replace(
+                "\"probe_evidence_sha256\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"",
+                "\"probe_evidence_sha256\": \"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"",
+            )),
+            Err(CatalogError::InvalidCatalog),
+        );
+        assert_eq!(
+            CompatibilityCatalog::parse(&profile.replace("\"probe_outcome\": \"unavailable\"", "\"probe_outcome\": \"empty\"")),
+            Err(CatalogError::InvalidCatalog),
+        );
     }
 }

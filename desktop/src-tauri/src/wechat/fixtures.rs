@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::types::{CapturedWechat, CaptureVersion, ContractError, OcrBackendResult, OcrReadyReply, RequestId};
+    use super::super::types::{CapturedWechat, CaptureVersion, ContractError, NormalizedOcrText, OcrBackendResult, OcrReadyReply, RequestId};
     use serde::Deserialize;
 
     #[derive(Deserialize)]
@@ -45,16 +45,10 @@ mod tests {
             stable_message_id: normal.stable_message_id,
             is_single_chat: normal.is_single_chat,
         };
-        assert!(OcrReadyReply::from_backend(captured, OcrBackendResult::Text(normal.ocr_text)).is_ok());
+        assert!(OcrReadyReply::from_backend(captured, OcrBackendResult::Text(NormalizedOcrText::parse(&normal.ocr_text).unwrap())).is_ok());
 
         let empty: OcrFixture = serde_json::from_str(fixture("empty_ocr")).unwrap();
-        let captured = CapturedWechat {
-            request_id: empty.request_id,
-            capture_version: empty.capture_version,
-            stable_message_id: empty.stable_message_id,
-            is_single_chat: empty.is_single_chat,
-        };
-        assert_eq!(OcrReadyReply::from_backend(captured, OcrBackendResult::Text(empty.ocr_text)), Err(ContractError::WxOcrEmpty));
+        assert_eq!(NormalizedOcrText::parse(&empty.ocr_text), Err(ContractError::WxOcrEmpty));
 
         let group: OcrFixture = serde_json::from_str(fixture("group_chat")).unwrap();
         let captured = CapturedWechat {
@@ -64,7 +58,7 @@ mod tests {
             is_single_chat: group.is_single_chat,
         };
         assert_eq!(
-            OcrReadyReply::from_backend(captured, OcrBackendResult::Text(group.ocr_text)),
+            OcrReadyReply::from_backend(captured, OcrBackendResult::Text(NormalizedOcrText::parse(&group.ocr_text).unwrap())),
             Err(ContractError::WxGroupChatUnsupported),
         );
     }

@@ -96,3 +96,19 @@ cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features
 
 - 静态门禁只读取源码，检查内存帧、物理原点裁剪、无焦点恢复、worker join 和协调器接线；不启动应用、不访问网络或读取任何微信内容。
 - Windows 真机的 GDI/WGC 成功、失败、超时、取消与窗口恢复仍待受控 Windows 11 环境验证；当前 macOS 结果不替代该验证。
+
+## 建立 Windows OCR 专用后端和条件本地 OCR fallback（2026-08-06）
+
+```bash
+# 只读源码与空 production catalog 的静态边界检查；不启动应用、不访问网络或真实微信。
+python3 -B kaifa/kaifa_test/verify_wechat_windows_ocr.py --project-root .
+
+# 合成 RGBA 与契约单测；不调用 WinRT、模型、检索、文件 OCR 或外部进程。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat:: --no-default-features
+
+# 当前主机的非 Windows 编译检查。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features
+```
+
+- `verify_wechat_windows_ocr.py` 检查 `wechat/ocr.rs` 只消费 `chat_rgba`，并拒绝路径、进程、PowerShell、Paddle、StorageFile、HTTP、Tauri command 与文件 API；它还确认 `OcrService` 的新内存入口直接使用 WinRT `SoftwareBitmap`/`OcrEngine`，以及 production catalog 仍为空。
+- Windows target 编译和真机 UAT 必须在受控 Windows 11 x64 上补做。当前 host 未安装 `x86_64-pc-windows-msvc` target，不能用 macOS 合成测试替代该证据；未取得冻结 probe 前，fallback 保持 Disabled。

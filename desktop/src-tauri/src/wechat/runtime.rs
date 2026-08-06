@@ -4,6 +4,33 @@
 pub(crate) struct WechatReplyRuntime;
 
 impl WechatReplyRuntime {
+    /// Private OCR hand-off for a verified capture. It has no Tauri command and
+    /// cannot progress to retrieval or a model after an OCR failure.
+    pub(crate) fn recognize_captured_wechat<S: super::ocr::WechatOcrAuditSink>(
+        &self,
+        slices: &super::capture::WechatCaptureSlices,
+        identity: &super::window_identity::WechatWindowIdentity,
+        captured: super::types::CapturedWechat,
+        state: &mut super::state_machine::StateMachine,
+        stage_seq: u64,
+        audit_sink: &mut S,
+    ) -> Result<super::types::OcrReadyReply, super::types::ContractError> {
+        let mut dispatcher = super::ocr::WechatOcrDispatcher::new(
+            super::ocr::WindowsMemoryPrimary,
+            super::ocr::DisabledLocalFallback,
+        );
+        match dispatcher.recognize(slices, identity, captured, audit_sink) {
+            Ok(reply) => Ok(reply),
+            Err(error @ (super::types::ContractError::WxOcrEmpty
+            | super::types::ContractError::WxOcrUnavailable
+            | super::types::ContractError::WxOcrFailed)) => {
+                state.fail_ocr(error, stage_seq)?;
+                Err(error)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     /// Re-reads the foreground Windows window and returns a backend-only identity.
     /// This step never captures pixels, invokes OCR, retrieval, or a model.
     #[cfg(target_os = "windows")]

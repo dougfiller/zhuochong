@@ -101,3 +101,16 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 负坐标与越界裁剪 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat::capture::tests --no-default-features` | 两项合成测试：副屏负原点先平移；帧外窗口与非法 ROI fail-closed | 通过 |
 | 当前平台编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features` | macOS 编译通过；保留既有 dead-code 与 `block v0.1.6` future-incompat 提示 | 通过 |
 | Windows 实机路径 | Windows 11 x64 + 受支持微信 profile 的成功/失败/超时/取消测试 | 用户决定本 run 不执行 Windows 实机测试；此项不提供运行时通过证据 | not-run（用户豁免） |
+
+## 建立 Windows OCR 专用后端和条件本地 OCR fallback（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_wechat_windows_ocr.py`。该脚本只读取源码与版本控制 catalog；Rust 单测只使用合成 RGBA/虚构 profile，不启动 Tauri、不访问网络、真实微信、模型、检索、文件 OCR 或外部进程。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 私有内存 OCR 边界 | `python3 -B kaifa/kaifa_test/verify_wechat_windows_ocr.py --project-root .` | 通过；检查仅 `chat_rgba`、WinRT `SoftwareBitmap`/`OcrEngine` 内存入口、结果规范化、空 production catalog 和禁止路径/PowerShell/Paddle/StorageFile/HTTP/文件 API。 | 通过 |
+| dispatcher、规范化和 fallback 门禁 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat:: --no-default-features` | 38/38 通过；覆盖控制字符/空白/长度拒绝、Empty/Unavailable/Failed 终止、零 fallback、准确审计才一次 fallback，以及 OCR 失败不能进入 retrieval/generation。 | 通过 |
+| 当前平台编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features` | 通过；仅现有/隔离模块的 dead-code 警告与 `block v0.1.6` future-incompat 提示。 | 通过 |
+| diff 空白检查 | `git diff --check -- desktop/src-tauri/src/ocr.rs desktop/src-tauri/src/wechat desktop/src-tauri/Cargo.toml kaifa/kaifa_test` | 通过。 | 通过 |
+| Windows target 编译与 WinRT/UAT | `cargo check --target x86_64-pc-windows-msvc ...`；Windows 11 x64 受控 probe | blocked；本机仅安装 `aarch64-apple-darwin`，目标检查因缺 `x86_64-pc-windows-msvc` target 失败；未执行 Windows 真机或真实微信。 | blocked |
+| Rust 格式检查 | `cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` | 环境限制；`stable-aarch64-apple-darwin` 未安装 `cargo-fmt`/`rustfmt` component。 | 未运行 |

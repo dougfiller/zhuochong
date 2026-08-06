@@ -7490,6 +7490,7 @@ dependencies = [
  "url",
  "uuid",
  "winapi",
+ "windows 0.61.3",
  "windows-capture",
  "work-review-core",
  "x11",

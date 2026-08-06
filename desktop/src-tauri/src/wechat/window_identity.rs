@@ -1,4 +1,4 @@
-use super::profiles::{CompatibilityCatalog, CompatibilityProfile, NormalizedRoi};
+use super::profiles::{CompatibilityCatalog, CompatibilityProfile, NormalizedRoi, OcrFallbackAudit};
 use super::types::ContractError;
 use crate::monitor::WindowBounds;
 
@@ -69,6 +69,7 @@ pub(crate) struct WechatWindowIdentity {
     chat_roi: NormalizedRoi,
     header_identity_roi: NormalizedRoi,
     title_hint: String,
+    ocr_fallback_audit: Option<OcrFallbackAudit>,
 }
 
 impl WechatWindowIdentity {
@@ -107,6 +108,10 @@ impl WechatWindowIdentity {
             is_minimized: false,
         }
     }
+
+    pub(crate) fn ocr_fallback_audit(&self) -> Option<&OcrFallbackAudit> {
+        self.ocr_fallback_audit.as_ref()
+    }
 }
 
 pub(crate) fn validate_foreground(
@@ -139,6 +144,7 @@ pub(crate) fn validate_foreground(
         chat_roi: profile.chat_roi,
         header_identity_roi: profile.header_identity_roi,
         title_hint: sanitize_title_hint(&evidence.title_hint),
+        ocr_fallback_audit: profile.ocr_fallback_audit.clone(),
     })
 }
 

@@ -16,6 +16,16 @@ use uuid::Uuid;
 const OCR_COMMAND_TIMEOUT: Duration = Duration::from_secs(20);
 const PADDLE_WORKER_READY_TIMEOUT: Duration = Duration::from_secs(45);
 
+/// Result of the private WeChat-only Windows memory OCR entry point.
+/// It deliberately contains no boxes, paths, or engine diagnostics.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum WindowsMemoryOcrResult {
+    Text(String),
+    Empty,
+    Unavailable,
+    Failed,
+}
+
 /// OCR 结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OcrResult {
@@ -79,6 +89,78 @@ struct PaddleWorkerClient {
 }
 
 impl OcrService {
+    /// Runs Windows OCR directly over an RGBA image already held in memory.
+    /// This is intentionally separate from `new` and `extract_text`: it never
+    /// creates Paddle assets, a script, a process, or a file-backed stream.
+    #[cfg(target_os = "windows")]
+    pub(crate) fn extract_windows_ocr_rgba(image: &image::RgbaImage) -> WindowsMemoryOcrResult {
+        use windows::Graphics::Imaging::{BitmapAlphaMode, BitmapPixelFormat, SoftwareBitmap};
+        use windows::Media::Ocr::OcrEngine;
+        use windows::Storage::Streams::DataWriter;
+
+        let width = match i32::try_from(image.width()) {
+            Ok(width) if width > 0 => width,
+            _ => return WindowsMemoryOcrResult::Failed,
+        };
+        let height = match i32::try_from(image.height()) {
+            Ok(height) if height > 0 => height,
+            _ => return WindowsMemoryOcrResult::Failed,
+        };
+        let expected_len = match usize::try_from(image.width())
+            .ok()
+            .and_then(|width| usize::try_from(image.height()).ok().and_then(|height| width.checked_mul(height)))
+            .and_then(|pixels| pixels.checked_mul(4))
+        {
+            Some(expected_len) if expected_len == image.as_raw().len() => expected_len,
+            _ => return WindowsMemoryOcrResult::Failed,
+        };
+        if expected_len == 0 {
+            return WindowsMemoryOcrResult::Failed;
+        }
+
+        let buffer = match DataWriter::new()
+            .and_then(|writer| {
+                writer.WriteBytes(image.as_raw())?;
+                writer.DetachBuffer()
+            }) {
+            Ok(buffer) => buffer,
+            Err(_) => return WindowsMemoryOcrResult::Failed,
+        };
+        let bitmap = match SoftwareBitmap::CreateCopyWithAlphaFromBuffer(
+            &buffer,
+            BitmapPixelFormat::Rgba8,
+            width,
+            height,
+            BitmapAlphaMode::Straight,
+        ) {
+            Ok(bitmap) => bitmap,
+            Err(_) => return WindowsMemoryOcrResult::Failed,
+        };
+        let engine = match OcrEngine::TryCreateFromUserProfileLanguages() {
+            Ok(engine) => engine,
+            Err(_) => return WindowsMemoryOcrResult::Unavailable,
+        };
+        let result = match engine.RecognizeAsync(&bitmap).and_then(|operation| operation.get()) {
+            Ok(result) => result,
+            Err(_) => return WindowsMemoryOcrResult::Failed,
+        };
+        let text = match result.Text() {
+            Ok(text) => text.to_string(),
+            Err(_) => return WindowsMemoryOcrResult::Failed,
+        };
+        if text.is_empty() {
+            WindowsMemoryOcrResult::Empty
+        } else {
+            WindowsMemoryOcrResult::Text(text)
+        }
+    }
+
+    /// Non-Windows hosts never substitute a path, process, or remote provider.
+    #[cfg(not(target_os = "windows"))]
+    pub(crate) fn extract_windows_ocr_rgba(_image: &image::RgbaImage) -> WindowsMemoryOcrResult {
+        WindowsMemoryOcrResult::Unavailable
+    }
+
     /// 创建 OCR 服务
     pub fn new(data_dir: &Path) -> Self {
         let paddle_script_path = data_dir.join("paddle_ocr.py");

@@ -91,6 +91,25 @@ impl StateMachine {
         Ok(())
     }
 
+    pub(crate) fn fail_ocr(
+        &mut self,
+        error: ContractError,
+        stage_seq: u64,
+    ) -> Result<(), ContractError> {
+        if self.state != ReplyState::Ocr
+            || stage_seq <= self.stage_seq
+            || !matches!(
+                error,
+                ContractError::WxOcrEmpty | ContractError::WxOcrUnavailable | ContractError::WxOcrFailed
+            )
+        {
+            return Err(ContractError::WxContractViolation);
+        }
+        self.state = ReplyState::Failed;
+        self.stage_seq = stage_seq;
+        Ok(())
+    }
+
     pub(crate) fn accepts_reply(
         &self,
         request_id: &RequestId,
@@ -197,5 +216,23 @@ mod tests {
             Some(BindingGeneration::new(4)),
             Some(BindingObservationVersion::new(5)),
         ));
+    }
+
+    #[test]
+    fn ocr_failures_terminate_before_model_or_retrieval_stages() {
+        for error in [
+            ContractError::WxOcrEmpty,
+            ContractError::WxOcrUnavailable,
+            ContractError::WxOcrFailed,
+        ] {
+            let mut state = machine(ReplyMode::M2);
+            state.advance(ReplyState::Validating, 1).unwrap();
+            state.advance(ReplyState::Capturing, 2).unwrap();
+            state.advance(ReplyState::Ocr, 3).unwrap();
+            state.fail_ocr(error, 4).unwrap();
+            assert_eq!(state.state(), ReplyState::Failed);
+            assert_eq!(state.advance(ReplyState::Retrieving, 5), Err(ContractError::WxContractViolation));
+            assert_eq!(state.advance(ReplyState::Generating, 5), Err(ContractError::WxContractViolation));
+        }
     }
 }
