@@ -21,6 +21,47 @@ pub(crate) struct MemberAudit {
     pub(crate) declared_hash: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SourceAuditDigest {
+    pub(crate) count: u64,
+    pub(crate) digest: String,
+}
+
+pub(crate) struct SourceAuditAccumulator {
+    count: u64,
+    hasher: Sha256,
+}
+
+impl SourceAuditAccumulator {
+    pub(crate) fn new() -> Self {
+        Self {
+            count: 0,
+            hasher: Sha256::new(),
+        }
+    }
+
+    pub(crate) fn add(&mut self, audit: &MemberAudit) {
+        self.count += 1;
+        self.hasher.update(audit.member_path_token.as_bytes());
+        self.hasher.update([0]);
+        self.hasher.update(audit.member_kind.as_bytes());
+        self.hasher.update([0]);
+        self.hasher.update(audit.size_bytes.to_le_bytes());
+        self.hasher.update(audit.mtime_ms.to_le_bytes());
+        if let Some(hash) = &audit.declared_hash {
+            self.hasher.update(hash.as_bytes());
+        }
+        self.hasher.update([0xff]);
+    }
+
+    pub(crate) fn finish(&self) -> SourceAuditDigest {
+        SourceAuditDigest {
+            count: self.count,
+            digest: format!("{:x}", self.hasher.clone().finalize()),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CompletenessVerdict {
     FullDeclared,

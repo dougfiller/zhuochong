@@ -1,3 +1,16 @@
+## 大型 messages[] 流式导入、规范化和媒体引用（2026-08-07）
+
+```bash
+# 只读取本 run 的源码与 migration；不读取聊天导出或媒体正文。
+python3 -B kaifa/kaifa_test/verify_streaming_message_import.py
+
+# 在 Tauri crate 中运行知识模块的定向单元测试。
+(cd desktop/src-tauri && cargo test knowledge --bin work-review)
+```
+
+- `verify_streaming_message_import.py` 是静态边界门禁：确认 `messages[]` visitor、v3 normalization/media schema、generation input key 和媒体 `exists_state='unknown'` 均存在，且不引入媒体打开、读取或元数据探测路径。
+- Rust 测试仅使用手写 fixture 和系统临时目录的 SQLite；不启动 Tauri、不访问网络，也不会对真实微信或导出包做任何操作。
+
 ## 冻结 Work Review 来源并建立正式产品源码副本（2026-08-05）
 
 ### 基线复制与复核

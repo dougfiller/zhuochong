@@ -2,10 +2,12 @@ use crate::wechat::types::ContractError;
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use std::path::Path;
 
-pub(crate) const SCHEMA_HEAD: i32 = 2;
+pub(crate) const SCHEMA_HEAD: i32 = 3;
 const INITIAL: &str = include_str!("migrations/knowledge/0001_initial.sql");
 const SOURCE_LINEAGE_MESSAGE_GENERATIONS: &str =
     include_str!("migrations/knowledge/0002_source_lineage_message_generations.sql");
+const STREAMING_MESSAGE_NORMALIZATION_MEDIA: &str =
+    include_str!("migrations/knowledge/0003_streaming_message_normalization_media.sql");
 
 pub(crate) fn open_writer(path: &Path) -> Result<Connection, ContractError> {
     let connection = Connection::open(path).map_err(|_| ContractError::KbNotReady)?;
@@ -88,7 +90,17 @@ fn migrate_and_validate(connection: &Connection) -> Result<(), ContractError> {
     if version == 1 {
         connection
             .execute_batch(&format!(
-                "BEGIN IMMEDIATE; {SOURCE_LINEAGE_MESSAGE_GENERATIONS}; PRAGMA user_version={SCHEMA_HEAD}; COMMIT;"
+                "BEGIN IMMEDIATE; {SOURCE_LINEAGE_MESSAGE_GENERATIONS}; PRAGMA user_version=2; COMMIT;"
+            ))
+            .map_err(|_| ContractError::KbNotReady)?;
+    }
+    let version: i32 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(|_| ContractError::KbNotReady)?;
+    if version == 2 {
+        connection
+            .execute_batch(&format!(
+                "BEGIN IMMEDIATE; {STREAMING_MESSAGE_NORMALIZATION_MEDIA}; PRAGMA user_version={SCHEMA_HEAD}; COMMIT;"
             ))
             .map_err(|_| ContractError::KbNotReady)?;
     }
@@ -140,6 +152,10 @@ pub(crate) fn validate_schema(
         ("knowledge_index_generations", "status"),
         ("knowledge_catalog_state", "active_index_generation_id"),
         ("knowledge_chunks", "index_generation_id"),
+        ("knowledge_message_normalizations", "canonical_hash"),
+        ("knowledge_media_refs", "exists_state"),
+        ("knowledge_import_generation_input_keys", "identity_key"),
+        ("knowledge_sources", "member_audit_digest"),
     ] {
         let exists: Option<i64> = connection
             .query_row(

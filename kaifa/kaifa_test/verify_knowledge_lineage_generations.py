@@ -33,10 +33,10 @@ def main() -> int:
         print("\n".join(failures))
         return 1
     text = {name: path.read_text(encoding="utf-8") for name, path in paths.items()}
-    failures += require(text["migrations"], ("SCHEMA_HEAD: i32 = 2", "SOURCE_LINEAGE_MESSAGE_GENERATIONS"), paths["migrations"])
+    failures += require(text["migrations"], ("SCHEMA_HEAD: i32 = 3", "SOURCE_LINEAGE_MESSAGE_GENERATIONS", "STREAMING_MESSAGE_NORMALIZATION_MEDIA"), paths["migrations"])
     failures += require(text["migration"], ("exported_at_ms", "coverage_kind", "knowledge_message_versions_identity_content_idx", "knowledge_source_lineage_successor_idx"), paths["migration"])
     failures += require(text["store"], ("IncomingMessage", "append_staging_messages", "record_source_audits", "register_ready_index_set", "activate_candidates", "knowledge_source_lineage", "knowledge_message_versions", "parent_generation_id"), paths["store"])
-    failures += require(text["importer"], ("Vec::with_capacity(256)", "append_staging_messages", "register_ready_index_set", "activate_candidates", "discard_staging"), paths["importer"])
+    failures += require(text["importer"], ("Vec::with_capacity(256)", "append_staging_messages", "finalize_source_candidates", "discard_stagings"), paths["importer"])
     failures += require(text["schema"], ("exported_at_ms", "parse_from_rfc3339"), paths["schema"])
     production_importer = text["importer"].split("#[cfg(test)]", 1)[0]
     for forbidden in ("write_all(", "remove_file(", "rename(", "rusqlite"):

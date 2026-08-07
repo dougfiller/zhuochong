@@ -1,10 +1,14 @@
 use super::archive_importer::{ArchiveImportSummary, WechatJsonArchiveImporter};
 use super::archive_schema::CoverageKind;
-use super::archive_store::{CompletenessVerdict, ImportFingerprint, MemberAudit};
+use super::archive_store::{
+    CompletenessVerdict, ImportFingerprint, MemberAudit, SourceAuditDigest,
+};
 use super::migrations;
 use crate::wechat::types::ContractError;
 use rusqlite::{params, Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
+#[cfg(test)]
+use std::cell::Cell;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -12,6 +16,36 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 const MAX_READERS: usize = 4;
+
+#[cfg(test)]
+thread_local! {
+    static FAIL_ON_APPEND_BATCH: Cell<Option<usize>> = const { Cell::new(None) };
+}
+
+#[cfg(test)]
+pub(crate) fn fail_on_append_batch(batch: usize) {
+    FAIL_ON_APPEND_BATCH.with(|remaining| remaining.set(Some(batch)));
+}
+
+#[cfg(test)]
+pub(crate) fn clear_append_batch_failure() {
+    FAIL_ON_APPEND_BATCH.with(|remaining| remaining.set(None));
+}
+
+#[cfg(test)]
+fn should_fail_append_batch() -> bool {
+    FAIL_ON_APPEND_BATCH.with(|remaining| match remaining.get() {
+        Some(1) => {
+            remaining.set(None);
+            true
+        }
+        Some(batch) => {
+            remaining.set(Some(batch - 1));
+            false
+        }
+        None => false,
+    })
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StoreAvailability {
@@ -38,6 +72,12 @@ pub(crate) struct StagingImport {
     source_id: String,
 }
 
+impl StagingImport {
+    pub(crate) fn source_id(&self) -> &str {
+        &self.source_id
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct CandidateImport(StagingImport);
 
@@ -49,6 +89,24 @@ pub(crate) struct IncomingMessage {
     pub(crate) normalized_content: String,
     pub(crate) content_hash: String,
     pub(crate) source_member_token: String,
+    pub(crate) created_at_ms: i64,
+    pub(crate) source_ordinal: u64,
+    pub(crate) sort_key: String,
+    pub(crate) message_kind: String,
+    pub(crate) render_kind: String,
+    pub(crate) sender_key: String,
+    pub(crate) text_hash: String,
+    pub(crate) reference_json: Option<String>,
+    pub(crate) extra_json: Option<String>,
+    pub(crate) media_refs: Vec<IncomingMediaRef>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct IncomingMediaRef {
+    pub(crate) ordinal: u64,
+    pub(crate) kind: String,
+    pub(crate) relative_path: Option<String>,
+    pub(crate) metadata_json: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -257,6 +315,10 @@ impl KnowledgeStore {
         staging: &StagingImport,
         batch: &[IncomingMessage],
     ) -> Result<(), ContractError> {
+        #[cfg(test)]
+        if should_fail_append_batch() {
+            return Err(ContractError::KbNotReady);
+        }
         self.with_writer(|connection| {
             let transaction = connection
                 .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
@@ -268,6 +330,18 @@ impl KnowledgeStore {
             if staging_exists.is_none() { return Err(ContractError::KbNotReady); }
             for incoming in batch {
                 if (incoming.stable_id.is_some()) == (incoming.fallback_key.is_some()) {
+                    return Err(ContractError::KbNotReady);
+                }
+                let identity_key = incoming
+                    .stable_id
+                    .as_ref()
+                    .map(|id| format!("stable:{id}"))
+                    .or_else(|| incoming.fallback_key.as_ref().map(|key| format!("fallback:{key}")))
+                    .ok_or(ContractError::KbNotReady)?;
+                if transaction.execute(
+                    "INSERT INTO knowledge_import_generation_input_keys(import_generation_id,identity_key) VALUES(?1,?2)",
+                    params![staging.id, identity_key],
+                ).map_err(|_| ContractError::KbNotReady)? != 1 {
                     return Err(ContractError::KbNotReady);
                 }
                 let message_id: Option<String> = if let Some(stable_id) = &incoming.stable_id {
@@ -311,6 +385,16 @@ impl KnowledgeStore {
                     "INSERT OR IGNORE INTO knowledge_message_sources(message_version_id,source_id,source_relative_path) VALUES(?1,?2,?3)",
                     params![version_id, staging.source_id, incoming.source_member_token],
                 ).map_err(|_| ContractError::KbNotReady)?;
+                transaction.execute(
+                    "INSERT OR IGNORE INTO knowledge_message_normalizations(message_version_id,created_at_ms,source_ordinal,sort_key,message_kind,render_kind,sender_key,text_hash,reference_json,extra_json,canonical_hash) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+                    params![version_id, incoming.created_at_ms, incoming.source_ordinal as i64, incoming.sort_key, incoming.message_kind, incoming.render_kind, incoming.sender_key, incoming.text_hash, incoming.reference_json, incoming.extra_json, incoming.content_hash],
+                ).map_err(|_| ContractError::KbNotReady)?;
+                for media in &incoming.media_refs {
+                    transaction.execute(
+                        "INSERT OR IGNORE INTO knowledge_media_refs(id,message_version_id,source_id,source_relative_path,ordinal,media_kind,exists_state,metadata_json) VALUES(?1,?2,?3,?4,?5,?6,'unknown',?7)",
+                        params![opaque_id("media"), version_id, staging.source_id, media.relative_path.as_deref().unwrap_or(""), media.ordinal as i64, media.kind, media.metadata_json],
+                    ).map_err(|_| ContractError::KbNotReady)?;
+                }
                 if incoming_source_wins(&transaction, staging, &message_id)? {
                     transaction.execute(
                         "INSERT INTO knowledge_import_generation_members(import_generation_id,message_id,message_version_id,selection_reason) VALUES(?1,?2,?3,?4) ON CONFLICT(import_generation_id,message_id) DO UPDATE SET message_version_id=excluded.message_version_id,selection_reason='newer_source'",
@@ -364,6 +448,26 @@ impl KnowledgeStore {
         })
     }
 
+    pub(crate) fn set_source_verdict(
+        &self,
+        source_id: &str,
+        verdict: CompletenessVerdict,
+    ) -> Result<(), ContractError> {
+        self.with_writer(|connection| {
+            connection
+                .execute(
+                    "UPDATE knowledge_sources SET import_status=?1,checked_at_ms=?2 WHERE id=?3",
+                    params![verdict.as_str(), now_ms(), source_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)
+                .and_then(|changed| {
+                    (changed == 1)
+                        .then_some(())
+                        .ok_or(ContractError::KbNotReady)
+                })
+        })
+    }
+
     pub(crate) fn discard_stagings(&self, stagings: &[StagingImport]) -> Result<(), ContractError> {
         if stagings.is_empty() {
             return Ok(());
@@ -384,6 +488,57 @@ impl KnowledgeStore {
                 transaction.execute("DELETE FROM knowledge_message_sources WHERE source_id=?1 AND NOT EXISTS(SELECT 1 FROM knowledge_import_generations WHERE trigger_source_id=?1)", [&staging.source_id]).map_err(|_| ContractError::KbNotReady)?;
                 transaction.execute("DELETE FROM knowledge_sources WHERE id=?1 AND NOT EXISTS(SELECT 1 FROM knowledge_import_generations WHERE trigger_source_id=?1)", [&staging.source_id]).map_err(|_| ContractError::KbNotReady)?;
             }
+            transaction.commit().map_err(|_| ContractError::KbNotReady)
+        })
+    }
+
+    pub(crate) fn discard_source_candidates(&self, source_id: &str) -> Result<(), ContractError> {
+        self.with_writer(|connection| {
+            let transaction = connection
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "DELETE FROM knowledge_index_generation_imports WHERE import_generation_id IN (SELECT id FROM knowledge_import_generations WHERE trigger_source_id=?1 AND status IN ('staging','ready_candidate'))",
+                    [source_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "DELETE FROM knowledge_import_generation_members WHERE import_generation_id IN (SELECT id FROM knowledge_import_generations WHERE trigger_source_id=?1 AND status IN ('staging','ready_candidate'))",
+                    [source_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "DELETE FROM knowledge_message_versions WHERE import_generation_id IN (SELECT id FROM knowledge_import_generations WHERE trigger_source_id=?1 AND status IN ('staging','ready_candidate'))",
+                    [source_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "DELETE FROM knowledge_import_generations WHERE trigger_source_id=?1 AND status IN ('staging','ready_candidate')",
+                    [source_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "DELETE FROM knowledge_source_lineage WHERE predecessor_source_id=?1 OR successor_source_id=?1",
+                    [source_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "DELETE FROM knowledge_message_sources WHERE source_id=?1 AND NOT EXISTS(SELECT 1 FROM knowledge_import_generations WHERE trigger_source_id=?1)",
+                    [source_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "DELETE FROM knowledge_sources WHERE id=?1 AND NOT EXISTS(SELECT 1 FROM knowledge_import_generations WHERE trigger_source_id=?1)",
+                    [source_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
             transaction.commit().map_err(|_| ContractError::KbNotReady)
         })
     }
@@ -547,18 +702,53 @@ impl KnowledgeStore {
     pub(crate) fn fast_verify_archive(
         &self,
         fingerprint: &ImportFingerprint,
-        members: &[MemberAudit],
+        audit: &SourceAuditDigest,
     ) -> Result<bool, ContractError> {
         self.with_reader(|connection| {
             let source_id: Option<String> = connection.query_row("SELECT id FROM knowledge_sources WHERE account_stable_id=?1 AND export_id=?2 AND schema_version=?3 AND manifest_hash=?4 AND coverage_hash=?5 AND import_status IN ('full_declared','filtered_selected')", params![fingerprint.account_stable_id, fingerprint.export_id, fingerprint.schema_version, fingerprint.manifest_content_hash, fingerprint.coverage_signature], |row| row.get(0)).optional().map_err(|_| ContractError::KbNotReady)?;
             let Some(source_id) = source_id else { return Ok(false); };
-            let count: u64 = connection.query_row("SELECT COUNT(*) FROM knowledge_source_members WHERE source_id=?1 AND checked=1", [&source_id], |row| row.get(0)).map_err(|_| ContractError::KbNotReady)?;
-            if members.is_empty() || count != members.len() as u64 { return Ok(false); }
-            for member in members {
-                let found: Option<i64> = connection.query_row("SELECT 1 FROM knowledge_source_members WHERE source_id=?1 AND member_path_token=?2 AND member_kind=?3 AND size_bytes=?4 AND mtime_ms=?5 AND declared_hash IS ?6 AND checked=1", params![source_id, member.member_path_token, member.member_kind, member.size_bytes as i64, member.mtime_ms, member.declared_hash], |row| row.get(0)).optional().map_err(|_| ContractError::KbNotReady)?;
-                if found.is_none() { return Ok(false); }
-            }
-            Ok(true)
+            let matching: Option<i64> = connection.query_row(
+                "SELECT 1 FROM knowledge_sources WHERE id=?1 AND member_audit_count=?2 AND member_audit_digest=?3",
+                params![source_id, audit.count as i64, audit.digest],
+                |row| row.get(0),
+            ).optional().map_err(|_| ContractError::KbNotReady)?;
+            Ok(matching.is_some())
+        })
+    }
+
+    pub(crate) fn record_source_audit(
+        &self,
+        source_id: &str,
+        member: &MemberAudit,
+    ) -> Result<(), ContractError> {
+        self.with_writer(|connection| {
+            connection.execute(
+                "INSERT OR IGNORE INTO knowledge_source_members(source_id,member_path_token,member_kind,size_bytes,mtime_ms,declared_hash,checked) VALUES(?1,?2,?3,?4,?5,?6,1)",
+                params![source_id, member.member_path_token, member.member_kind, member.size_bytes as i64, member.mtime_ms, member.declared_hash],
+            ).map_err(|_| ContractError::KbNotReady)?;
+            Ok(())
+        })
+    }
+
+    pub(crate) fn finalize_source_candidates(
+        &self,
+        source_id: &str,
+        verdict: CompletenessVerdict,
+        audit: &SourceAuditDigest,
+    ) -> Result<(), ContractError> {
+        self.with_writer(|connection| {
+            let transaction = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|_| ContractError::KbNotReady)?;
+            let member_count: i64 = transaction.query_row("SELECT COUNT(*) FROM knowledge_source_members WHERE source_id=?1 AND checked=1", [source_id], |row| row.get(0)).map_err(|_| ContractError::KbNotReady)?;
+            if member_count != audit.count as i64 { return Err(ContractError::KbNotReady); }
+            transaction.execute(
+                "UPDATE knowledge_sources SET import_status=?1,checked_at_ms=?2,member_audit_count=?3,member_audit_digest=?4 WHERE id=?5",
+                params![verdict.as_str(), now_ms(), audit.count as i64, audit.digest, source_id],
+            ).map_err(|_| ContractError::KbNotReady)?;
+            transaction.execute(
+                "UPDATE knowledge_import_generations SET status='ready_candidate' WHERE trigger_source_id=?1 AND status='staging' AND (SELECT COUNT(DISTINCT v.message_id) FROM knowledge_message_sources p JOIN knowledge_message_versions v ON v.id=p.message_version_id JOIN knowledge_messages m ON m.id=v.message_id WHERE p.source_id=knowledge_import_generations.trigger_source_id AND m.conversation_id=knowledge_import_generations.conversation_id)=(SELECT COUNT(*) FROM knowledge_import_generation_input_keys WHERE import_generation_id=knowledge_import_generations.id)",
+                [source_id],
+            ).map_err(|_| ContractError::KbNotReady)?;
+            transaction.commit().map_err(|_| ContractError::KbNotReady)
         })
     }
 
@@ -899,6 +1089,16 @@ mod tests {
             normalized_content: content.into(),
             content_hash: hex_hash(content),
             source_member_token: "member".into(),
+            created_at_ms: 0,
+            source_ordinal: 0,
+            sort_key: "00000000000000000000|00000000000000000000|fixture".into(),
+            message_kind: "text".into(),
+            render_kind: "text".into(),
+            sender_key: "fixture".into(),
+            text_hash: hex_hash(content),
+            reference_json: None,
+            extra_json: None,
+            media_refs: Vec::new(),
         }
     }
 
@@ -979,13 +1179,7 @@ mod tests {
 
         let second = store.begin_staging_source(source("versions-b")).unwrap();
         store
-            .append_staging_messages(
-                &second,
-                &[
-                    message("message-1", "first body"),
-                    message("message-1", "second body"),
-                ],
-            )
+            .append_staging_messages(&second, &[message("message-1", "second body")])
             .unwrap();
         let second = store
             .mark_ready_candidate(
@@ -1017,12 +1211,56 @@ mod tests {
             )
             .unwrap();
         assert_eq!(version_count, 2);
-        assert_eq!(source_count, 3);
+        assert_eq!(source_count, 2);
         let _ = fs::remove_dir_all(data_dir);
     }
 
     #[test]
-    fn selected_candidate_keeps_parent_members_and_validates_its_own_text_count() {
+    fn media_references_are_ordinal_metadata_rows_with_unknown_existence() {
+        let data_dir = temp_dir();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let staging = store.begin_staging_source(source("media")).unwrap();
+        let mut incoming = message("message-1", "body");
+        incoming.media_refs = vec![
+            IncomingMediaRef {
+                ordinal: 0,
+                kind: "image".into(),
+                relative_path: Some("media/a.jpg".into()),
+                metadata_json: Some(r#"{"label":"a"}"#.into()),
+            },
+            IncomingMediaRef {
+                ordinal: 1,
+                kind: "voice".into(),
+                relative_path: None,
+                metadata_json: None,
+            },
+        ];
+        store
+            .append_staging_messages(&staging, &[incoming])
+            .unwrap();
+        let database =
+            Connection::open(data_dir.join("wechat_knowledge/knowledge.sqlite")).unwrap();
+        let rows: Vec<(i64, String, String)> = database
+            .prepare(
+                "SELECT ordinal,media_kind,exists_state FROM knowledge_media_refs ORDER BY ordinal",
+            )
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                (0, "image".into(), "unknown".into()),
+                (1, "voice".into(), "unknown".into())
+            ]
+        );
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn selected_candidate_keeps_parent_members_and_finalizes_from_its_own_input_count() {
         let data_dir = temp_dir();
         let store = KnowledgeStore::open(&data_dir).unwrap();
         let full = store
@@ -1049,11 +1287,14 @@ mod tests {
             .append_staging_messages(&selected, &[message("one", "new")])
             .unwrap();
         let selected_id = selected.id.clone();
-        let selected = store
-            .mark_ready_candidate(
-                selected,
-                CandidateChecks {
-                    expected_message_count: 1,
+        let selected_source_id = selected.source_id().to_owned();
+        store
+            .finalize_source_candidates(
+                &selected_source_id,
+                CompletenessVerdict::FilteredSelected,
+                &SourceAuditDigest {
+                    count: 0,
+                    digest: String::new(),
                 },
             )
             .unwrap();
@@ -1074,10 +1315,14 @@ mod tests {
             )
             .unwrap();
         assert_eq!((members, retained), (2, 1));
-        let index = store
-            .register_ready_index(&selected, "selected".into())
+        let status: String = database
+            .query_row(
+                "SELECT status FROM knowledge_import_generations WHERE id=?1",
+                [&selected_id],
+                |row| row.get(0),
+            )
             .unwrap();
-        store.activate_candidate(selected, index).unwrap();
+        assert_eq!(status, "ready_candidate");
         let _ = fs::remove_dir_all(data_dir);
     }
 

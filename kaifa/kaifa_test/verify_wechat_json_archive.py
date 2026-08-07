@@ -42,7 +42,8 @@ def main() -> int:
     tauri = root / "desktop/src-tauri/src"
     failures += require_text(tauri / "knowledge/archive_schema.rs", ["deny_unknown_fields", "WECHAT_ARCHIVE_V1", "CoverageKind", "unsupported_source_scope_and_media_contracts_fail_closed", 'source.kind == "user_selected"', "include_media"], root)
     failures += require_text(tauri / "knowledge/archive_importer.rs", ["WechatArchiveReadGuard", "open_messages_stream", "deserialize_seq", "KbSourceUnsupported", "MAX_JSON_STRING_BYTES", "JsonStringLimitReader", "open_member_no_follow", "oversized_message_string_is_rejected_without_recording_an_import", "symlinked_member_is_rejected_by_no_follow_open", "source_path_is_not_persisted_in_the_derived_database"], root)
-    failures += require_text(tauri / "knowledge/archive_store.rs", ["wechat_knowledge", "archive_member_audits", "fast_verified"], root)
+    failures += require_text(tauri / "knowledge/archive_store.rs", ["SourceAuditAccumulator", "SourceAuditDigest", "member_path_token"], root)
+    failures += require_text(tauri / "knowledge/store.rs", ["wechat_knowledge", "record_source_audit", "fast_verify_archive", "member_audit_digest"], root)
     importer = (tauri / "knowledge/archive_importer.rs").read_text(encoding="utf-8") if (tauri / "knowledge/archive_importer.rs").is_file() else ""
     importer_runtime = importer.split("#[cfg(test)]", 1)[0]
     forbidden = ["create(", "write_all(", "remove_file(", "rename("]

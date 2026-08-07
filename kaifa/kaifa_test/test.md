@@ -1,3 +1,13 @@
+## 大型 messages[] 流式导入、规范化和媒体引用（2026-08-07）
+
+检测脚本：`kaifa/kaifa_test/verify_streaming_message_import.py`。它只读取本 run 的 Rust 源码和 migration，不打开导出目录、媒体、微信或网络。
+
+| 验收项 | 命令/方法 | 实际结果 |
+| --- | --- | --- |
+| 静态导入边界 | `python3 -B kaifa/kaifa_test/verify_streaming_message_import.py` | 检查 v3 migration、流式 visitor、完整 envelope header、规范化、输入 identity 去重和媒体仅元数据持久化。 |
+| Rust 定向测试 | `cargo test knowledge --bin work-review`（在 `desktop/src-tauri`） | 覆盖 archive fixture、流式序号、路径拒绝、64 KiB JSON 字符串限制、候选不可见和 store 的迁移/外键行为；当前 30 passed。 |
+| 格式与空白 | `rustfmt --check desktop/src-tauri/src/knowledge/{archive_importer,store,migrations,archive_schema}.rs` 与 scoped `git diff --check` | 仅检查本 run 修改的文件；不处理并行工作区的既有差异。 |
+
 ## 冻结 Work Review 来源并建立正式产品源码副本（2026-08-05）
 
 检测脚本：`kaifa/kaifa_test/verify_work_review_baseline.py`
