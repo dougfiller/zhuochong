@@ -366,6 +366,8 @@ async fn index_building_generation_with(
             EMBEDDING_BATCH_LIMIT,
         )?;
         if pending.is_empty() {
+            let validation = store.validate_candidate_index(index_generation_id)?;
+            store.activate_validated_candidate(index_generation_id, &validation)?;
             return Ok(KnowledgeEmbeddingProgress {
                 embedded_chunks,
                 pending_chunks: 0,
@@ -442,12 +444,12 @@ async fn search_active_hybrid_with(
     resolver: &dyn EndpointResolver,
     audit: &dyn EmbeddingAuditSink,
 ) -> Result<Vec<HybridHit>, ContractError> {
-    let frozen = store
-        .read_active_embedding_config()
-        .map_err(|error| match error {
-            ContractError::KbNotReady => error,
-            _ => ContractError::KbRetrievalFailed,
-        })?;
+    let frozen = store.preflight_active_embedding_config(
+        &request.scope,
+        request.from_ms,
+        request.to_ms,
+        request.top_k,
+    )?;
     let endpoint = validate_and_pin_loopback(&frozen.config.endpoint, resolver)
         .await
         .map_err(|_| ContractError::KbRetrievalFailed)?;
@@ -574,11 +576,13 @@ pub(crate) fn audit_call(
 #[cfg(test)]
 mod tests {
     use super::super::archive_schema::CoverageKind;
+    use super::super::archive_store::CompletenessVerdict;
     use super::super::chunk::{
         chunk_messages, CHUNK_SCHEMA_VERSION, FTS_PRETOKEN_VERSION, TOKEN_COUNTER_VERSION,
     };
     use super::super::store::{CandidateChecks, FrozenIndexBuildSpec, IncomingMessage, NewSource};
     use super::*;
+    use rusqlite::Connection;
     use sha2::{Digest, Sha256};
     use std::ffi::OsString;
     use std::fs;
@@ -776,6 +780,9 @@ mod tests {
         second.sort_key = "00000000000002000000|00000000000000000001|fixture".into();
         store
             .append_staging_messages(&staging, &[first, second])
+            .unwrap();
+        store
+            .set_source_verdict(staging.source_id(), CompletenessVerdict::FullDeclared)
             .unwrap();
         store
             .mark_ready_candidate(
@@ -1108,7 +1115,7 @@ mod tests {
 
     #[tokio::test]
     async fn building_resume_and_active_hybrid_execute_high_level_orchestration() {
-        let (address, calls, server) = spawn_ollama_fixture(5).await;
+        let (address, calls, server) = spawn_ollama_fixture(4).await;
         let (data_dir, store, generation, scope) = build_fixture(format!("http://{address}"));
         let pending = store
             .list_pending_build_embeddings(&generation, None, 32)
@@ -1129,14 +1136,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(first.embedded_chunks, 1);
-        let resumed = index_building_generation(&store, &generation)
-            .await
-            .unwrap();
-        assert_eq!(resumed.embedded_chunks, 0);
-        assert_eq!(resumed.pending_chunks, 0);
-        store
-            .activate_completed_build_for_test(&generation)
-            .unwrap();
+        assert_eq!(first.pending_chunks, 0);
         let hits = search_active_hybrid(
             &store,
             ActiveHybridRequest {
@@ -1163,11 +1163,107 @@ mod tests {
                 ("/api/tags", 0),
                 ("/api/embed", 1),
                 ("/api/tags", 0),
-                ("/api/tags", 0),
                 ("/api/embed", 1),
             ]
         );
         let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn incomplete_active_combinations_fail_before_any_embedding_transport() {
+        for corruption in [
+            "catalog_null",
+            "building",
+            "failed",
+            "snapshot_mismatch",
+            "missing_completed",
+            "missing_activated",
+            "missing_mapping",
+            "pointer_mismatch",
+            "import_not_active",
+        ] {
+            let (data_dir, store, generation, scope) = build_fixture("http://127.0.0.1:9".into());
+            let pending = store
+                .list_pending_build_embeddings(&generation, None, 32)
+                .unwrap();
+            let rows = pending
+                .iter()
+                .map(|chunk| EncodedEmbedding {
+                    chunk_key: chunk.chunk_key.clone(),
+                    content_hash: chunk.content_hash.clone(),
+                    blob: encode_embedding(&[1.0, 0.0]),
+                })
+                .collect::<Vec<_>>();
+            store.write_build_embeddings(&generation, 2, &rows).unwrap();
+            store
+                .activate_completed_build_for_test(&generation)
+                .unwrap();
+            let connection =
+                Connection::open(data_dir.join("wechat_knowledge/knowledge.sqlite")).unwrap();
+            match corruption {
+                "catalog_null" => connection.execute(
+                    "UPDATE knowledge_catalog_state SET active_index_generation_id=NULL,active_snapshot_hash=NULL,activated_at_ms=NULL WHERE singleton_id=1",
+                    [],
+                ),
+                "building" => connection.execute(
+                    "UPDATE knowledge_index_generations SET status='building',completed_at_ms=NULL WHERE id=?1",
+                    [&generation],
+                ),
+                "failed" => connection.execute(
+                    "UPDATE knowledge_index_generations SET status='failed',completed_at_ms=NULL,error_code='KB_NOT_READY',error_summary='FIXTURE' WHERE id=?1",
+                    [&generation],
+                ),
+                "snapshot_mismatch" => connection.execute(
+                    "UPDATE knowledge_catalog_state SET active_snapshot_hash='mismatch' WHERE singleton_id=1",
+                    [],
+                ),
+                "missing_completed" => connection.execute(
+                    "UPDATE knowledge_index_generations SET completed_at_ms=NULL WHERE id=?1",
+                    [&generation],
+                ),
+                "missing_activated" => connection.execute(
+                    "UPDATE knowledge_catalog_state SET activated_at_ms=NULL WHERE singleton_id=1",
+                    [],
+                ),
+                "missing_mapping" => connection.execute(
+                    "DELETE FROM knowledge_index_generation_imports WHERE index_generation_id=?1",
+                    [&generation],
+                ),
+                "pointer_mismatch" => connection.execute(
+                    "UPDATE knowledge_conversations SET active_import_generation_id=NULL",
+                    [],
+                ),
+                "import_not_active" => connection.execute(
+                    "UPDATE knowledge_import_generations SET status='ready_candidate' WHERE status='active'",
+                    [],
+                ),
+                _ => unreachable!(),
+            }
+            .unwrap();
+            drop(connection);
+            let audit = TestAudit::default();
+            let endpoint_resolver = resolver(&[]);
+            assert_eq!(
+                search_active_hybrid_with(
+                    &store,
+                    ActiveHybridRequest {
+                        scope: vec![scope],
+                        query: "虚构查询".into(),
+                        from_ms: None,
+                        to_ms: None,
+                        top_k: 12,
+                    },
+                    &endpoint_resolver,
+                    &audit,
+                )
+                .await,
+                Err(ContractError::KbNotReady),
+                "corruption {corruption}"
+            );
+            assert_eq!(endpoint_resolver.calls.load(Ordering::SeqCst), 0);
+            assert!(audit.0.lock().unwrap().is_empty());
+            let _ = fs::remove_dir_all(data_dir);
+        }
     }
 
     #[tokio::test]

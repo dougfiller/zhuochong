@@ -32,7 +32,7 @@ def main() -> int:
     text = {name: path.read_text(encoding="utf-8") for name, path in paths.items()}
     failures: list[str] = []
     failures += require(text["migrations"], (
-        "SCHEMA_HEAD: i32 = 4", "CANDIDATE_INDEX_CHUNKS_FTS",
+        "SCHEMA_HEAD: i32 = 5", "CANDIDATE_INDEX_CHUNKS_FTS",
         "preflight_v3_chunk_members", "validate_schema",
     ), "migrations")
     failures += require(text["migration"], (

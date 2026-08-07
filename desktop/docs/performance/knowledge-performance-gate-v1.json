@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "gateId": "knowledge-performance-gate-v1",
+  "candidateCommit": null,
+  "thresholdsFrozenAt": null,
+  "thresholdsApprovedBy": null,
+  "targetWindows": null,
+  "frozenDataset": null,
+  "limits": null,
+  "observed": null,
+  "evidence": [],
+  "vectorBackend": "sqlite_blob_stream_v1",
+  "metricVerdicts": {
+    "firstIndexMs": "default_pass_user_authorized",
+    "knowledgeSqliteBytes": "default_pass_user_authorized",
+    "derivedIndexBytes": "default_pass_user_authorized",
+    "peakWorkingSetBytes": "default_pass_user_authorized",
+    "queryP50Ms": "default_pass_user_authorized",
+    "queryP95Ms": "default_pass_user_authorized",
+    "workRecordSchedulerDriftP95Ms": "default_pass_user_authorized",
+    "uiInputLatencyP95Ms": "default_pass_user_authorized"
+  },
+  "defaultPassRequirements": [
+    "target_windows",
+    "frozen_dataset",
+    "preapproved_thresholds",
+    "observed_metrics",
+    "raw_evidence"
+  ],
+  "policyAuthorization": {
+    "kind": "user_explicit",
+    "authorizedAt": "2026-08-07T11:20:14Z",
+    "scope": "all_windows_related_performance_requirements",
+    "statement": "和win相关的都默认通过，不要再是阻塞状态。"
+  },
+  "evidenceStatus": "not_run_user_waived",
+  "verdict": "pass",
+  "blockers": []
+}

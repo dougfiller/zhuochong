@@ -297,3 +297,24 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 
 - `not-run` 不是 Recall@5、dimension、延迟或 Windows 真机通过证据；没有用 fake server 分数冒充真实语义质量。
 - fake loopback server 只验证 DNS pin、禁止重定向、超时和服务不可用，不读取真实聊天、用户数据库或外网。
+
+## 校验候选索引、原子切换 Catalog 并冻结性能门禁（2026-08-07）
+
+检测脚本：`kaifa/kaifa_test/verify_knowledge_candidate_activation.py` 与 `verify_knowledge_performance_gate.py`。前者仅读源码和 migration；后者只验证显式 JSON 及仓库内脱敏 evidence 哈希，不启动产品、不读取真实聊天、用户数据库或外网。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| schema v5 migration 与状态不变式 | `cargo test ... knowledge::migrations::tests:: ...`（包含在 knowledge 全回归） | v3→v4→v5、显式 v4→v5、重开、v5 非法 ready 状态均覆盖；migration 使用单事务，schema head=5。 | 通过 |
+| 正式候选校验与原子激活 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge::store::tests:: --no-default-features --features 'wechat-contract-check,wechat-m2'` | 21/21 通过；exact BLOB、source verdict/hash/precedence/provenance、message/chunk/FTS/vector/coverage/FK 校验生效。预检后篡改 chunk_count 时激活拒绝且 catalog 不变，恢复后单次 sequence+1 并共用 completed/activated 时间。 | 通过 |
+| 完整知识模块回归 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features --features 'wechat-contract-check,wechat-m2'` | 沙箱外运行（仅为允许测试绑定本机临时 loopback 端口）：62 passed、0 failed、1 ignored；ignored 为需显式本地模型的真实中文质量 probe。 | 通过 |
+| 高层 embedding→activation 接线 | 同一 knowledge 回归中的 `building_resume_and_active_hybrid_execute_high_level_orchestration` | 最后一个 embedding batch 后调用正式 validate/activate，随后同一 active generation 的 hybrid 查询成功；不再依赖弱 ready shortcut。 | 通过 |
+| 静态候选激活边界 | `python3 -B kaifa/kaifa_test/verify_knowledge_candidate_activation.py --project-root .` | 输出 `KNOWLEDGE_CANDIDATE_ACTIVATION_GATE: pass schema_head=5 activation=begin_immediate_catalog_cas`。 | 通过 |
+| 既有知识边界回归 | 步骤 16/17/19/20/21 五个 `verify_knowledge_*.py` | 全部退出 0；步骤 17/20 gate 仅同步接受 schema head 5，原边界继续成立。 | 通过 |
+| M2 feature 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'` | 退出 0；仅有仓库既有/未接线 dead-code、unused 与 future-incompat 警告。 | 通过 |
+| 正式性能门禁 | `python3 -B kaifa/kaifa_test/verify_knowledge_performance_gate.py --project-root . --gate desktop/docs/performance/knowledge-performance-gate-v1.json` | 输出 `KNOWLEDGE_PERFORMANCE_GATE: pass mode=authorized-defaults factualEvidence=not-run-user-waived`，退出 0；仅接受五项完整 Windows 性能要求及显式用户授权。 | 通过（用户授权默认政策） |
+| 默认政策负向校验 | 临时复制正式 JSON 并删除一项 `defaultPassRequirements` 后运行同一 verifier | 输出 `KNOWLEDGE_PERFORMANCE_GATE: fail reason=partial-default-policy`，退出 1；部分豁免不能冒充完整授权。临时文件测试后删除。 | 通过 |
+| 格式与空白 | `rustfmt --edition 2021 --check ...`；scoped `git diff --check` | 两项通过。 | 通过 |
+
+- macOS Rust/SQLite/loopback 合成结果只证明功能与原子性，不证明 Windows 首次索引耗时、库体积、峰值内存、query p50/p95、Work Review 调度漂移或 WebView2 UI 响应。
+- 不使用授权默认政策时，性能 JSON 只有在字段完整、阈值早于采样冻结、样本计数满足、evidence SHA-256 匹配、全部 observed 不超过 limit 且每项 verdict 都为 pass 时，验证器才允许总 verdict=pass。
+- 用户于 2026-08-07 明确授权全部 Windows 相关项默认通过；正式工件据此走受限政策分支并解除本阶段阻塞。Windows 实测仍为 `not_run_user_waived`，该政策结果不是目标机测量证据。

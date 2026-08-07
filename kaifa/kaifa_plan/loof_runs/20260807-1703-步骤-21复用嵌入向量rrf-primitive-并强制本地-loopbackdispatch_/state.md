@@ -5,8 +5,8 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fdbb8-081a-7141-8d91-e212d2031f36
-- next_poll_at: 2026-08-07T10:18:05+00:00
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月07日17点06分-复用嵌入向量RRF并强制本地Loopback.md

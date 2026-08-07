@@ -6,7 +6,7 @@ use crate::wechat::types::ContractError;
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction};
 use std::path::Path;
 
-pub(crate) const SCHEMA_HEAD: i32 = 4;
+pub(crate) const SCHEMA_HEAD: i32 = 5;
 const INITIAL: &str = include_str!("migrations/knowledge/0001_initial.sql");
 const SOURCE_LINEAGE_MESSAGE_GENERATIONS: &str =
     include_str!("migrations/knowledge/0002_source_lineage_message_generations.sql");
@@ -14,6 +14,8 @@ const STREAMING_MESSAGE_NORMALIZATION_MEDIA: &str =
     include_str!("migrations/knowledge/0003_streaming_message_normalization_media.sql");
 const CANDIDATE_INDEX_CHUNKS_FTS: &str =
     include_str!("migrations/knowledge/0004_candidate_index_chunks_fts.sql");
+const CANDIDATE_ACTIVATION_DIAGNOSTICS: &str =
+    include_str!("migrations/knowledge/0005_candidate_activation_diagnostics.sql");
 
 pub(crate) fn open_writer(path: &Path) -> Result<Connection, ContractError> {
     let connection = Connection::open(path).map_err(|_| ContractError::KbNotReady)?;
@@ -116,6 +118,16 @@ fn migrate_and_validate(connection: &Connection) -> Result<(), ContractError> {
     if version == 3 {
         migrate_v3_to_v4(connection)?;
     }
+    let version: i32 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(|_| ContractError::KbNotReady)?;
+    if version == 4 {
+        connection
+            .execute_batch(&format!(
+                "BEGIN IMMEDIATE; {CANDIDATE_ACTIVATION_DIAGNOSTICS}; PRAGMA user_version=5; COMMIT;"
+            ))
+            .map_err(|_| ContractError::KbNotReady)?;
+    }
     validate_schema(connection, true)
 }
 
@@ -129,9 +141,8 @@ fn migrate_v3_to_v4(connection: &Connection) -> Result<(), ContractError> {
         .map_err(|_| ContractError::KbNotReady)?;
     backfill_v4_chunks(&transaction)?;
     transaction
-        .pragma_update(None, "user_version", SCHEMA_HEAD)
+        .pragma_update(None, "user_version", 4)
         .map_err(|_| ContractError::KbNotReady)?;
-    validate_schema(&transaction, true)?;
     transaction.commit().map_err(|_| ContractError::KbNotReady)
 }
 
@@ -318,6 +329,9 @@ pub(crate) fn validate_schema(
         ("knowledge_index_generations", "fts_pretoken_version"),
         ("knowledge_index_generations", "retrieval_token_budget"),
         ("knowledge_index_generations", "message_count"),
+        ("knowledge_index_generations", "completed_at_ms"),
+        ("knowledge_index_generations", "error_code"),
+        ("knowledge_index_generations", "error_summary"),
         ("knowledge_catalog_state", "active_index_generation_id"),
         ("knowledge_chunks", "index_generation_id"),
         ("knowledge_chunks", "chunk_index"),
@@ -362,6 +376,7 @@ pub(crate) fn validate_schema(
         "knowledge_chunks_generation_conversation_index_idx",
         "knowledge_chunks_generation_conversation_time_idx",
         "knowledge_chunk_messages_version_idx",
+        "knowledge_index_generations_status_created_idx",
     ] {
         let exists: Option<i64> = connection
             .query_row(
@@ -378,6 +393,14 @@ pub(crate) fn validate_schema(
     let invalid_build: Option<i64> = connection
         .query_row(
             "SELECT 1 FROM knowledge_index_generations WHERE status='building' AND (schema_version<>'chunk-v1' OR token_counter_version<>'v1' OR fts_pretoken_version<>'fts-pretoken-v1' OR retrieval_token_budget NOT BETWEEN 256 AND 4096 OR COALESCE(trim(json_extract(embedding_metadata_json,'$.provider')),'')='' OR COALESCE(trim(json_extract(embedding_metadata_json,'$.endpoint')),'')='' OR COALESCE(trim(json_extract(embedding_metadata_json,'$.model')),'')='' OR COALESCE(trim(json_extract(embedding_metadata_json,'$.fingerprint')),'')='' OR json_extract(embedding_metadata_json,'$.dimension') NOT BETWEEN 1 AND 65536) LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| ContractError::KbNotReady)?;
+    let invalid_generation_state: Option<i64> = connection
+        .query_row(
+            "SELECT 1 FROM knowledge_index_generations WHERE (status='building' AND (completed_at_ms IS NOT NULL OR error_code IS NOT NULL OR error_summary IS NOT NULL)) OR (status='ready' AND (completed_at_ms IS NULL OR error_code IS NOT NULL OR error_summary IS NOT NULL)) OR (status='failed' AND (completed_at_ms IS NOT NULL OR COALESCE(trim(error_code),'')='' OR COALESCE(trim(error_summary),'')='')) LIMIT 1",
             [],
             |row| row.get(0),
         )
@@ -408,6 +431,7 @@ pub(crate) fn validate_schema(
         .optional()
         .map_err(|_| ContractError::KbNotReady)?;
     if invalid_build.is_some()
+        || invalid_generation_state.is_some()
         || invalid_chunk.is_some()
         || mismatched_fts.is_some()
         || invalid_member.is_some()
@@ -547,7 +571,7 @@ mod tests {
     }
 
     #[test]
-    fn v3_empty_database_migrates_and_reopens_at_v4() {
+    fn v3_empty_database_migrates_and_reopens_at_v5() {
         let path = temp_database();
         drop(create_v3(&path, false));
         drop(open_writer(&path).unwrap());
@@ -561,7 +585,7 @@ mod tests {
     }
 
     #[test]
-    fn recoverable_v3_chunk_is_rebuilt_inside_the_v4_transaction() {
+    fn recoverable_v3_chunk_is_rebuilt_before_v5_activation_diagnostics() {
         let path = temp_database();
         drop(create_v3(&path, true));
         drop(open_writer(&path).unwrap());
@@ -608,6 +632,45 @@ mod tests {
             .unwrap();
         assert_eq!(version, 3);
         assert_eq!(original, ("legacy-key".into(), "legacy content".into()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn v4_database_migrates_atomically_to_v5() {
+        let path = temp_database();
+        let connection = create_v3(&path, false);
+        migrate_v3_to_v4(&connection).unwrap();
+        let version: i32 = connection
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 4);
+        drop(connection);
+        drop(open_writer(&path).unwrap());
+        let connection = Connection::open(&path).unwrap();
+        let migrated: (i32, i64, i64) = connection
+            .query_row(
+                "SELECT (SELECT user_version FROM pragma_user_version),(SELECT COUNT(*) FROM pragma_table_info('knowledge_index_generations') WHERE name='error_summary'),(SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='knowledge_index_generations_status_created_idx')",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(migrated, (5, 1, 1));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn v5_schema_rejects_invalid_generation_state() {
+        let path = temp_database();
+        let connection = open_writer(&path).unwrap();
+        connection.execute(
+            "INSERT INTO knowledge_index_generations(id,schema_version,embedding_metadata_json,snapshot_hash,status,created_at_ms,token_counter_version,fts_pretoken_version,retrieval_token_budget,message_count) VALUES('invalid-ready','chunk-v1','{\"provider\":\"ollama_loopback\",\"endpoint\":\"http://127.0.0.1:11434\",\"model\":\"fixture\",\"fingerprint\":\"fixture\",\"dimension\":8}','snapshot','ready',1,'v1','fts-pretoken-v1',512,0)",
+            [],
+        ).unwrap();
+        assert_eq!(
+            validate_schema(&connection, false),
+            Err(ContractError::KbNotReady)
+        );
+        drop(connection);
         let _ = fs::remove_file(path);
     }
 }

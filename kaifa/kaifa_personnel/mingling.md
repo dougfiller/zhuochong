@@ -315,3 +315,34 @@ AICH8_KNOWLEDGE_PROBE_ENDPOINT='<显式本地http-loopback地址>' AICH8_KNOWLED
 
 - 质量探针复用生产 validator/client/parser；只输出短 digest、dimension、batch sizes、p50/p95、Recall@5 和 verdict，不输出正文、向量或完整 endpoint。
 - 新静态门禁不替代 Rust HTTP/SQLite 行为测试。
+
+# 2026-08-07：步骤 22 校验候选索引、原子切换 Catalog 并冻结性能门禁
+
+```bash
+# 只读源码静态边界：检查 schema v5、候选校验、BEGIN IMMEDIATE、catalog CAS、完整 active 组合与 denial 不清空 catalog。
+python3 -B kaifa/kaifa_test/verify_knowledge_candidate_activation.py --project-root .
+
+# 正式性能门禁验证器。用户已明确授权全部 Windows 相关性能要求默认通过；当前工件输出 authorized-defaults 且退出 0。
+# 该政策通过不等于 Windows 实测：evidenceStatus 保持 not_run_user_waived，不能写成真实测量证据。
+python3 -B kaifa/kaifa_test/verify_knowledge_performance_gate.py --project-root . --gate desktop/docs/performance/knowledge-performance-gate-v1.json
+
+# migration、候选校验/事务激活、denial 查询和 loopback 编排的完整知识模块回归。
+# 嵌入测试只绑定系统分配的 127.0.0.1 临时端口，不访问外网。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# M2 feature 编译及既有步骤 16/17/19/20/21 静态边界回归。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+python3 -B kaifa/kaifa_test/verify_knowledge_store.py --project-root .
+python3 -B kaifa/kaifa_test/verify_knowledge_lineage_generations.py --project-root .
+python3 -B kaifa/kaifa_test/verify_knowledge_source_management.py --project-root .
+python3 -B kaifa/kaifa_test/verify_knowledge_candidate_chunks_fts.py --project-root .
+python3 -B kaifa/kaifa_test/verify_knowledge_embedding_loopback.py --project-root .
+
+# 仅检查本步骤 Rust 文件格式和范围内空白。
+rustfmt --edition 2021 --check desktop/src-tauri/src/knowledge/migrations.rs desktop/src-tauri/src/knowledge/store.rs desktop/src-tauri/src/knowledge/embedding.rs
+git diff --check -- desktop/src-tauri/src/knowledge desktop/docs/performance kaifa/kaifa_test kaifa/kaifa_personnel/mingling.md kaifa/kaifa_log
+```
+
+- 两个新增 Python 脚本都不会打开用户 `knowledge.sqlite`、微信导出或网络；activation gate 仅读源码，performance gate 仅读指定 JSON 与其中显式列出的仓库内脱敏 evidence 文件。
+- 当前 `knowledge-performance-gate-v1.json` 仅在完整列出五项 Windows 性能要求、保存用户原话/授权时间/授权范围，且 `evidenceStatus=not_run_user_waived` 时允许政策默认通过；验证器输出 `pass mode=authorized-defaults factualEvidence=not-run-user-waived` 并退出 0。
+- 删除授权、只声明部分默认项、扩大范围、伪造 evidence 状态或保留 blockers 都会 fail-closed。真实 Windows/冻结样本/阈值/观测/原始证据仍未运行，不能把该政策例外表述为实测通过。
