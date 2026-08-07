@@ -8,8 +8,12 @@
   export let onClose = () => {};
   export let onCopyWechatSuggestion = () => {};
   export let onDismissWechatSuggestion = () => {};
+  export let onViewWechatSuggestionSources = () => {};
   export let copyPending = false;
   export let copyError = '';
+  export let wechatSourceLoading = false;
+  export let wechatSourceResult = null;
+  export let wechatSourceError = '';
   export let onStartWechatGeneration = () => {};
   export let onCancelWechatGeneration = () => {};
   export let prepareSeconds = 0;
@@ -82,7 +86,34 @@
             {#if copyError}
               <p class="relative mt-2 text-[11px] font-medium text-rose-700" role="alert">{copyError}</p>
             {/if}
+            {#if wechatSourceError}
+              <p class="relative mt-2 text-[11px] font-medium text-rose-700" role="alert">{wechatSourceError}</p>
+            {/if}
+            {#if wechatSourceResult}
+              <div class="relative mt-2 max-h-28 space-y-1 overflow-y-auto text-[10px] text-slate-600" data-current-reply-sources>
+                {#if !wechatSourceResult.hasSourceDetails}
+                  <p>{t('settingsKnowledge.noSourceReceipt')}</p>
+                {/if}
+                {#each wechatSourceResult.items || [] as item}
+                  <div class="rounded border border-slate-200 p-1">
+                    {#if item.availability === 'available'}
+                      {#each item.turns as turn}<p class="whitespace-pre-wrap">{turn.role} · {turn.text}</p>{/each}
+                    {:else}
+                      <p>{t('settingsKnowledge.sourceCurrentlyUnavailable')}</p>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
             <div class="relative mt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={copyPending || wechatSourceLoading}
+                on:click|stopPropagation={onViewWechatSuggestionSources}
+              >
+                {t('settingsKnowledge.viewReplySources')}
+              </button>
               <button
                 type="button"
                 class="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"

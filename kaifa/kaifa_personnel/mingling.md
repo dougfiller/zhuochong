@@ -408,3 +408,37 @@ git diff --check -- desktop kaifa/kaifa_test kaifa/kaifa_personnel/mingling.md
 
 - `verify_knowledge_scope_binding.py` 只验证唯一进程内 binding、opaque scope key、header-only 内存路径、single-chat profile 门禁、hint-only 配置、双 UI 三操作和禁止自动化能力等稳定源码边界；它不替代行为测试。
 - 默认沙箱不允许 loopback bind；knowledge HTTP fixture 需在获准环境运行。真实 Windows 前台微信、冻结 production profile、header OCR 与窗口切换 UAT 仍为 `not-run`。
+
+# 2026-08-07：步骤 25 最小 ModelKnowledgeContext 与强制 RAG M2
+
+```bash
+# 步骤 25 静态 fail-closed 门禁；仅读取本次 Rust/Svelte 源码，不打开用户数据库、微信导出或网络。
+python3 -B kaifa/kaifa_test/verify_task25_m2_rag.py
+
+# M2 微信合约、运行时、上下文裁减、transport spy 和 trace/source receipt 行为回归。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::' --no-default-features --features 'wechat-contract-check,wechat-m2' --no-fail-fast
+
+# 检索门面回归；仅使用完全虚构数据和系统分配的 127.0.0.1 临时端口，不访问外网。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'knowledge::retrieve::tests' --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# M2/M1 分别编译；不启动 Tauri、微信或模型。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1'
+
+# 以下四个是预期 exit 101 的编译负向探针：M2 不可触达 M1、私有构造不可绕过、release 必须且只能选一个 feature。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2,wechat-contract-probe-m2-m1'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2,wechat-contract-probe-private-constructors'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1,wechat-m2'
+
+# 显式加载历史和点击查看来源的设置页定向回归及生产构建。
+(cd desktop && node --test src/routes/settings/SettingsWechatKnowledge.test.js)
+(cd desktop && npm run build)
+
+# Rust 格式与本步骤范围空白。
+cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check
+git diff --check -- desktop/src-tauri/src/knowledge desktop/src-tauri/src/wechat desktop/src-tauri/src/main.rs desktop/src/routes/settings desktop/src/lib/i18n/locales kaifa/kaifa_test/verify_task25_m2_rag.py kaifa/kaifa_personnel/mingling.md kaifa/kaifa_test/test.md kaifa/kaifa_log
+```
+
+- `verify_task25_m2_rag.py` 检查唯一受信任 `build_model_context`、实际 canonical payload 预算、尾部整 hit 裁减、M2 强制检索顺序、私有 permit、冻结重试、禁止 Agent/tools 和显式来源查看；静态通过不替代 Rust 行为测试。
+- 真实 Windows 前台微信/OCR/窗口切换、真实模型网络请求、真实聊天数据、性能和发布均未运行；macOS/fake transport/SQLite 结果不替代这些证据。

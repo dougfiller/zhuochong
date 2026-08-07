@@ -5,8 +5,8 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fdcab-0161-7d02-a6af-37ac409c2d2d
-- next_poll_at: 2026-08-07T14:43:27+00:00
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月07日21点48分-会话范围绑定与代际失效.md

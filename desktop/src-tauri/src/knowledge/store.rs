@@ -443,6 +443,37 @@ pub(in crate::knowledge) struct AuthorizedHitPayload {
     pub(in crate::knowledge) ended_at_ms: i64,
     pub(in crate::knowledge) source_paths: Vec<String>,
     pub(in crate::knowledge) content: String,
+    pub(in crate::knowledge) context_lines: Vec<AuthorizedContextLine>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AuthorizedContextLine {
+    pub(crate) occurred_at_ms: i64,
+    pub(crate) direction: Direction,
+    pub(crate) text: String,
+}
+
+impl AuthorizedContextLine {
+    pub(crate) fn role(&self) -> &'static str {
+        match self.direction {
+            Direction::Self_ => "self",
+            Direction::Other => "other",
+        }
+    }
+
+    pub(crate) fn model_direction(&self) -> &'static str {
+        match self.direction {
+            Direction::Self_ => "outgoing",
+            Direction::Other => "incoming",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CurrentKnowledgeSourceExcerpt {
+    pub(crate) started_at_ms: i64,
+    pub(crate) ended_at_ms: i64,
+    pub(crate) lines: Vec<AuthorizedContextLine>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1861,6 +1892,7 @@ impl KnowledgeStore {
                         .map_err(|_| ContractError::KbRetrievalFailed)?;
                     rows
                 };
+                let context_lines = read_safe_context_lines(&transaction, chunk_id, &row.5)?;
                 let first_message_id = message_ids.first().cloned().ok_or(ContractError::KbRetrievalFailed)?;
                 let last_message_id = message_ids.last().cloned().ok_or(ContractError::KbRetrievalFailed)?;
                 if source_paths.is_empty() || row.0 != *chunk_id || row.3 > row.4 {
@@ -1878,6 +1910,7 @@ impl KnowledgeStore {
                     ended_at_ms: row.4,
                     source_paths,
                     content: row.5,
+                    context_lines,
                 });
             }
             ensure_retrieval_active(&transaction, frozen)?;
@@ -1887,6 +1920,60 @@ impl KnowledgeStore {
             Ok(payloads)
         })
         .map_err(|_| ContractError::KbRetrievalFailed)
+    }
+
+    pub(crate) fn rehydrate_active_source_excerpt(
+        &self,
+        chunk_id: &str,
+    ) -> Result<Option<CurrentKnowledgeSourceExcerpt>, ContractError> {
+        if chunk_id.is_empty()
+            || chunk_id.len() > 128
+            || !chunk_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        {
+            return Err(ContractError::WxTraceInvalidQuery);
+        }
+        self.with_reader(|connection| {
+            let active = load_active_embedding_read(connection)?;
+            let token = AuthorizedScopeToken {
+                scope: AuthorizedScope::GlobalUserSelected,
+                catalog_generation: active.catalog_generation.ok_or(ContractError::KbNotReady)?,
+                authorization_epoch: active.catalog_generation.ok_or(ContractError::KbNotReady)?,
+                index_generation_id: active.index_generation_id,
+                snapshot_hash: active.snapshot_hash,
+            };
+            let (mut sql, mut parameters) = authorized_chunk_query(
+                &token,
+                "chunk.id,chunk.started_at_ms,chunk.ended_at_ms,chunk.content",
+                "",
+            );
+            sql.push_str(" AND chunk.id=?");
+            parameters.push(Value::Text(chunk_id.to_owned()));
+            let row = connection
+                .query_row(&sql, params_from_iter(parameters), |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, String>(3)?,
+                    ))
+                })
+                .optional()
+                .map_err(|_| ContractError::KbRetrievalFailed)?;
+            let Some((id, started_at_ms, ended_at_ms, content)) = row else {
+                return Ok(None);
+            };
+            if id != chunk_id || started_at_ms > ended_at_ms {
+                return Err(ContractError::KbRetrievalFailed);
+            }
+            let lines = read_safe_context_lines(connection, chunk_id, &content)?;
+            Ok(Some(CurrentKnowledgeSourceExcerpt {
+                started_at_ms,
+                ended_at_ms,
+                lines,
+            }))
+        })
     }
 
     pub(in crate::knowledge) fn ensure_retrieval_still_active(
@@ -2971,6 +3058,64 @@ fn authorized_chunk_query(
         "SELECT {selection} FROM knowledge_catalog_state catalog JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' AND generation.completed_at_ms IS NOT NULL AND generation.snapshot_hash=catalog.active_snapshot_hash JOIN knowledge_chunks chunk ON chunk.index_generation_id=generation.id JOIN knowledge_conversations conversation ON conversation.id=chunk.conversation_id JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=generation.id AND mapping.conversation_id=conversation.id AND mapping.import_generation_id=conversation.active_import_generation_id JOIN knowledge_import_generations import_generation ON import_generation.id=mapping.import_generation_id AND import_generation.status='active' {additional_join} WHERE catalog.singleton_id=1 AND catalog.catalog_generation_seq=? AND generation.id=? AND catalog.active_snapshot_hash=?{scope_predicate} AND NOT EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.conversation_id=chunk.conversation_id OR denial.message_id IN (SELECT message_id FROM knowledge_chunk_messages WHERE chunk_id=chunk.id)) AND NOT EXISTS(SELECT 1 FROM knowledge_chunk_messages member WHERE member.chunk_id=chunk.id AND NOT EXISTS(SELECT 1 FROM knowledge_message_sources provenance JOIN knowledge_import_generation_sources active_source_map ON active_source_map.import_generation_id=mapping.import_generation_id AND active_source_map.source_id=provenance.source_id JOIN knowledge_sources source ON source.id=provenance.source_id AND source.source_state='active' WHERE provenance.message_version_id=member.message_version_id AND NOT EXISTS(SELECT 1 FROM knowledge_denials source_denial WHERE source_denial.source_id=source.id)))"
     );
     (sql, parameters)
+}
+
+fn read_safe_context_lines(
+    connection: &Connection,
+    chunk_id: &str,
+    expected_content: &str,
+) -> Result<Vec<AuthorizedContextLine>, ContractError> {
+    let mut statement = connection
+        .prepare(
+            "SELECT member.message_index,normalization.created_at_ms,normalization.direction,normalization.sender_key,version.normalized_content FROM knowledge_chunk_messages member JOIN knowledge_message_versions version ON version.id=member.message_version_id AND version.message_id=member.message_id JOIN knowledge_message_normalizations normalization ON normalization.message_version_id=version.id WHERE member.chunk_id=?1 ORDER BY member.message_index",
+        )
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    let rows = statement
+        .query_map([chunk_id], |row| {
+            Ok((
+                row.get::<_, u32>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+            ))
+        })
+        .map_err(|_| ContractError::KbRetrievalFailed)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    if rows.is_empty() {
+        return Err(ContractError::KbRetrievalFailed);
+    }
+    let mut rendered = Vec::with_capacity(rows.len());
+    let mut safe = Vec::with_capacity(rows.len());
+    let mut previous_time = None;
+    for (expected_index, (message_index, occurred_at_ms, direction, sender_key, text)) in
+        rows.into_iter().enumerate()
+    {
+        let direction =
+            Direction::parse(&direction).map_err(|_| ContractError::KbRetrievalFailed)?;
+        if message_index != expected_index as u32
+            || previous_time.is_some_and(|previous| occurred_at_ms < previous)
+            || sender_key.is_empty()
+            || text.is_empty()
+        {
+            return Err(ContractError::KbRetrievalFailed);
+        }
+        rendered.push(format!(
+            "[{occurred_at_ms}][{}][{sender_key}] {text}",
+            direction.as_str()
+        ));
+        safe.push(AuthorizedContextLine {
+            occurred_at_ms,
+            direction,
+            text,
+        });
+        previous_time = Some(occurred_at_ms);
+    }
+    if rendered.join("\n") != expected_content {
+        return Err(ContractError::KbRetrievalFailed);
+    }
+    Ok(safe)
 }
 
 fn ensure_retrieval_active(

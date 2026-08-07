@@ -53,4 +53,11 @@ test('微信和知识库设置使用与save_config相同的camelCase payload', a
   assert.match(knowledge, /\$: busy = Boolean\(operationId\)/);
   assert.match(knowledge, /selectedRoots/);
   assert.doesNotMatch(knowledge, /showToast\([^\n]*selectedRoot/);
+  assert.match(knowledge, /async function loadReplyHistory\(\)/);
+  assert.match(knowledge, /async function showReplySources\(requestId\)/);
+  assert.match(knowledge, /invoke\('get_wechat_reply_sources', \{ input: \{ requestId \} \}\)/);
+  assert.match(knowledge, /entry\.stageName === 'generating' && entry\.m2/);
+  const mountBody = knowledge.match(/onMount\(\(\) => \{([^}]*)\}\);/)?.[1] || '';
+  assert.doesNotMatch(mountBody, /loadReplyHistory|showReplySources|get_wechat_reply_sources/);
+  assert.doesNotMatch(knowledge, /input:\s*\{\s*hitId|sourcePath|messageId|conversationId|hitScore/);
 });

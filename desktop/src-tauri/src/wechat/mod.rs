@@ -8,7 +8,7 @@ mod model_client;
 mod model_contract;
 mod ocr;
 pub(crate) mod profiles;
-#[cfg(feature = "wechat-m1")]
+#[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
 mod reply_flow;
 pub(crate) mod runtime;
 pub(crate) mod state_machine;
@@ -44,5 +44,6 @@ mod m2_m1_probe {
 
     const _: () = {
         let _ = WechatReplyModelClient::generate_m1;
+        let _ = super::reply_flow::generate_m1_wechat_reply;
     };
 }

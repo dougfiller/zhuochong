@@ -11,6 +11,7 @@ pub(crate) mod runtime;
 pub(crate) mod store;
 pub(crate) mod types;
 
+pub(crate) use chunk::token_count_v1;
 #[allow(unused_imports)]
 pub(crate) use retrieve::{KnowledgeError, KnowledgeRetrieveRequest, RetrievedReply};
 pub(crate) use store::KnowledgeStore;

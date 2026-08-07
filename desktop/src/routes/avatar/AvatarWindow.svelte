@@ -8,6 +8,10 @@
   import AvatarFollowupCard from '../../lib/components/Avatar/AvatarFollowupCard.svelte';
   import AvatarPopover from '../../lib/components/Avatar/AvatarPopover.svelte';
   import { formatWechatUserError } from '../../lib/utils/errorDisplay.js';
+  import {
+    loadCurrentWechatSuggestionSources,
+    sameWechatSuggestion,
+  } from './wechatSuggestionSources.js';
   import { applyLocaleToDocument, initializeLocale, locale, t } from '$lib/i18n/index.js';
   import {
     getAvatarMotionStepDelay,
@@ -55,6 +59,9 @@
   let ordinaryBubbleTimer = null;
   let copyPending = false;
   let copyError = '';
+  let wechatSourceLoading = false;
+  let wechatSourceResult = null;
+  let wechatSourceError = '';
   const WECHAT_PREPARE_SECONDS = 3;
   let wechatPrepareSeconds = 0;
   let wechatGeneratePending = false;
@@ -375,12 +382,6 @@
     return payload?.kind === 'wechatSuggestion';
   }
 
-  function sameWechatSuggestion(left, right) {
-    return left?.requestId === right?.requestId
-      && left?.suggestionGeneration === right?.suggestionGeneration
-      && left?.bindingGeneration === right?.bindingGeneration;
-  }
-
   function showBubble(payload) {
     if (isWechatSuggestion(payload)) {
       if (payload.clear) {
@@ -388,6 +389,9 @@
           wechatSuggestionBubble = null;
           copyPending = false;
           copyError = '';
+          wechatSourceLoading = false;
+          wechatSourceResult = null;
+          wechatSourceError = '';
           resumeFocusSession();
           resumeOrdinaryBubble();
         }
@@ -396,6 +400,9 @@
       wechatSuggestionBubble = payload;
       copyPending = false;
       copyError = '';
+      wechatSourceLoading = false;
+      wechatSourceResult = null;
+      wechatSourceError = '';
       pauseOrdinaryBubble();
       pauseFocusSession();
       return;
@@ -452,6 +459,34 @@
       await invoke('dismiss_wechat_suggestion', { input });
     } catch (_error) {
       // A stale dismiss must not affect a newer suggestion.
+    }
+  }
+
+  async function viewWechatSuggestionSources() {
+    const input = wechatSuggestionInput();
+    if (!input || wechatSourceLoading) {
+      return;
+    }
+    wechatSourceLoading = true;
+    wechatSourceResult = null;
+    wechatSourceError = '';
+    try {
+      const result = await loadCurrentWechatSuggestionSources(
+        invoke,
+        input,
+        () => wechatSuggestionBubble,
+      );
+      if (result) {
+        wechatSourceResult = result;
+      }
+    } catch (_error) {
+      if (sameWechatSuggestion(wechatSuggestionBubble, input)) {
+        wechatSourceError = t('settingsKnowledge.sourcesUnavailable');
+      }
+    } finally {
+      if (sameWechatSuggestion(wechatSuggestionBubble, input)) {
+        wechatSourceLoading = false;
+      }
     }
   }
 
@@ -1027,8 +1062,12 @@
       onClose={dismissBubble}
       onCopyWechatSuggestion={copyWechatSuggestion}
       onDismissWechatSuggestion={dismissWechatSuggestion}
+      onViewWechatSuggestionSources={viewWechatSuggestionSources}
       {copyPending}
       {copyError}
+      {wechatSourceLoading}
+      {wechatSourceResult}
+      {wechatSourceError}
       onStartWechatGeneration={startWechatGeneration}
       onCancelWechatGeneration={cancelWechatGeneration}
       prepareSeconds={wechatPrepareSeconds}

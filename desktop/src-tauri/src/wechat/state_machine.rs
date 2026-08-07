@@ -1,7 +1,6 @@
 use super::types::{
     BindingGeneration, BindingObservationVersion, ContractError, RequestId, SuggestionGeneration,
 };
-use crate::knowledge::types::RetrievedReply;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReplyMode {
@@ -69,12 +68,14 @@ impl StateMachine {
 
     pub(crate) fn complete_retrieval(
         &mut self,
-        reply: &RetrievedReply,
+        request_id: &RequestId,
+        binding_generation: BindingGeneration,
         stage_seq: u64,
     ) -> Result<(), ContractError> {
         if self.mode != ReplyMode::M2
             || self.state != ReplyState::Retrieving
-            || self.request_id != *reply.request_id()
+            || self.request_id != *request_id
+            || self.binding_generation != binding_generation
             || stage_seq <= self.stage_seq
         {
             return Err(ContractError::WxContractViolation);
@@ -277,7 +278,9 @@ mod tests {
             0,
         )
         .unwrap();
-        state.complete_retrieval(&reply, 5).unwrap();
+        state
+            .complete_retrieval(reply.request_id(), BindingGeneration::new(4), 5)
+            .unwrap();
         assert!(!state.accepts_reply(
             &RequestId::new(),
             SuggestionGeneration::new(3),

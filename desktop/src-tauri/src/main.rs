@@ -4572,6 +4572,7 @@ async fn main() {
             wechat::commands::get_wechat_settings_status,
             wechat::commands::generate_wechat_reply,
             wechat::commands::list_wechat_reply_traces,
+            wechat::commands::get_wechat_reply_sources,
             wechat::commands::delete_wechat_reply_content,
             wechat::commands::request_wechat_suggestion_copy,
             wechat::commands::confirm_wechat_suggestion_copy,

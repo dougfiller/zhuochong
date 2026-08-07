@@ -15,6 +15,9 @@
   let maintenance = { operation: 'idle', state: 'open', completed: 0, total: 0 };
   let operationId = null;
   let polling = null;
+  let replyTraces = [];
+  let replySources = null;
+  let sourceLoading = false;
   $: busy = Boolean(operationId) || maintenance?.maintenance === 'closed';
   $: canRebuild = !busy && sources.some((source) => source.sourceState === 'active');
   async function refresh() {
@@ -82,13 +85,31 @@
     catch (_) { showToast(t('settingsKnowledge.operationFailed'), 'error'); }
     finally { operationId = null; await refresh(); stopPolling(); }
   }
+  async function loadReplyHistory() {
+    sourceLoading = true;
+    replySources = null;
+    try {
+      const page = await invoke('list_wechat_reply_traces', { input: { limit: 100 } });
+      replyTraces = (page.entries || [])
+        .filter((entry) => entry.stageName === 'generating' && entry.m2)
+        .slice(-20)
+        .reverse();
+    } catch (_) { replyTraces = []; showToast(t('settingsKnowledge.sourcesUnavailable'), 'error'); }
+    finally { sourceLoading = false; }
+  }
+  async function showReplySources(requestId) {
+    sourceLoading = true;
+    replySources = null;
+    try { replySources = await invoke('get_wechat_reply_sources', { input: { requestId } }); }
+    catch (_) { showToast(t('settingsKnowledge.sourcesUnavailable'), 'error'); }
+    finally { sourceLoading = false; }
+  }
   onMount(() => { refresh(); return stopPolling; });
 </script>
 
 <div class="settings-card mb-5">
   <h3 class="settings-card-title">{t('settingsKnowledge.title')}</h3>
   <p class="settings-card-desc">{t('settingsKnowledge.notReady')}</p>
-  <p class="mb-4 text-sm text-amber-700 dark:text-amber-200" role="status">{t('settingsKnowledge.m1NoM2')}</p>
   <div class="space-y-4">
     <KnowledgeScopePicker hintKeys={config.knowledge.lastScopeHintKeys || []} onHintsChange={saveScopeHints} />
     <div class="grid grid-cols-2 gap-3">
@@ -120,6 +141,34 @@
           </li>
         {/each}
         </ul>
+      {/if}
+    </section>
+    <section class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+      <h4 class="text-sm font-medium">{t('settingsKnowledge.replySourcesTitle')}</h4>
+      <p class="mt-1 text-xs text-gray-500">{t('settingsKnowledge.replySourcesDescription')}</p>
+      <button class="settings-button mt-3" disabled={sourceLoading} on:click={loadReplyHistory}>{t('settingsKnowledge.loadReplyHistory')}</button>
+      {#if replyTraces.length}
+        <ul class="mt-3 space-y-2 text-xs text-gray-500">
+          {#each replyTraces as trace}
+            <li class="rounded border border-gray-100 p-2 dark:border-gray-800">
+              <div>{trace.occurredAt} · {trace.m2.sourceCount} · {trace.m2.contextHashPrefix || '—'}</div>
+              <button class="mt-1" disabled={sourceLoading || !trace.m2.hasSourceDetails} on:click={() => showReplySources(trace.requestId)}>{t('settingsKnowledge.viewReplySources')}</button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if replySources}
+        <div class="mt-3 space-y-2 text-xs" data-source-details>
+          {#if !replySources.hasSourceDetails}<p>{t('settingsKnowledge.noSourceReceipt')}</p>{/if}
+          {#each replySources.items || [] as item}
+            <article class="rounded border border-gray-100 p-2 dark:border-gray-800">
+              <div>{item.ordinal} · {item.availability}</div>
+              {#if item.availability === 'available'}
+                {#each item.turns as turn}<p class="mt-1 whitespace-pre-wrap">{turn.role} · {turn.text}</p>{/each}
+              {:else}<p class="mt-1">{t('settingsKnowledge.sourceCurrentlyUnavailable')}</p>{/if}
+            </article>
+          {/each}
+        </div>
       {/if}
     </section>
   </div>

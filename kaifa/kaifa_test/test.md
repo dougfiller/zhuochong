@@ -357,3 +357,25 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 
 - loopback 测试只使用完全虚构账号、会话、正文与系统临时目录，不访问外网或真实数据。
 - `not-run` 不是 Windows profile、OCR 稳定性、真实微信窗口切换或完整步骤 25 M2 编排通过证据。
+
+## 最小 ModelKnowledgeContext 与强制 RAG M2（2026-08-07）
+
+检测脚本：`kaifa/kaifa_test/verify_task25_m2_rag.py`。该脚本只读取步骤 25 的 Rust/Svelte 源码，不打开用户 `knowledge.sqlite`、微信导出、trace 正文或网络。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 静态安全门禁 | `python3 -B kaifa/kaifa_test/verify_task25_m2_rag.py` | 输出 `TASK25_M2_RAG_STATIC_OK`；确认唯一私有 context builder、canonical payload 预算/裁减、冻结 permit/hash、M2 强制检索、M1 隔离、禁止 Agent/tools 与显式来源查看边界。 | 通过 |
+| M2 行为回归 | `cargo test ... 'wechat::' ... --features 'wechat-contract-check,wechat-m2' --no-fail-fast` | 75 passed、0 failed。覆盖 no-hit/命中上下文、按实际序列化 payload 计数与尾部整 hit 裁减、不可信历史 canary、request/binding/context hash/stage 关联、完全相同请求单次重试、安全 trace/source receipt。fake transport 不发送真实模型请求。 | 通过 |
+| 检索门面回归 | `cargo test ... 'knowledge::retrieve::tests' ...` | 默认沙箱因本机临时端口权限受限；在获准的本机 loopback 环境原命令重跑为 23 passed、0 failed。只使用虚构数据和 127.0.0.1，不访问外网。 | 通过 |
+| Release feature 正向编译 | 分别 `cargo check ... wechat-m2` 与 `cargo check ... wechat-m1` | 两者均 exit 0；仅有仓库既有/未接线 dead-code/unused 警告。 | 通过 |
+| M2 不可达 M1 | `cargo check ... wechat-m2,wechat-contract-probe-m2-m1` | 预期 exit 101；M2 编译图中无法引用 M1 flow/client。 | 通过（预期失败） |
+| 私有构造边界 | `cargo check ... wechat-m2,wechat-contract-probe-private-constructors` | 预期 exit 101；编译器拒绝从 `wechat/mod.rs` 构造 `RetrievedReply`/`ModelKnowledgeContext` 私有字段。 | 通过（预期失败） |
+| Feature 唯一性 | 不启用 release feature；同时启用 M1/M2 | 两者均预期 exit 101，分别命中“必须精确启用一个”和“不可同时启用” compile error。 | 通过（预期失败） |
+| 设置页来源查看 | `cd desktop && node --test src/routes/settings/SettingsWechatKnowledge.test.js` | 1/1 通过；仅明确加载历史后显示脱敏摘要，再点击查看时才按 requestId 从当前 Store 重取，不自动读正文或展示内部 hit ID/分数/路径。 | 通过 |
+| 前端生产构建 | `cd desktop && npm run build` | Vite 5.4.21 构建成功（246 modules）。 | 通过 |
+| 格式与空白 | `cargo fmt ... -- --check`；步骤 25 scoped `git diff --check` | 退出 0。 | 通过 |
+| Windows/真实模型/性能/发布 | 受控 Windows 11 x64、冻结 production profile、用户已验证文本模型、脱敏规模样本 | 本阶段未运行真实前台微信/OCR/窗口切换、真实模型网络请求、真实聊天数据、Windows 性能或正式发布。 | not-run |
+
+- `ModelKnowledgeContext` 不携带路径、内部 chunk/message/conversation ID、provenance、分数、未入选 hits 或整段会话；实际输入由系统规则、不可信历史知识和当前文字三部分构成。
+- 来源详情不存在 trace 正文快照；必须由后端凭内部 receipt 从当前 active Store 重取，来源已消失/被拒绝/代际改变时明确返回不可用。
+- macOS 合成测试不是 Windows 真机、真实模型、素材合规或发布证据。

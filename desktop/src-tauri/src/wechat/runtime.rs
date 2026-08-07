@@ -3,8 +3,7 @@ use super::config::selected_verified_model;
 use super::content::{WechatContentKind, WechatContentStore};
 #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
 use super::model_client::WechatReplyModelClient;
-#[cfg(feature = "wechat-m2")]
-use super::model_contract::ModelKnowledgeContext;
+use super::model_contract::{ModelCallPermit, ModelKnowledgeContext};
 use super::state_machine::{ReplyMode, ReplyState, StateMachine};
 use super::trace::{M2TraceMetadata, ReplyTraceEvent, ReplyTraceStore};
 #[cfg(feature = "wechat-m1")]
@@ -16,7 +15,6 @@ use super::types::{
 use crate::avatar_engine::AvatarBubblePayload;
 #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
 use crate::config::{TextModelProfile, WechatConfig};
-use crate::knowledge::types::RetrievedReply;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -54,7 +52,7 @@ struct ActiveReply {
     deadline: Instant,
     cancel: tokio::sync::watch::Sender<bool>,
     trace: ReplyTraceStore,
-    model_transport_calls: u8,
+    logical_model_requests: u8,
 }
 
 #[derive(Clone, Debug)]
@@ -168,7 +166,7 @@ impl WechatReplyRuntime {
             deadline: Instant::now() + snapshot.timeout,
             cancel,
             trace: trace.clone(),
-            model_transport_calls: 0,
+            logical_model_requests: 0,
         };
         let event = event_for(&active, ReplyState::Validating, None, None)?;
         trace.append(event)?;
@@ -219,7 +217,7 @@ impl WechatReplyRuntime {
             }
             return result;
         }
-        if next == ReplyState::ReplyReady && active.model_transport_calls != 1 {
+        if next == ReplyState::ReplyReady && active.logical_model_requests != 1 {
             return fail_closed(&mut inner, ContractError::WxContractViolation);
         }
         let mut candidate = active.state.clone();
@@ -296,7 +294,7 @@ impl WechatReplyRuntime {
     pub(crate) fn complete_retrieval(
         &self,
         lease: &ReplyLease,
-        reply: &RetrievedReply,
+        context: &ModelKnowledgeContext,
         m2: M2TraceMetadata,
     ) -> Result<(), ContractError> {
         let mut inner = self
@@ -326,7 +324,11 @@ impl WechatReplyRuntime {
         }
         let mut candidate = active.state.clone();
         if candidate
-            .complete_retrieval(reply, candidate.stage_seq().saturating_add(1))
+            .complete_retrieval(
+                context.request_id(),
+                context.binding_generation(),
+                candidate.stage_seq().saturating_add(1),
+            )
             .is_err()
         {
             return fail_closed(&mut inner, ContractError::WxContractViolation);
@@ -338,6 +340,40 @@ impl WechatReplyRuntime {
         }
         active.state = candidate;
         Ok(())
+    }
+
+    #[cfg(feature = "wechat-m2")]
+    pub(super) fn authorize_model_call(
+        &self,
+        lease: &ReplyLease,
+        context: &ModelKnowledgeContext,
+        model_request_id: String,
+    ) -> Result<ModelCallPermit, ContractError> {
+        let inner = self
+            .inner
+            .lock()
+            .map_err(|_| ContractError::WxContractViolation)?;
+        let active = inner.active.as_ref().ok_or(ContractError::WxRequestStale)?;
+        if !lease_matches(active, lease)
+            || active.state.state() != ReplyState::Generating
+            || active.state.stage_seq() != 5
+            || active.logical_model_requests != 0
+            || active.state.request_id() != context.request_id()
+            || active.state.binding_generation() != context.binding_generation()
+            || model_request_id.len() != 32
+            || !model_request_id
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err(ContractError::WxContractViolation);
+        }
+        Ok(ModelCallPermit::new_with_model_request_id(
+            context.request_id().clone(),
+            context.binding_generation(),
+            context.context_hash().clone(),
+            active.state.stage_seq(),
+            model_request_id,
+        ))
     }
 
     pub(crate) fn cancel_reply(&self, lease: &ReplyLease) -> Result<(), ContractError> {
@@ -424,10 +460,10 @@ impl WechatReplyRuntime {
         if !lease_matches(active, lease) {
             return Err(ContractError::WxRequestStale);
         }
-        if active.state.state() != ReplyState::Generating || active.model_transport_calls >= 1 {
+        if active.state.state() != ReplyState::Generating || active.logical_model_requests >= 1 {
             return fail_closed(&mut inner, ContractError::WxContractViolation);
         }
-        active.model_transport_calls += 1;
+        active.logical_model_requests += 1;
         Ok(())
     }
 
@@ -455,7 +491,7 @@ impl WechatReplyRuntime {
         }
         let binding =
             (active.state.mode() == ReplyMode::M2).then_some(active.state.binding_generation());
-        if active.model_transport_calls != 1
+        if active.logical_model_requests != 1
             || !reply.is_current(lease.request_id(), lease.suggestion_generation(), binding)
             || !active.state.accepts_reply(
                 lease.request_id(),
@@ -710,33 +746,14 @@ impl WechatReplyRuntime {
         }
     }
 
-    /// Runs exactly one private M2 model call after retrieval has created a
-    /// trusted context and the caller has copied the configuration snapshot.
     #[cfg(feature = "wechat-m2")]
-    pub(crate) async fn generate_m2_reply(
-        &self,
-        config: WechatConfig,
-        profiles: Vec<TextModelProfile>,
-        context: ModelKnowledgeContext,
-        lease: &ReplyLease,
-    ) -> Result<GeneratedReply, ContractError> {
-        self.generate_m2_reply_with_client(
-            &WechatReplyModelClient::new(),
-            config,
-            profiles,
-            context,
-            lease,
-        )
-        .await
-    }
-
-    #[cfg(feature = "wechat-m2")]
-    async fn generate_m2_reply_with_client(
+    pub(super) async fn generate_m2_reply_with_client(
         &self,
         client: &WechatReplyModelClient,
         config: WechatConfig,
         profiles: Vec<TextModelProfile>,
         context: ModelKnowledgeContext,
+        permit: ModelCallPermit,
         lease: &ReplyLease,
     ) -> Result<GeneratedReply, ContractError> {
         if let Err(error) = selected_verified_model(&config, &profiles) {
@@ -745,7 +762,13 @@ impl WechatReplyRuntime {
         }
         self.record_model_transport_call(lease)?;
         match client
-            .generate_m2(&config, &profiles, context, lease.suggestion_generation())
+            .generate_rag_reply(
+                &config,
+                &profiles,
+                &context,
+                &permit,
+                lease.suggestion_generation(),
+            )
             .await
         {
             Ok(reply) => {
@@ -936,7 +959,7 @@ fn event_for(
         active.state.suggestion_generation(),
         active.state.binding_generation(),
         active.state.observation_version(),
-        active.model_transport_calls,
+        active.logical_model_requests,
         error,
         m2,
     ))
@@ -1006,7 +1029,7 @@ fn record_stale(active: &mut ActiveReply, _lease: &ReplyLease) -> Result<(), Con
         active.state.suggestion_generation(),
         active.state.binding_generation(),
         active.state.observation_version(),
-        active.model_transport_calls,
+        active.logical_model_requests,
     ))
 }
 
@@ -1549,18 +1572,18 @@ impl WechatReplyModelPort for UnavailableWechatReplyModel {
 #[cfg(test)]
 mod reply_runtime_tests {
     use super::*;
-    #[cfg(feature = "wechat-m1")]
+    #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
     use crate::agent::model::{SingleTurnTextRequest, SingleTurnTextTransport};
     use crate::avatar_engine::AvatarBubbleKind;
-    #[cfg(feature = "wechat-m1")]
+    #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
     use crate::config::{AiProvider, ModelConfig, TextModelProfile, WechatConfig};
-    #[cfg(feature = "wechat-m1")]
+    #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
     use crate::error::AppError;
     use crate::knowledge::types::{retrieval_fixture, RetrievalOutcome, RetrievalStatus};
     use crate::wechat::trace::{RetrievalMode, TraceQuery};
-    #[cfg(feature = "wechat-m1")]
+    #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
     use async_trait::async_trait;
-    #[cfg(feature = "wechat-m1")]
+    #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn snapshot() -> BeginReplySnapshot {
@@ -1689,13 +1712,13 @@ mod reply_runtime_tests {
         let _ = std::fs::remove_dir_all(directory);
     }
 
-    #[cfg(feature = "wechat-m1")]
+    #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
     struct FakeTransport {
         calls: Arc<AtomicUsize>,
         succeeds: bool,
     }
 
-    #[cfg(feature = "wechat-m1")]
+    #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
     #[async_trait]
     impl SingleTurnTextTransport for FakeTransport {
         async fn complete(
@@ -1712,7 +1735,7 @@ mod reply_runtime_tests {
         }
     }
 
-    #[cfg(feature = "wechat-m1")]
+    #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
     fn selected_model_snapshot() -> (WechatConfig, Vec<TextModelProfile>) {
         let mut config = WechatConfig::default();
         config.text_model_profile_id = Some("selected".into());
@@ -2125,9 +2148,12 @@ mod reply_runtime_tests {
             "fixture",
             RetrievalOutcome::Retrieved(RetrievalStatus::Success),
             &[("excerpt", 1)],
-            1,
+            512,
         )
         .unwrap();
+        let wrong_context = super::super::model_contract::build_model_context(wrong_reply)
+            .unwrap()
+            .context;
         let metadata = M2TraceMetadata::new(
             None,
             Some(1),
@@ -2141,12 +2167,89 @@ mod reply_runtime_tests {
         .unwrap();
 
         assert_eq!(
-            runtime.complete_retrieval(&lease, &wrong_reply, metadata),
+            runtime.complete_retrieval(&lease, &wrong_context, metadata),
             Err(ContractError::WxContractViolation)
         );
         assert!(runtime
             .begin_reply(snapshot(), ReplyTraceStore::new(&directory))
             .is_ok());
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[cfg(feature = "wechat-m2")]
+    #[tokio::test]
+    async fn m2_trace_permit_and_rag_call_share_one_request_binding_and_context_hash() {
+        let directory =
+            std::env::temp_dir().join(format!("wechat-runtime-{}", uuid::Uuid::new_v4()));
+        let trace = ReplyTraceStore::new(&directory);
+        let runtime = WechatReplyRuntime::default();
+        let lease = runtime
+            .begin_reply(
+                BeginReplySnapshot {
+                    mode: ReplyMode::M2,
+                    binding_generation: BindingGeneration::new(1),
+                    observation_version: BindingObservationVersion::new(2),
+                    capture_version: None,
+                    timeout: Duration::from_secs(5),
+                },
+                trace.clone(),
+            )
+            .unwrap();
+        runtime
+            .transition(
+                &lease,
+                ReplyState::Validating,
+                ReplyState::Capturing,
+                None,
+                None,
+            )
+            .unwrap();
+        runtime
+            .transition(&lease, ReplyState::Capturing, ReplyState::Ocr, None, None)
+            .unwrap();
+        runtime
+            .transition(&lease, ReplyState::Ocr, ReplyState::Retrieving, None, None)
+            .unwrap();
+        let built = super::super::model_contract::build_model_context(
+            retrieval_fixture(
+                lease.request_id().clone(),
+                "请确认",
+                RetrievalOutcome::Retrieved(RetrievalStatus::Success),
+                &[("虚构历史", 12)],
+                1024,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let model_request_id = "c".repeat(32);
+        let metadata = M2TraceMetadata::from_audit(&built.audit, model_request_id.clone()).unwrap();
+        runtime
+            .complete_retrieval(&lease, &built.context, metadata)
+            .unwrap();
+        let permit = runtime
+            .authorize_model_call(&lease, &built.context, model_request_id)
+            .unwrap();
+        assert_eq!(permit.stage_seq(), 5);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let client = WechatReplyModelClient::with_transport(Arc::new(FakeTransport {
+            calls: calls.clone(),
+            succeeds: true,
+        }));
+        let (config, profiles) = selected_model_snapshot();
+        let reply = runtime
+            .generate_m2_reply_with_client(&client, config, profiles, built.context, permit, &lease)
+            .await
+            .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert!(reply.is_current(
+            lease.request_id(),
+            lease.suggestion_generation(),
+            Some(BindingGeneration::new(1))
+        ));
+        let receipt = trace.source_receipt(lease.request_id()).unwrap().unwrap();
+        assert_eq!(receipt.hit_ids.len(), 1);
+        assert_eq!(receipt.context_hash.len(), 64);
+        runtime.finish_reply(lease).unwrap();
         let _ = std::fs::remove_dir_all(directory);
     }
 

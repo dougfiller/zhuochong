@@ -36,7 +36,9 @@ fn invalid_id(id: &str) -> bool {
 
 #[allow(unused_imports)]
 pub(crate) use super::retrieve::{
-    KnowledgeError, KnowledgeRetrieveRequest, RetrievalMode, RetrievalStatus, RetrievedReply,
+    KnowledgeError, KnowledgeRetrieveRequest, RetrievalMode, RetrievalStatus,
+    RetrievedContextDirection, RetrievedContextHit, RetrievedContextLine, RetrievedContextParts,
+    RetrievedReply,
 };
 
 #[cfg(test)]

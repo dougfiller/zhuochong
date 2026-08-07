@@ -39,6 +39,12 @@ pub(crate) struct M2TraceMetadata {
     hit_ids: Vec<String>,
     hit_scores: Vec<f64>,
     model_request_id: Option<String>,
+    context_hash: Option<String>,
+    token_counter_version: Option<String>,
+    payload_token_count: Option<u32>,
+    selected_hit_count: Option<u8>,
+    #[serde(default)]
+    selected_excerpt_hashes: Vec<String>,
 }
 
 impl M2TraceMetadata {
@@ -61,6 +67,49 @@ impl M2TraceMetadata {
             hit_ids,
             hit_scores,
             model_request_id,
+            context_hash: None,
+            token_counter_version: None,
+            payload_token_count: None,
+            selected_hit_count: None,
+            selected_excerpt_hashes: Vec::new(),
+        };
+        validate_m2_metadata(&metadata)?;
+        Ok(metadata)
+    }
+
+    pub(super) fn from_audit(
+        audit: &super::model_contract::LocalContextAuditReceipt,
+        model_request_id: String,
+    ) -> Result<Self, ContractError> {
+        let retrieval_mode = if audit.status == crate::knowledge::types::RetrievalStatus::NoHit {
+            RetrievalMode::NoHit
+        } else if audit.retrieval_mode == crate::knowledge::types::RetrievalMode::FtsFallback {
+            RetrievalMode::FtsFallback
+        } else {
+            RetrievalMode::Success
+        };
+        let metadata = Self {
+            query_hmac: Some(audit.frozen_result_hash.clone()),
+            catalog_generation_seq: Some(audit.catalog_generation),
+            active_import_snapshot_hash: Some(audit.active_snapshot_hash.clone()),
+            index_generation_id: Some(audit.index_generation_id.clone()),
+            retrieval_mode,
+            hit_ids: audit
+                .selected_hits
+                .iter()
+                .map(|hit| hit.hit_id.clone())
+                .collect(),
+            hit_scores: audit.selected_hits.iter().map(|hit| hit.score).collect(),
+            model_request_id: Some(model_request_id),
+            context_hash: Some(audit.context_hash.as_str().to_owned()),
+            token_counter_version: Some(audit.token_counter_version.clone()),
+            payload_token_count: Some(audit.payload_token_count),
+            selected_hit_count: Some(audit.selected_hits.len() as u8),
+            selected_excerpt_hashes: audit
+                .selected_hits
+                .iter()
+                .map(|hit| hit.safe_excerpt_hash.clone())
+                .collect(),
         };
         validate_m2_metadata(&metadata)?;
         Ok(metadata)
@@ -82,7 +131,8 @@ pub(crate) struct ReplyTraceEvent {
     suggestion_generation: u64,
     binding_generation: u64,
     observation_version: u64,
-    model_transport_calls: u8,
+    #[serde(rename = "logicalModelRequests", alias = "modelTransportCalls")]
+    logical_model_requests: u8,
     final_state: Option<String>,
     m2: Option<M2TraceMetadata>,
 }
@@ -96,7 +146,7 @@ impl ReplyTraceEvent {
         suggestion_generation: SuggestionGeneration,
         binding_generation: BindingGeneration,
         observation_version: BindingObservationVersion,
-        model_transport_calls: u8,
+        logical_model_requests: u8,
         error_code: Option<ContractError>,
         m2: Option<M2TraceMetadata>,
     ) -> Self {
@@ -117,7 +167,7 @@ impl ReplyTraceEvent {
             suggestion_generation: suggestion_generation.value(),
             binding_generation: binding_generation.value(),
             observation_version: observation_version.value(),
-            model_transport_calls,
+            logical_model_requests,
             final_state: terminal.then(|| state_name(state).to_owned()),
             m2,
         }
@@ -130,7 +180,7 @@ impl ReplyTraceEvent {
         suggestion_generation: SuggestionGeneration,
         binding_generation: BindingGeneration,
         observation_version: BindingObservationVersion,
-        model_transport_calls: u8,
+        logical_model_requests: u8,
     ) -> Self {
         let mut event = Self::stage(
             request_id,
@@ -140,7 +190,7 @@ impl ReplyTraceEvent {
             suggestion_generation,
             binding_generation,
             observation_version,
-            model_transport_calls,
+            logical_model_requests,
             Some(ContractError::WxRequestStale),
             None,
         );
@@ -165,9 +215,18 @@ pub(crate) struct WechatReplyTraceEntry {
     suggestion_generation: u64,
     binding_generation: u64,
     observation_version: u64,
-    model_transport_calls: u8,
+    logical_model_requests: u8,
     final_state: Option<String>,
-    m2: Option<M2TraceMetadata>,
+    m2: Option<M2TraceSummary>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct M2TraceSummary {
+    retrieval_mode: RetrievalMode,
+    source_count: u8,
+    has_source_details: bool,
+    context_hash_prefix: Option<String>,
 }
 
 impl From<ReplyTraceEvent> for WechatReplyTraceEntry {
@@ -185,11 +244,27 @@ impl From<ReplyTraceEvent> for WechatReplyTraceEntry {
             suggestion_generation: value.suggestion_generation,
             binding_generation: value.binding_generation,
             observation_version: value.observation_version,
-            model_transport_calls: value.model_transport_calls,
+            logical_model_requests: value.logical_model_requests,
             final_state: value.final_state,
-            m2: value.m2,
+            m2: value.m2.map(|metadata| M2TraceSummary {
+                retrieval_mode: metadata.retrieval_mode,
+                source_count: metadata.hit_ids.len() as u8,
+                has_source_details: metadata.hit_ids.len()
+                    == metadata.selected_excerpt_hashes.len()
+                    && !metadata.hit_ids.is_empty(),
+                context_hash_prefix: metadata
+                    .context_hash
+                    .map(|hash| hash.chars().take(12).collect()),
+            }),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ReplySourceReceipt {
+    pub(crate) context_hash: String,
+    pub(crate) hit_ids: Vec<String>,
+    pub(crate) excerpt_hashes: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -342,6 +417,54 @@ impl ReplyTraceStore {
             tail_recovered,
         })
     }
+
+    pub(crate) fn source_receipt(
+        &self,
+        request_id: &RequestId,
+    ) -> Result<Option<ReplySourceReceipt>, ContractError> {
+        let mut found = None;
+        for path in trace_files(&self.root)? {
+            let bytes = fs::read(path).map_err(|_| ContractError::WxTracePersistFailed)?;
+            let line_count = bytes.split_inclusive(|byte| *byte == b'\n').count();
+            for (line_index, raw) in bytes.split_inclusive(|byte| *byte == b'\n').enumerate() {
+                let complete = raw.ends_with(b"\n");
+                let line = raw.strip_suffix(b"\n").unwrap_or(raw);
+                if line.is_empty() && complete || line.len() > MAX_JSONL_LINE_BYTES {
+                    return Err(ContractError::WxTracePersistFailed);
+                }
+                let event = match serde_json::from_slice::<ReplyTraceEvent>(line) {
+                    Ok(event) if complete => event,
+                    _ if line_index + 1 == line_count => break,
+                    _ => return Err(ContractError::WxTracePersistFailed),
+                };
+                validate_event(&event)?;
+                if event.request_id != request_id.to_string()
+                    || event.stage_name != "generating"
+                    || event.status != "entered"
+                {
+                    continue;
+                }
+                let Some(metadata) = event.m2 else {
+                    continue;
+                };
+                let (Some(context_hash), true) = (
+                    metadata.context_hash,
+                    metadata.hit_ids.len() == metadata.selected_excerpt_hashes.len(),
+                ) else {
+                    continue;
+                };
+                if found.is_some() {
+                    return Err(ContractError::WxTracePersistFailed);
+                }
+                found = Some(ReplySourceReceipt {
+                    context_hash,
+                    hit_ids: metadata.hit_ids,
+                    excerpt_hashes: metadata.selected_excerpt_hashes,
+                });
+            }
+        }
+        Ok(found)
+    }
 }
 
 fn state_name(state: ReplyState) -> &'static str {
@@ -404,6 +527,11 @@ fn validate_m2_metadata(metadata: &M2TraceMetadata) -> Result<(), ContractError>
         .is_some_and(|value| value == 0)
         || metadata.hit_ids.len() > MAX_HITS
         || metadata.hit_ids.len() != metadata.hit_scores.len()
+        || (!metadata.selected_excerpt_hashes.is_empty()
+            && metadata.hit_ids.len() != metadata.selected_excerpt_hashes.len())
+        || metadata
+            .selected_hit_count
+            .is_some_and(|count| usize::from(count) != metadata.hit_ids.len())
         || !metadata
             .hit_ids
             .iter()
@@ -421,11 +549,23 @@ fn validate_m2_metadata(metadata: &M2TraceMetadata) -> Result<(), ContractError>
             .as_deref()
             .is_none_or(is_metadata_token)
         || !metadata.query_hmac.as_deref().is_none_or(is_sha256_hex)
+        || !metadata.context_hash.as_deref().is_none_or(is_sha256_hex)
+        || !metadata
+            .selected_excerpt_hashes
+            .iter()
+            .all(|value| is_sha256_hex(value))
+        || !metadata
+            .token_counter_version
+            .as_deref()
+            .is_none_or(|value| value == "v1")
+        || metadata.payload_token_count.is_some_and(|value| value == 0)
         || !metadata
             .active_import_snapshot_hash
             .as_deref()
             .is_none_or(is_sha256_hex)
         || (metadata.retrieval_mode == RetrievalMode::NoHit && !metadata.hit_ids.is_empty())
+        || (metadata.retrieval_mode == RetrievalMode::NoHit
+            && metadata.selected_hit_count.is_some_and(|count| count != 0))
     {
         return Err(ContractError::WxTracePersistFailed);
     }
@@ -622,5 +762,59 @@ mod tests {
             ),
             Err(ContractError::WxTracePersistFailed)
         );
+    }
+
+    #[test]
+    fn source_receipt_stays_internal_while_trace_page_exposes_only_a_safe_summary() {
+        let directory = std::env::temp_dir().join(format!("wechat-trace-{}", uuid::Uuid::new_v4()));
+        let store = ReplyTraceStore::new(&directory);
+        let request_id = RequestId::new();
+        let metadata = M2TraceMetadata {
+            query_hmac: Some("a".repeat(64)),
+            catalog_generation_seq: Some(1),
+            active_import_snapshot_hash: Some("b".repeat(64)),
+            index_generation_id: Some("index-1".into()),
+            retrieval_mode: RetrievalMode::Success,
+            hit_ids: vec!["hit-1".into()],
+            hit_scores: vec![0.5],
+            model_request_id: Some("c".repeat(32)),
+            context_hash: Some("d".repeat(64)),
+            token_counter_version: Some("v1".into()),
+            payload_token_count: Some(300),
+            selected_hit_count: Some(1),
+            selected_excerpt_hashes: vec!["e".repeat(64)],
+        };
+        store
+            .append(ReplyTraceEvent::stage(
+                &request_id,
+                5,
+                ReplyState::Generating,
+                None,
+                SuggestionGeneration::new(1),
+                BindingGeneration::new(2),
+                BindingObservationVersion::new(3),
+                0,
+                None,
+                Some(metadata),
+            ))
+            .unwrap();
+
+        let receipt = store.source_receipt(&request_id).unwrap().unwrap();
+        assert_eq!(receipt.hit_ids, ["hit-1"]);
+        assert_eq!(receipt.excerpt_hashes, ["e".repeat(64)]);
+        let page = store
+            .list(TraceQuery {
+                request_id: Some(request_id),
+                occurred_after: None,
+                occurred_before: None,
+                cursor: None,
+                limit: 10,
+            })
+            .unwrap();
+        let wire = serde_json::to_string(&page).unwrap();
+        assert!(wire.contains("sourceCount"));
+        assert!(!wire.contains("hit-1"));
+        assert!(!wire.contains("hitScores"));
+        let _ = fs::remove_dir_all(directory);
     }
 }

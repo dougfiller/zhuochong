@@ -397,7 +397,7 @@ pub(crate) async fn get_wechat_settings_status(
     Ok(status_for(&config, &profiles, runtime.request_phase()))
 }
 
-/// The sole user-initiated M1 entry point. It deliberately accepts no frontend
+/// The sole user-initiated reply entry point. It deliberately accepts no frontend
 /// data, so profile, window identity, capture scope, and model choice remain
 /// in trusted backend state.
 #[tauri::command]
@@ -406,18 +406,46 @@ pub(crate) async fn generate_wechat_reply(
     state: State<'_, Arc<Mutex<AppState>>>,
     runtime: State<'_, WechatReplyRuntime>,
     coordinator: State<'_, super::CaptureCoordinator>,
+    store: State<'_, crate::knowledge::KnowledgeStore>,
+    binding: State<'_, super::binding::KnowledgeScopeBinding>,
 ) -> Result<(), AppError> {
-    #[cfg(feature = "wechat-m1")]
+    #[cfg(all(feature = "wechat-m1", not(feature = "wechat-m2")))]
     {
-        super::reply_flow::generate_wechat_reply(app, state.inner().clone(), &runtime, &coordinator)
-            .await
-            .map_err(contract_error)
+        let _ = (&store, &binding);
+        return super::reply_flow::generate_m1_wechat_reply(
+            app,
+            state.inner().clone(),
+            &runtime,
+            &coordinator,
+        )
+        .await
+        .map_err(contract_error);
     }
-    #[cfg(not(feature = "wechat-m1"))]
+    #[cfg(all(feature = "wechat-m2", not(feature = "wechat-m1")))]
     {
-        let _ = (app, state, runtime, coordinator);
+        return super::reply_flow::generate_m2_wechat_reply(
+            app,
+            state.inner().clone(),
+            &store,
+            &runtime,
+            &coordinator,
+            &binding,
+        )
+        .await
+        .map_err(contract_error);
+    }
+    #[cfg(not(any(feature = "wechat-m1", feature = "wechat-m2")))]
+    {
+        let _ = (app, state, runtime, coordinator, store, binding);
         Err(contract_error(
             super::types::ContractError::WxWindowUnsupported,
+        ))
+    }
+    #[cfg(all(feature = "wechat-m1", feature = "wechat-m2"))]
+    {
+        let _ = (app, state, runtime, coordinator, store, binding);
+        Err(contract_error(
+            super::types::ContractError::WxContractViolation,
         ))
     }
 }
@@ -453,6 +481,140 @@ pub(crate) async fn list_wechat_reply_traces(
             limit: input.limit.unwrap_or(50),
         })
         .map_err(contract_error)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ReplySourcesInput {
+    request_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReplySourceTurnDto {
+    time_ms: i64,
+    role: &'static str,
+    direction: &'static str,
+    text: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReplySourceItemDto {
+    ordinal: u8,
+    availability: &'static str,
+    reason: Option<&'static str>,
+    start_ms: Option<i64>,
+    end_ms: Option<i64>,
+    turns: Vec<ReplySourceTurnDto>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReplySourcesDto {
+    has_source_details: bool,
+    context_hash_prefix: Option<String>,
+    items: Vec<ReplySourceItemDto>,
+}
+
+#[tauri::command]
+pub(crate) async fn get_wechat_reply_sources(
+    input: ReplySourcesInput,
+    state: State<'_, Arc<Mutex<AppState>>>,
+    store: State<'_, crate::knowledge::KnowledgeStore>,
+) -> Result<ReplySourcesDto, AppError> {
+    let request_id = super::types::RequestId::parse(&input.request_id).map_err(contract_error)?;
+    let data_dir = state
+        .lock()
+        .map_err(|error| AppError::Unknown(error.to_string()))?
+        .data_dir
+        .clone();
+    let Some(receipt) = ReplyTraceStore::new(data_dir)
+        .source_receipt(&request_id)
+        .map_err(contract_error)?
+    else {
+        return Ok(ReplySourcesDto {
+            has_source_details: false,
+            context_hash_prefix: None,
+            items: Vec::new(),
+        });
+    };
+    let mut items = Vec::with_capacity(receipt.hit_ids.len());
+    for (index, (hit_id, expected_hash)) in receipt
+        .hit_ids
+        .iter()
+        .zip(receipt.excerpt_hashes.iter())
+        .enumerate()
+    {
+        let ordinal = u8::try_from(index + 1)
+            .map_err(|_| contract_error(super::types::ContractError::WxTracePersistFailed))?;
+        let current = store
+            .rehydrate_active_source_excerpt(hit_id)
+            .map_err(contract_error)?;
+        let Some(current) = current else {
+            items.push(ReplySourceItemDto {
+                ordinal,
+                availability: "unavailable",
+                reason: Some("missing"),
+                start_ms: None,
+                end_ms: None,
+                turns: Vec::new(),
+            });
+            continue;
+        };
+        let hash_turns = current
+            .lines
+            .iter()
+            .map(|line| {
+                (
+                    line.occurred_at_ms,
+                    line.role(),
+                    line.model_direction(),
+                    line.text.as_str(),
+                )
+            })
+            .collect::<Vec<_>>();
+        if super::model_contract::safe_excerpt_hash(
+            current.started_at_ms,
+            current.ended_at_ms,
+            &hash_turns,
+        )
+        .map_err(contract_error)?
+            != *expected_hash
+        {
+            items.push(ReplySourceItemDto {
+                ordinal,
+                availability: "unavailable",
+                reason: Some("changed"),
+                start_ms: None,
+                end_ms: None,
+                turns: Vec::new(),
+            });
+            continue;
+        }
+        items.push(ReplySourceItemDto {
+            ordinal,
+            availability: "available",
+            reason: None,
+            start_ms: Some(current.started_at_ms),
+            end_ms: Some(current.ended_at_ms),
+            turns: current
+                .lines
+                .into_iter()
+                .map(|line| ReplySourceTurnDto {
+                    time_ms: line.occurred_at_ms,
+                    role: line.role(),
+                    direction: line.model_direction(),
+                    text: line.text,
+                })
+                .collect(),
+        });
+    }
+    Ok(ReplySourcesDto {
+        has_source_details: true,
+        context_hash_prefix: Some(receipt.context_hash.chars().take(12).collect()),
+        items,
+    })
 }
 
 #[tauri::command]

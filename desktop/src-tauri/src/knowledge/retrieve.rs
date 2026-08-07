@@ -124,6 +124,61 @@ struct LocalKnowledgeHit {
     excerpt: String,
     token_count: u32,
     score: f64,
+    context_lines: Vec<RetrievedContextLine>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RetrievedContextDirection {
+    Self_,
+    Other,
+}
+
+impl RetrievedContextDirection {
+    pub(crate) fn role(self) -> &'static str {
+        match self {
+            Self::Self_ => "self",
+            Self::Other => "other",
+        }
+    }
+
+    pub(crate) fn direction(self) -> &'static str {
+        match self {
+            Self::Self_ => "outgoing",
+            Self::Other => "incoming",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct RetrievedContextLine {
+    pub(crate) occurred_at_ms: i64,
+    pub(crate) direction: RetrievedContextDirection,
+    pub(crate) text: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct RetrievedContextHit {
+    pub(crate) hit_id: String,
+    pub(crate) score: f64,
+    pub(crate) started_at_ms: i64,
+    pub(crate) ended_at_ms: i64,
+    pub(crate) lines: Vec<RetrievedContextLine>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct RetrievedContextParts {
+    pub(crate) request_id: RequestId,
+    pub(crate) query: String,
+    pub(crate) binding_generation: BindingGeneration,
+    pub(crate) catalog_generation: u64,
+    pub(crate) index_generation_id: String,
+    pub(crate) active_snapshot_hash: String,
+    pub(crate) frozen_result_hash: String,
+    pub(crate) status: RetrievalStatus,
+    pub(crate) retrieval_mode: RetrievalMode,
+    pub(crate) token_counter_version: String,
+    pub(crate) token_budget: u32,
+    pub(crate) hits: Vec<RetrievedContextHit>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -137,6 +192,8 @@ pub(crate) struct RetrievedReply {
     frozen_result_hash: String,
     status: RetrievalStatus,
     retrieval_mode: RetrievalMode,
+    token_counter_version: String,
+    token_budget: u32,
     hits: Vec<LocalKnowledgeHit>,
     elapsed_ms: u64,
 }
@@ -223,6 +280,8 @@ impl RetrievedReply {
             frozen_result_hash,
             status,
             retrieval_mode,
+            token_counter_version: request.token_counter_version.clone(),
+            token_budget: request.token_budget,
             hits,
             elapsed_ms,
         })
@@ -250,6 +309,33 @@ impl RetrievedReply {
 
     pub(crate) fn excerpts(&self) -> Vec<String> {
         self.hits.iter().map(|hit| hit.excerpt.clone()).collect()
+    }
+
+    pub(crate) fn into_context_parts(self) -> RetrievedContextParts {
+        RetrievedContextParts {
+            request_id: self.request_id,
+            query: self.normalized_query,
+            binding_generation: self.binding_generation,
+            catalog_generation: self.catalog_generation,
+            index_generation_id: self.index_generation_id,
+            active_snapshot_hash: self.active_snapshot_hash,
+            frozen_result_hash: self.frozen_result_hash,
+            status: self.status,
+            retrieval_mode: self.retrieval_mode,
+            token_counter_version: self.token_counter_version,
+            token_budget: self.token_budget,
+            hits: self
+                .hits
+                .into_iter()
+                .map(|hit| RetrievedContextHit {
+                    hit_id: hit.knowledge_chunk_id,
+                    score: quantize_score(hit.score),
+                    started_at_ms: hit.source_time_range.started_at_ms,
+                    ended_at_ms: hit.source_time_range.ended_at_ms,
+                    lines: hit.context_lines,
+                })
+                .collect(),
+        }
     }
 }
 
@@ -567,15 +653,31 @@ fn assemble_hits(
             return Err(KnowledgeError::RetrievalFailed);
         }
         validate_source_paths(&payload.source_paths)?;
+        if payload.context_lines.is_empty()
+            || payload
+                .context_lines
+                .first()
+                .map(|line| line.occurred_at_ms)
+                != Some(payload.started_at_ms)
+            || payload.context_lines.last().map(|line| line.occurred_at_ms)
+                != Some(payload.ended_at_ms)
+        {
+            return Err(KnowledgeError::RetrievalFailed);
+        }
         let cap = remaining.min(MAX_HIT_TOKENS);
         if cap == 0 {
             break;
         }
-        let excerpt = truncate_utf8(&payload.content, cap);
-        if excerpt.is_empty() {
+        let token_count = token_count_v1(&payload.content);
+        if token_count == 0 || token_count > MAX_HIT_TOKENS {
             return Err(KnowledgeError::RetrievalFailed);
         }
-        let token_count = token_count_v1(&excerpt);
+        // A model-visible hit is an indivisible sequence of complete turns.
+        // Never truncate only the rendered excerpt while retaining longer
+        // structured turns: if the next hit does not fit, omit that tail hit.
+        if token_count > cap {
+            break;
+        }
         remaining = remaining
             .checked_sub(token_count)
             .ok_or(KnowledgeError::RetrievalFailed)?;
@@ -591,9 +693,21 @@ fn assemble_hits(
                 ended_at_ms: payload.ended_at_ms,
             },
             source_paths: payload.source_paths,
-            excerpt,
+            excerpt: payload.content,
             token_count: u32::try_from(token_count).map_err(|_| KnowledgeError::RetrievalFailed)?,
             score: ranked.score,
+            context_lines: payload
+                .context_lines
+                .into_iter()
+                .map(|line| RetrievedContextLine {
+                    occurred_at_ms: line.occurred_at_ms,
+                    direction: match line.direction {
+                        super::chunk::Direction::Self_ => RetrievedContextDirection::Self_,
+                        super::chunk::Direction::Other => RetrievedContextDirection::Other,
+                    },
+                    text: line.text,
+                })
+                .collect(),
         });
     }
     Ok(hits)
@@ -685,6 +799,13 @@ fn result_hash(
         for field in [hit.excerpt.as_str(), &hit.token_count.to_string(), &score] {
             hash_field(&mut hasher, field);
         }
+        hash_field(&mut hasher, &hit.context_lines.len().to_string());
+        for line in &hit.context_lines {
+            hash_field(&mut hasher, &line.occurred_at_ms.to_string());
+            hash_field(&mut hasher, line.direction.role());
+            hash_field(&mut hasher, line.direction.direction());
+            hash_field(&mut hasher, &line.text);
+        }
     }
     Ok(hex::encode(hasher.finalize()))
 }
@@ -755,6 +876,11 @@ pub(crate) fn retrieval_fixture(
                 excerpt: (*excerpt).into(),
                 token_count: *tokens,
                 score: 1.0,
+                context_lines: vec![RetrievedContextLine {
+                    occurred_at_ms: 1,
+                    direction: RetrievedContextDirection::Other,
+                    text: (*excerpt).into(),
+                }],
             })
         })
         .collect();
@@ -764,10 +890,12 @@ pub(crate) fn retrieval_fixture(
         binding_generation: BindingGeneration::new(1),
         catalog_generation: 1,
         index_generation_id: "fixture-index".into(),
-        active_snapshot_hash: "fixture-snapshot".into(),
-        frozen_result_hash: "fixture-result".into(),
+        active_snapshot_hash: "a".repeat(64),
+        frozen_result_hash: "b".repeat(64),
         status,
         retrieval_mode: RetrievalMode::Hybrid,
+        token_counter_version: TOKEN_COUNTER_VERSION.into(),
+        token_budget,
         hits,
         elapsed_ms: 0,
     })
@@ -1203,6 +1331,18 @@ mod tests {
             excerpt: "虚构正文一".into(),
             token_count: 15,
             score: 0.5,
+            context_lines: vec![
+                RetrievedContextLine {
+                    occurred_at_ms: 1,
+                    direction: RetrievedContextDirection::Other,
+                    text: "虚构正文一".into(),
+                },
+                RetrievedContextLine {
+                    occurred_at_ms: 2,
+                    direction: RetrievedContextDirection::Self_,
+                    text: "虚构正文二".into(),
+                },
+            ],
         };
         let second = LocalKnowledgeHit {
             knowledge_chunk_id: "chunk-b".into(),
@@ -1296,6 +1436,12 @@ mod tests {
         changed[0].score += 0.01;
         hit_variants.push(("score", changed));
         let mut changed = base_hits.clone();
+        changed[0].context_lines[0].text = "另一条实际入模正文".into();
+        hit_variants.push(("model context text", changed));
+        let mut changed = base_hits.clone();
+        changed[0].context_lines[0].direction = RetrievedContextDirection::Self_;
+        hit_variants.push(("model context direction", changed));
+        let mut changed = base_hits.clone();
         changed.reverse();
         hit_variants.push(("hit order", changed));
         for (field, changed) in hit_variants {
@@ -1370,6 +1516,13 @@ mod tests {
         assert_eq!(reply.hits.len(), 1);
         assert_eq!(reply.hits[0].conversation_id, fixture_scope_key());
         assert_eq!(reply.hits[0].source_paths, ["archive/messages.jsonl"]);
+        let source = store
+            .rehydrate_active_source_excerpt(&reply.hits[0].knowledge_chunk_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(source.lines.len(), 1);
+        assert_eq!(source.lines[0].text, "周五同步虚构项目进度");
+        assert!(!source.lines[0].text.contains("fixture-sender"));
         assert_eq!(
             calls.lock().unwrap().as_slice(),
             ["/api/tags", "/api/embed"]
@@ -1831,7 +1984,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn production_assembly_enforces_the_total_utf8_budget() {
+    async fn production_assembly_omits_a_tail_hit_instead_of_leaking_uncapped_turns() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         drop(listener);
@@ -1839,18 +1992,25 @@ mod tests {
             format!("http://{address}"),
             &[
                 format!("虚构项目{}", "a".repeat(260)),
-                format!("虚构项目{}", "b".repeat(260)),
+                format!("虚构项目{}TAIL_CANARY", "b".repeat(260)),
             ],
         );
 
         let reply = store.knowledge_retrieve(request("虚构项目")).await.unwrap();
         assert_eq!(reply.status, RetrievalStatus::Success);
-        assert_eq!(reply.hits.len(), 2);
-        assert_eq!(
-            reply.hits.iter().map(|hit| hit.token_count).sum::<u32>(),
-            512
-        );
-        assert!(reply.hits[0].token_count > reply.hits[1].token_count);
+        assert_eq!(reply.hits.len(), 1);
+        assert!(reply.hits[0].token_count <= 512);
+        let result_hash = reply.frozen_result_hash().to_owned();
+        let parts = reply.into_context_parts();
+        let actual_model_text = parts
+            .hits
+            .iter()
+            .flat_map(|hit| hit.lines.iter())
+            .map(|line| line.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(!actual_model_text.contains("TAIL_CANARY"));
+        assert_eq!(parts.frozen_result_hash, result_hash);
         let _ = fs::remove_dir_all(data_dir);
     }
 
