@@ -21,14 +21,47 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
+use work_review_core::semantic::{
+    decode_embedding_exact, normalize_embedding_strict, StreamingCosineTopK,
+};
 
 const MAX_READERS: usize = 4;
 const READER_DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const UNIT_NORM_TOLERANCE: f64 = 1e-4;
 
 #[cfg(test)]
 thread_local! {
     static FAIL_ON_APPEND_BATCH: Cell<Option<usize>> = const { Cell::new(None) };
     static FAIL_CHUNK_WRITE_STEP: Cell<Option<u8>> = const { Cell::new(None) };
+}
+
+#[cfg(test)]
+static ACTIVE_VECTOR_AFTER_SCAN_HOOK: Mutex<Option<Box<dyn FnOnce() + Send>>> = Mutex::new(None);
+#[cfg(test)]
+static ACTIVE_FTS_AFTER_SCAN_HOOK: Mutex<Option<Box<dyn FnOnce() + Send>>> = Mutex::new(None);
+
+#[cfg(test)]
+fn set_active_vector_after_scan_hook(hook: impl FnOnce() + Send + 'static) {
+    *ACTIVE_VECTOR_AFTER_SCAN_HOOK.lock().unwrap() = Some(Box::new(hook));
+}
+
+#[cfg(test)]
+fn set_active_fts_after_scan_hook(hook: impl FnOnce() + Send + 'static) {
+    *ACTIVE_FTS_AFTER_SCAN_HOOK.lock().unwrap() = Some(Box::new(hook));
+}
+
+#[cfg(test)]
+fn run_active_vector_after_scan_hook() {
+    if let Some(hook) = ACTIVE_VECTOR_AFTER_SCAN_HOOK.lock().unwrap().take() {
+        hook();
+    }
+}
+
+#[cfg(test)]
+fn run_active_fts_after_scan_hook() {
+    if let Some(hook) = ACTIVE_FTS_AFTER_SCAN_HOOK.lock().unwrap().take() {
+        hook();
+    }
 }
 
 #[cfg(test)]
@@ -224,6 +257,40 @@ pub(crate) struct FrozenIndexBuild {
     pub(crate) spec: FrozenIndexBuildSpec,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct KnowledgeEmbeddingConfig {
+    pub(crate) provider: String,
+    pub(crate) endpoint: String,
+    pub(crate) model: String,
+    pub(crate) fingerprint: String,
+    pub(crate) dimension: u32,
+    pub(crate) chunk_schema_version: String,
+    pub(crate) token_counter_version: String,
+    pub(crate) fts_pretoken_version: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FrozenEmbeddingRead {
+    pub(crate) catalog_generation: Option<u64>,
+    pub(crate) index_generation_id: String,
+    pub(crate) snapshot_hash: String,
+    pub(crate) config: KnowledgeEmbeddingConfig,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct PendingEmbeddingChunk {
+    pub(crate) chunk_key: String,
+    pub(crate) content_hash: String,
+    pub(crate) content: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct EncodedEmbedding {
+    pub(crate) chunk_key: String,
+    pub(crate) content_hash: String,
+    pub(crate) blob: Vec<u8>,
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) struct StableConversationKey {
     pub(crate) account_stable_id: String,
@@ -254,6 +321,14 @@ pub(crate) struct ActiveFtsRequest {
     pub(crate) top_k: u8,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct ActiveVectorRequest {
+    pub(crate) scope: Vec<StableConversationKey>,
+    pub(crate) from_ms: Option<i64>,
+    pub(crate) to_ms: Option<i64>,
+    pub(crate) top_k: u8,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct FtsHit {
     pub(crate) chunk_key: String,
@@ -262,6 +337,16 @@ pub(crate) struct FtsHit {
     pub(crate) started_at_ms: i64,
     pub(crate) ended_at_ms: i64,
     pub(crate) rank: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct KnowledgeVectorHit {
+    pub(crate) chunk_key: String,
+    pub(crate) content: String,
+    pub(crate) token_count: u32,
+    pub(crate) started_at_ms: i64,
+    pub(crate) ended_at_ms: i64,
+    pub(crate) score: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -1168,13 +1253,264 @@ impl KnowledgeStore {
         })
     }
 
+    pub(crate) fn read_building_embedding_config(
+        &self,
+        index_generation_id: &str,
+    ) -> Result<FrozenEmbeddingRead, ContractError> {
+        self.with_reader(|connection| {
+            if !mapping_is_publishable(connection, index_generation_id)? {
+                return Err(ContractError::KbNotReady);
+            }
+            connection
+                .query_row(
+                    "SELECT id,snapshot_hash,schema_version,token_counter_version,fts_pretoken_version,embedding_metadata_json FROM knowledge_index_generations WHERE id=?1 AND status='building'",
+                    [index_generation_id],
+                    |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, String>(4)?,
+                            row.get::<_, String>(5)?,
+                        ))
+                    },
+                )
+                .map_err(|_| ContractError::KbNotReady)
+                .and_then(|row| frozen_embedding_read(None, row).map_err(|_| ContractError::KbNotReady))
+        })
+    }
+
+    pub(crate) fn read_active_embedding_config(
+        &self,
+    ) -> Result<FrozenEmbeddingRead, ContractError> {
+        self.with_reader(|connection| {
+            connection
+                .query_row(
+                    "SELECT catalog.catalog_generation_seq,generation.id,generation.snapshot_hash,generation.schema_version,generation.token_counter_version,generation.fts_pretoken_version,generation.embedding_metadata_json FROM knowledge_catalog_state catalog JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' WHERE catalog.singleton_id=1",
+                    [],
+                    |row| {
+                        Ok((
+                            row.get::<_, u64>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, String>(4)?,
+                            row.get::<_, String>(5)?,
+                            row.get::<_, String>(6)?,
+                        ))
+                    },
+                )
+                .map_err(|_| ContractError::KbNotReady)
+                .and_then(|row| {
+                    frozen_embedding_read(
+                        Some(row.0),
+                        (row.1, row.2, row.3, row.4, row.5, row.6),
+                    )
+                    .map_err(|_| ContractError::KbNotReady)
+                })
+        })
+    }
+
+    pub(crate) fn list_pending_build_embeddings(
+        &self,
+        index_generation_id: &str,
+        after_chunk_key: Option<&str>,
+        limit: u8,
+    ) -> Result<Vec<PendingEmbeddingChunk>, ContractError> {
+        if !(1..=32).contains(&limit) {
+            return Err(ContractError::KbNotReady);
+        }
+        self.read_building_embedding_config(index_generation_id)?;
+        self.with_reader(|connection| {
+            let mut statement = connection
+                .prepare(
+                    "SELECT chunk.chunk_key,chunk.content_hash,chunk.content FROM knowledge_chunks chunk JOIN knowledge_index_generations generation ON generation.id=chunk.index_generation_id AND generation.status='building' WHERE chunk.index_generation_id=?1 AND chunk.embedding IS NULL AND (?2 IS NULL OR chunk.chunk_key>?2) ORDER BY chunk.chunk_key LIMIT ?3",
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            let rows = statement
+                .query_map(
+                    params![index_generation_id, after_chunk_key, i64::from(limit)],
+                    |row| {
+                        Ok(PendingEmbeddingChunk {
+                            chunk_key: row.get(0)?,
+                            content_hash: row.get(1)?,
+                            content: row.get(2)?,
+                        })
+                    },
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            rows
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| ContractError::KbNotReady)
+        })
+    }
+
+    pub(crate) fn write_build_embeddings(
+        &self,
+        index_generation_id: &str,
+        dimension: u32,
+        rows: &[EncodedEmbedding],
+    ) -> Result<(), ContractError> {
+        if rows.is_empty() || rows.len() > 32 {
+            return Err(ContractError::KbNotReady);
+        }
+        let expected_dimension =
+            usize::try_from(dimension).map_err(|_| ContractError::KbNotReady)?;
+        let mut keys = BTreeSet::new();
+        for row in rows {
+            if !keys.insert(row.chunk_key.as_str())
+                || decode_unit_embedding(&row.blob, expected_dimension).is_err()
+            {
+                return Err(ContractError::KbNotReady);
+            }
+        }
+        self.with_writer(|connection| {
+            let transaction = connection
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(|_| ContractError::KbNotReady)?;
+            let frozen = load_frozen_build(&transaction, index_generation_id)?;
+            if frozen.spec.embedding.dimension != dimension
+                || !mapping_is_publishable(&transaction, index_generation_id)?
+            {
+                return Err(ContractError::KbNotReady);
+            }
+            for row in rows {
+                let changed = transaction
+                    .execute(
+                        "UPDATE knowledge_chunks SET embedding=?1 WHERE index_generation_id=?2 AND chunk_key=?3 AND content_hash=?4 AND embedding IS NULL",
+                        params![row.blob, index_generation_id, row.chunk_key, row.content_hash],
+                    )
+                    .map_err(|_| ContractError::KbNotReady)?;
+                if changed != 1 {
+                    return Err(ContractError::KbNotReady);
+                }
+            }
+            transaction.commit().map_err(|_| ContractError::KbNotReady)
+        })
+    }
+
+    pub(crate) fn search_active_vectors(
+        &self,
+        request: ActiveVectorRequest,
+        query_vector: &[f32],
+    ) -> Result<Vec<KnowledgeVectorHit>, ContractError> {
+        self.search_active_vectors_for_generation(request, query_vector, None)
+    }
+
+    pub(crate) fn search_active_vectors_for_generation(
+        &self,
+        request: ActiveVectorRequest,
+        query_vector: &[f32],
+        expected: Option<&FrozenEmbeddingRead>,
+    ) -> Result<Vec<KnowledgeVectorHit>, ContractError> {
+        validate_active_scope(
+            &request.scope,
+            request.from_ms,
+            request.to_ms,
+            request.top_k,
+        )?;
+        self.with_reader(|connection| {
+            let start = load_active_embedding_read(connection).map_err(|error| {
+                if expected.is_some() {
+                    ContractError::KbRetrievalFailed
+                } else {
+                    error
+                }
+            })?;
+            ensure_expected_active(&start, expected)?;
+            let normalized_query = normalize_embedding_strict(query_vector.to_vec())
+                .map_err(|_| ContractError::KbRetrievalFailed)?;
+            if normalized_query.len() != start.config.dimension as usize {
+                return Err(ContractError::KbRetrievalFailed);
+            }
+            ensure_scope_resolved(connection, &request.scope)?;
+            let values = std::iter::repeat("(?,?)")
+                .take(request.scope.len())
+                .collect::<Vec<_>>()
+                .join(",");
+            let sql = format!(
+                "WITH requested(account_stable_id,conversation_stable_id) AS (VALUES {values}) SELECT chunk.chunk_key,chunk.content,chunk.token_count,chunk.started_at_ms,chunk.ended_at_ms,chunk.embedding FROM knowledge_catalog_state catalog JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' AND catalog.catalog_generation_seq=? AND generation.id=? JOIN knowledge_chunks chunk ON chunk.index_generation_id=generation.id JOIN knowledge_conversations conversation ON conversation.id=chunk.conversation_id JOIN requested scope ON scope.account_stable_id=conversation.account_stable_id AND scope.conversation_stable_id=conversation.conversation_stable_id WHERE (? IS NULL OR chunk.ended_at_ms>=?) AND (? IS NULL OR chunk.started_at_ms<?) AND NOT EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.conversation_id=chunk.conversation_id OR denial.message_id IN (SELECT message_id FROM knowledge_chunk_messages WHERE chunk_id=chunk.id)) ORDER BY chunk.chunk_key"
+            );
+            let mut parameters = Vec::new();
+            for scope in &request.scope {
+                parameters.push(Value::Text(scope.account_stable_id.clone()));
+                parameters.push(Value::Text(scope.conversation_stable_id.clone()));
+            }
+            parameters.push(Value::Integer(
+                start.catalog_generation.ok_or(ContractError::KbRetrievalFailed)? as i64,
+            ));
+            parameters.push(Value::Text(start.index_generation_id.clone()));
+            parameters.push(request.from_ms.map(Value::Integer).unwrap_or(Value::Null));
+            parameters.push(request.from_ms.map(Value::Integer).unwrap_or(Value::Null));
+            parameters.push(request.to_ms.map(Value::Integer).unwrap_or(Value::Null));
+            parameters.push(request.to_ms.map(Value::Integer).unwrap_or(Value::Null));
+            let mut statement = connection
+                .prepare(&sql)
+                .map_err(|_| ContractError::KbRetrievalFailed)?;
+            let mut sqlite_rows = statement
+                .query(params_from_iter(parameters))
+                .map_err(|_| ContractError::KbRetrievalFailed)?;
+            let candidate_k = usize::from(request.top_k).saturating_mul(4).max(20);
+            let mut top = StreamingCosineTopK::new(candidate_k);
+            while let Some(row) = sqlite_rows
+                .next()
+                .map_err(|_| ContractError::KbRetrievalFailed)?
+            {
+                let blob = row
+                    .get::<_, Option<Vec<u8>>>(5)
+                    .map_err(|_| ContractError::KbRetrievalFailed)?
+                    .ok_or(ContractError::KbRetrievalFailed)?;
+                let vector = decode_unit_embedding(&blob, start.config.dimension as usize)
+                    .map_err(|_| ContractError::KbRetrievalFailed)?;
+                let hit = KnowledgeVectorHit {
+                    chunk_key: row.get(0).map_err(|_| ContractError::KbRetrievalFailed)?,
+                    content: row.get(1).map_err(|_| ContractError::KbRetrievalFailed)?,
+                    token_count: row
+                        .get::<_, i64>(2)
+                        .ok()
+                        .and_then(|value| u32::try_from(value).ok())
+                        .ok_or(ContractError::KbRetrievalFailed)?,
+                    started_at_ms: row.get(3).map_err(|_| ContractError::KbRetrievalFailed)?,
+                    ended_at_ms: row.get(4).map_err(|_| ContractError::KbRetrievalFailed)?,
+                    score: 0.0,
+                };
+                top.push(hit, &vector, &normalized_query)
+                    .map_err(|_| ContractError::KbRetrievalFailed)?;
+            }
+            drop(sqlite_rows);
+            drop(statement);
+            #[cfg(test)]
+            run_active_vector_after_scan_hook();
+            let end = load_active_embedding_read(connection)
+                .map_err(|_| ContractError::KbRetrievalFailed)?;
+            ensure_same_active(&start, &end)?;
+            Ok(top
+                .into_sorted()
+                .into_iter()
+                .map(|entry| KnowledgeVectorHit {
+                    score: entry.score,
+                    ..entry.item
+                })
+                .collect())
+        })
+    }
+
     pub(crate) fn search_active_fts(
         &self,
         request: ActiveFtsRequest,
     ) -> Result<Vec<FtsHit>, ContractError> {
+        self.search_active_fts_for_generation(request, None)
+    }
+
+    pub(crate) fn search_active_fts_for_generation(
+        &self,
+        request: ActiveFtsRequest,
+        expected: Option<&FrozenEmbeddingRead>,
+    ) -> Result<Vec<FtsHit>, ContractError> {
         if request.scope.is_empty()
             || request.scope.len() > 32
-            || !(1..=12).contains(&request.top_k)
+            || !(1..=48).contains(&request.top_k)
         {
             return Err(ContractError::KbScopeUnresolved);
         }
@@ -1190,20 +1526,29 @@ impl KnowledgeStore {
             return Err(ContractError::KbScopeUnresolved);
         }
         self.with_reader(|connection| {
-            let active_pretoken_version: Option<String> = connection.query_row(
-                "SELECT generation.fts_pretoken_version FROM knowledge_catalog_state catalog JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' WHERE catalog.singleton_id=1",
-                [], |row| row.get(0),
-            ).optional().map_err(|_| ContractError::KbRetrievalFailed)?;
-            let active_pretoken_version = active_pretoken_version.ok_or(ContractError::KbNotReady)?;
+            let start = load_active_embedding_read(connection).map_err(|error| {
+                if expected.is_some() {
+                    ContractError::KbRetrievalFailed
+                } else {
+                    error
+                }
+            })?;
+            ensure_expected_active(&start, expected)?;
+            let active_pretoken_version = start.config.fts_pretoken_version.clone();
+            let catalog_generation = start
+                .catalog_generation
+                .ok_or(ContractError::KbRetrievalFailed)?;
             let values = std::iter::repeat("(?,?)").take(request.scope.len()).collect::<Vec<_>>().join(",");
             let scope_sql = format!(
-                "WITH requested(account_stable_id,conversation_stable_id) AS (VALUES {values}) SELECT COUNT(*) FROM requested JOIN knowledge_conversations conversation ON conversation.account_stable_id=requested.account_stable_id AND conversation.conversation_stable_id=requested.conversation_stable_id JOIN knowledge_catalog_state catalog ON catalog.singleton_id=1 JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=generation.id AND mapping.conversation_id=conversation.id"
+                "WITH requested(account_stable_id,conversation_stable_id) AS (VALUES {values}) SELECT COUNT(*) FROM requested JOIN knowledge_conversations conversation ON conversation.account_stable_id=requested.account_stable_id AND conversation.conversation_stable_id=requested.conversation_stable_id JOIN knowledge_catalog_state catalog ON catalog.singleton_id=1 AND catalog.catalog_generation_seq=? JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' AND generation.id=? JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=generation.id AND mapping.conversation_id=conversation.id"
             );
             let mut scope_parameters = Vec::with_capacity(request.scope.len() * 2);
             for scope in &request.scope {
                 scope_parameters.push(Value::Text(scope.account_stable_id.clone()));
                 scope_parameters.push(Value::Text(scope.conversation_stable_id.clone()));
             }
+            scope_parameters.push(Value::Integer(catalog_generation as i64));
+            scope_parameters.push(Value::Text(start.index_generation_id.clone()));
             let resolved: i64 = connection.query_row(
                 &scope_sql,
                 params_from_iter(scope_parameters),
@@ -1215,15 +1560,22 @@ impl KnowledgeStore {
             let denial: Option<i64> = connection.query_row("SELECT 1 FROM knowledge_denials LIMIT 1", [], |row| row.get(0)).optional().map_err(|_| ContractError::KbRetrievalFailed)?;
             if denial.is_some() { return Err(ContractError::KbNotReady); }
             let match_query = fts_match_query(&active_pretoken_version, &request.query)?;
-            let Some(match_query) = match_query else { return Ok(Vec::new()); };
+            let Some(match_query) = match_query else {
+                let end = load_active_embedding_read(connection)
+                    .map_err(|_| ContractError::KbRetrievalFailed)?;
+                ensure_same_active(&start, &end)?;
+                return Ok(Vec::new());
+            };
             let sql = format!(
-                "WITH requested(account_stable_id,conversation_stable_id) AS (VALUES {values}) SELECT chunk.chunk_key,chunk.content,chunk.token_count,chunk.started_at_ms,chunk.ended_at_ms,knowledge_chunks_fts.rank FROM knowledge_catalog_state catalog JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' JOIN knowledge_chunks_fts ON knowledge_chunks_fts.index_generation_id=generation.id JOIN knowledge_chunks chunk ON chunk.id=knowledge_chunks_fts.chunk_id AND chunk.index_generation_id=knowledge_chunks_fts.index_generation_id JOIN knowledge_conversations conversation ON conversation.id=chunk.conversation_id JOIN requested scope ON scope.account_stable_id=conversation.account_stable_id AND scope.conversation_stable_id=conversation.conversation_stable_id WHERE knowledge_chunks_fts MATCH ? AND (? IS NULL OR chunk.ended_at_ms>=?) AND (? IS NULL OR chunk.started_at_ms<?) AND NOT EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.conversation_id=chunk.conversation_id OR denial.message_id IN (SELECT message_id FROM knowledge_chunk_messages WHERE chunk_id=chunk.id)) ORDER BY knowledge_chunks_fts.rank,chunk.chunk_key LIMIT ?"
+                "WITH requested(account_stable_id,conversation_stable_id) AS (VALUES {values}) SELECT chunk.chunk_key,chunk.content,chunk.token_count,chunk.started_at_ms,chunk.ended_at_ms,knowledge_chunks_fts.rank FROM knowledge_catalog_state catalog JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' AND catalog.catalog_generation_seq=? AND generation.id=? JOIN knowledge_chunks_fts ON knowledge_chunks_fts.index_generation_id=generation.id JOIN knowledge_chunks chunk ON chunk.id=knowledge_chunks_fts.chunk_id AND chunk.index_generation_id=knowledge_chunks_fts.index_generation_id JOIN knowledge_conversations conversation ON conversation.id=chunk.conversation_id JOIN requested scope ON scope.account_stable_id=conversation.account_stable_id AND scope.conversation_stable_id=conversation.conversation_stable_id WHERE knowledge_chunks_fts MATCH ? AND (? IS NULL OR chunk.ended_at_ms>=?) AND (? IS NULL OR chunk.started_at_ms<?) AND NOT EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.conversation_id=chunk.conversation_id OR denial.message_id IN (SELECT message_id FROM knowledge_chunk_messages WHERE chunk_id=chunk.id)) ORDER BY knowledge_chunks_fts.rank,chunk.chunk_key LIMIT ?"
             );
             let mut parameters = Vec::new();
             for scope in &request.scope {
                 parameters.push(Value::Text(scope.account_stable_id.clone()));
                 parameters.push(Value::Text(scope.conversation_stable_id.clone()));
             }
+            parameters.push(Value::Integer(catalog_generation as i64));
+            parameters.push(Value::Text(start.index_generation_id.clone()));
             parameters.push(Value::Text(match_query));
             parameters.push(request.from_ms.map(Value::Integer).unwrap_or(Value::Null));
             parameters.push(request.from_ms.map(Value::Integer).unwrap_or(Value::Null));
@@ -1236,7 +1588,55 @@ impl KnowledgeStore {
                 started_at_ms: row.get(3)?, ended_at_ms: row.get(4)?, rank: row.get(5)?,
             })).map_err(|_| ContractError::KbRetrievalFailed)?
                 .collect::<Result<Vec<_>, _>>().map_err(|_| ContractError::KbRetrievalFailed)?;
+            drop(statement);
+            #[cfg(test)]
+            run_active_fts_after_scan_hook();
+            let end = load_active_embedding_read(connection)
+                .map_err(|_| ContractError::KbRetrievalFailed)?;
+            ensure_same_active(&start, &end)?;
             Ok(hits)
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn activate_completed_build_for_test(
+        &self,
+        index_generation_id: &str,
+    ) -> Result<(), ContractError> {
+        self.with_writer(|connection| {
+            let transaction = connection
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(|_| ContractError::KbNotReady)?;
+            let pending: i64 = transaction
+                .query_row(
+                    "SELECT COUNT(*) FROM knowledge_chunks WHERE index_generation_id=?1 AND embedding IS NULL",
+                    [index_generation_id],
+                    |row| row.get(0),
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            if pending != 0 {
+                return Err(ContractError::KbNotReady);
+            }
+            let snapshot_hash: String = transaction
+                .query_row(
+                    "SELECT snapshot_hash FROM knowledge_index_generations WHERE id=?1 AND status='building'",
+                    [index_generation_id],
+                    |row| row.get(0),
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "UPDATE knowledge_index_generations SET status='ready' WHERE id=?1 AND status='building'",
+                    [index_generation_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "UPDATE knowledge_catalog_state SET catalog_generation_seq=catalog_generation_seq+1,active_index_generation_id=?1,active_snapshot_hash=?2 WHERE singleton_id=1",
+                    params![index_generation_id, snapshot_hash],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction.commit().map_err(|_| ContractError::KbNotReady)
         })
     }
 
@@ -1554,6 +1954,147 @@ fn validate_build_spec(spec: &FrozenIndexBuildSpec) -> Result<(), ContractError>
         model: spec.embedding.model.clone(),
     })
     .map_err(|_| ContractError::KbNotReady)
+}
+
+fn frozen_embedding_read(
+    catalog_generation: Option<u64>,
+    row: (String, String, String, String, String, String),
+) -> Result<FrozenEmbeddingRead, ContractError> {
+    let embedding: FrozenEmbeddingIdentity =
+        serde_json::from_str(&row.5).map_err(|_| ContractError::KbNotReady)?;
+    let candidate = LocalEmbeddingConfig {
+        provider: embedding.provider.clone(),
+        endpoint: embedding.endpoint.clone(),
+        model: embedding.model.clone(),
+    };
+    validate_local_embedding(&candidate).map_err(|_| ContractError::KbNotReady)?;
+    if embedding.fingerprint.trim().is_empty()
+        || embedding.dimension == 0
+        || row.2 != CHUNK_SCHEMA_VERSION
+        || row.3 != TOKEN_COUNTER_VERSION
+        || row.4 != FTS_PRETOKEN_VERSION
+    {
+        return Err(ContractError::KbNotReady);
+    }
+    Ok(FrozenEmbeddingRead {
+        catalog_generation,
+        index_generation_id: row.0,
+        snapshot_hash: row.1,
+        config: KnowledgeEmbeddingConfig {
+            provider: embedding.provider,
+            endpoint: embedding.endpoint,
+            model: embedding.model,
+            fingerprint: embedding.fingerprint,
+            dimension: embedding.dimension,
+            chunk_schema_version: row.2,
+            token_counter_version: row.3,
+            fts_pretoken_version: row.4,
+        },
+    })
+}
+
+fn decode_unit_embedding(blob: &[u8], dimension: usize) -> Result<Vec<f32>, ContractError> {
+    let vector = decode_embedding_exact(blob, dimension).map_err(|_| ContractError::KbNotReady)?;
+    let norm = vector
+        .iter()
+        .map(|value| f64::from(*value) * f64::from(*value))
+        .sum::<f64>()
+        .sqrt();
+    if !norm.is_finite()
+        || norm <= f64::from(f32::EPSILON)
+        || (norm - 1.0).abs() > UNIT_NORM_TOLERANCE
+    {
+        return Err(ContractError::KbNotReady);
+    }
+    Ok(vector)
+}
+
+fn ensure_expected_active(
+    actual: &FrozenEmbeddingRead,
+    expected: Option<&FrozenEmbeddingRead>,
+) -> Result<(), ContractError> {
+    if let Some(expected) = expected {
+        ensure_same_active(expected, actual)?;
+    }
+    Ok(())
+}
+
+fn ensure_same_active(
+    expected: &FrozenEmbeddingRead,
+    actual: &FrozenEmbeddingRead,
+) -> Result<(), ContractError> {
+    if expected.catalog_generation != actual.catalog_generation
+        || expected.index_generation_id != actual.index_generation_id
+    {
+        return Err(ContractError::KbRetrievalFailed);
+    }
+    Ok(())
+}
+
+fn load_active_embedding_read(
+    connection: &Connection,
+) -> Result<FrozenEmbeddingRead, ContractError> {
+    let row = connection
+        .query_row(
+            "SELECT catalog.catalog_generation_seq,generation.id,generation.snapshot_hash,generation.schema_version,generation.token_counter_version,generation.fts_pretoken_version,generation.embedding_metadata_json FROM knowledge_catalog_state catalog JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' WHERE catalog.singleton_id=1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, u64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                ))
+            },
+        )
+        .map_err(|_| ContractError::KbNotReady)?;
+    frozen_embedding_read(Some(row.0), (row.1, row.2, row.3, row.4, row.5, row.6))
+}
+
+fn validate_active_scope(
+    scope: &[StableConversationKey],
+    from_ms: Option<i64>,
+    to_ms: Option<i64>,
+    top_k: u8,
+) -> Result<(), ContractError> {
+    if scope.is_empty() || scope.len() > 32 || !(1..=12).contains(&top_k) {
+        return Err(ContractError::KbScopeUnresolved);
+    }
+    if from_ms.zip(to_ms).is_some_and(|(from, to)| from >= to) {
+        return Err(ContractError::KbRetrievalFailed);
+    }
+    if scope.iter().cloned().collect::<BTreeSet<_>>().len() != scope.len() {
+        return Err(ContractError::KbScopeUnresolved);
+    }
+    Ok(())
+}
+
+fn ensure_scope_resolved(
+    connection: &Connection,
+    scope: &[StableConversationKey],
+) -> Result<(), ContractError> {
+    let values = std::iter::repeat("(?,?)")
+        .take(scope.len())
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "WITH requested(account_stable_id,conversation_stable_id) AS (VALUES {values}) SELECT COUNT(*) FROM requested JOIN knowledge_conversations conversation ON conversation.account_stable_id=requested.account_stable_id AND conversation.conversation_stable_id=requested.conversation_stable_id JOIN knowledge_catalog_state catalog ON catalog.singleton_id=1 JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=generation.id AND mapping.conversation_id=conversation.id"
+    );
+    let mut parameters = Vec::with_capacity(scope.len() * 2);
+    for key in scope {
+        parameters.push(Value::Text(key.account_stable_id.clone()));
+        parameters.push(Value::Text(key.conversation_stable_id.clone()));
+    }
+    let count: i64 = connection
+        .query_row(&sql, params_from_iter(parameters), |row| row.get(0))
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    if count != scope.len() as i64 {
+        return Err(ContractError::KbScopeUnresolved);
+    }
+    Ok(())
 }
 
 fn load_frozen_build(
@@ -3254,6 +3795,340 @@ mod tests {
         assert_eq!(fs::read(&primary).unwrap(), old_database);
         assert_eq!(fs::read(&primary_manifest).unwrap(), old_manifest);
         validate_database_pair(&primary, &primary_manifest).unwrap();
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn embedding_store_is_frozen_resumable_and_exact_blob_fail_closed() {
+        let data_dir = temp_dir();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let staging = store.begin_staging_source(source("vector-build")).unwrap();
+        let first = message("one", "周五同步虚构项目进度");
+        let mut second = message("two", "下周复盘虚构项目结果");
+        second.created_at_ms = 2_000_000;
+        second.source_ordinal = 1;
+        second.sort_key = "00000000000002000000|00000000000000000001|fixture".into();
+        store
+            .append_staging_messages(&staging, &[first, second])
+            .unwrap();
+        store
+            .mark_ready_candidate(
+                staging,
+                CandidateChecks {
+                    expected_message_count: 2,
+                },
+            )
+            .unwrap();
+        let frozen = store.begin_or_resume_index_build(build_spec()).unwrap();
+        let conversation = store
+            .list_build_conversations(&frozen.index_generation_id)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let page = store
+            .read_build_message_page(&frozen.index_generation_id, &conversation, None, 256)
+            .unwrap();
+        let drafts = super::super::chunk::chunk_messages(
+            &frozen.import_snapshot_hash,
+            frozen.spec.retrieval_token_budget,
+            &page.messages,
+        )
+        .unwrap();
+        store
+            .write_chunk_batch(&frozen.index_generation_id, &drafts)
+            .unwrap();
+
+        let read = store
+            .read_building_embedding_config(&frozen.index_generation_id)
+            .unwrap();
+        assert_eq!(read.config.dimension, 8);
+        assert_eq!(read.config.fingerprint, "fixture-fingerprint");
+        assert_eq!(
+            store.list_pending_build_embeddings(&frozen.index_generation_id, None, 0),
+            Err(ContractError::KbNotReady)
+        );
+        let pending = store
+            .list_pending_build_embeddings(&frozen.index_generation_id, None, 32)
+            .unwrap();
+        assert_eq!(pending.len(), 2);
+
+        let unit_blob =
+            work_review_core::semantic::encode_embedding(&[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let mut invalid_blobs = vec![
+            Vec::new(),
+            unit_blob[..unit_blob.len() - 1].to_vec(),
+            work_review_core::semantic::encode_embedding(&[0.0; 8]),
+            work_review_core::semantic::encode_embedding(&[2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            work_review_core::semantic::encode_embedding(&[
+                f32::NAN,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ]),
+            work_review_core::semantic::encode_embedding(&[
+                f32::INFINITY,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ]),
+            work_review_core::semantic::encode_embedding(&[1.0; 7]),
+            work_review_core::semantic::encode_embedding(&[1.0; 9]),
+        ];
+        for tail in 1..=4 {
+            let mut blob = unit_blob.clone();
+            blob.extend(std::iter::repeat(0).take(tail));
+            invalid_blobs.push(blob);
+        }
+        for blob in &invalid_blobs {
+            let invalid = EncodedEmbedding {
+                chunk_key: pending[0].chunk_key.clone(),
+                content_hash: pending[0].content_hash.clone(),
+                blob: blob.clone(),
+            };
+            assert_eq!(
+                store.write_build_embeddings(&frozen.index_generation_id, 8, &[invalid]),
+                Err(ContractError::KbNotReady)
+            );
+        }
+
+        let batch_pending = pending.clone();
+        assert_eq!(batch_pending.len(), 2);
+        let batch = batch_pending
+            .iter()
+            .enumerate()
+            .map(|(index, chunk)| EncodedEmbedding {
+                chunk_key: chunk.chunk_key.clone(),
+                content_hash: if index == 0 {
+                    chunk.content_hash.clone()
+                } else {
+                    "wrong-hash".into()
+                },
+                blob: unit_blob.clone(),
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            store.write_build_embeddings(&frozen.index_generation_id, 8, &batch),
+            Err(ContractError::KbNotReady)
+        );
+        assert_eq!(
+            store
+                .list_pending_build_embeddings(&frozen.index_generation_id, None, 32)
+                .unwrap()
+                .len(),
+            2,
+            "one bad row must roll back the whole batch"
+        );
+        let nan = EncodedEmbedding {
+            chunk_key: pending[0].chunk_key.clone(),
+            content_hash: pending[0].content_hash.clone(),
+            blob: work_review_core::semantic::encode_embedding(&[
+                f32::NAN,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ]),
+        };
+        assert_eq!(
+            store.write_build_embeddings(&frozen.index_generation_id, 8, &[nan]),
+            Err(ContractError::KbNotReady)
+        );
+        let encoded_rows = pending
+            .iter()
+            .map(|chunk| EncodedEmbedding {
+                chunk_key: chunk.chunk_key.clone(),
+                content_hash: chunk.content_hash.clone(),
+                blob: unit_blob.clone(),
+            })
+            .collect::<Vec<_>>();
+        let encoded = encoded_rows[0].clone();
+        store
+            .write_build_embeddings(
+                &frozen.index_generation_id,
+                frozen.spec.embedding.dimension,
+                &encoded_rows,
+            )
+            .unwrap();
+        assert!(store
+            .list_pending_build_embeddings(&frozen.index_generation_id, None, 32)
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            store.write_build_embeddings(
+                &frozen.index_generation_id,
+                frozen.spec.embedding.dimension,
+                std::slice::from_ref(&encoded),
+            ),
+            Err(ContractError::KbNotReady)
+        );
+
+        store
+            .with_writer(|connection| {
+                connection
+                    .execute(
+                        "UPDATE knowledge_index_generations SET status='ready' WHERE id=?1",
+                        [&frozen.index_generation_id],
+                    )
+                    .unwrap();
+                connection
+                    .execute(
+                        "UPDATE knowledge_catalog_state SET catalog_generation_seq=1,active_index_generation_id=?1,active_snapshot_hash=?2 WHERE singleton_id=1",
+                        params![frozen.index_generation_id, frozen.import_snapshot_hash],
+                    )
+                    .unwrap();
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            store.read_active_embedding_config().unwrap().config,
+            read.config
+        );
+        let request = ActiveVectorRequest {
+            scope: vec![conversation],
+            from_ms: None,
+            to_ms: None,
+            top_k: 12,
+        };
+        let query = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let hits = store
+            .search_active_vectors(request.clone(), &query)
+            .unwrap();
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].chunk_key, pending[0].chunk_key);
+
+        let expected = store.read_active_embedding_config().unwrap();
+        let switch_store = store.clone();
+        set_active_vector_after_scan_hook(move || {
+            switch_store
+                .with_writer(|connection| {
+                    connection
+                        .execute(
+                            "UPDATE knowledge_catalog_state SET catalog_generation_seq=catalog_generation_seq+1 WHERE singleton_id=1",
+                            [],
+                        )
+                        .unwrap();
+                    Ok(())
+                })
+                .unwrap();
+        });
+        assert_eq!(
+            store.search_active_vectors_for_generation(request.clone(), &query, Some(&expected)),
+            Err(ContractError::KbRetrievalFailed),
+            "a switch during vector scan must invalidate the whole search"
+        );
+
+        let after_vector = store.read_active_embedding_config().unwrap();
+        let switch_store = store.clone();
+        set_active_fts_after_scan_hook(move || {
+            switch_store
+                .with_writer(|connection| {
+                    connection
+                        .execute(
+                            "UPDATE knowledge_catalog_state SET catalog_generation_seq=catalog_generation_seq+1 WHERE singleton_id=1",
+                            [],
+                        )
+                        .unwrap();
+                    Ok(())
+                })
+                .unwrap();
+        });
+        assert_eq!(
+            store.search_active_fts_for_generation(
+                ActiveFtsRequest {
+                    scope: request.scope.clone(),
+                    query: "周五同步".into(),
+                    from_ms: None,
+                    to_ms: None,
+                    top_k: 20,
+                },
+                Some(&after_vector),
+            ),
+            Err(ContractError::KbRetrievalFailed),
+            "a switch during FTS scan must invalidate the whole search"
+        );
+
+        let between_stages = store.read_active_embedding_config().unwrap();
+        store
+            .search_active_vectors_for_generation(request.clone(), &query, Some(&between_stages))
+            .unwrap();
+        store
+            .with_writer(|connection| {
+                connection
+                    .execute(
+                        "UPDATE knowledge_catalog_state SET catalog_generation_seq=catalog_generation_seq+1 WHERE singleton_id=1",
+                        [],
+                    )
+                    .unwrap();
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            store.search_active_fts_for_generation(
+                ActiveFtsRequest {
+                    scope: request.scope.clone(),
+                    query: "周五同步".into(),
+                    from_ms: None,
+                    to_ms: None,
+                    top_k: 20,
+                },
+                Some(&between_stages),
+            ),
+            Err(ContractError::KbRetrievalFailed),
+            "a switch between vector and FTS must reject the whole hybrid token"
+        );
+
+        let during_probe = store.read_active_embedding_config().unwrap();
+        store
+            .with_writer(|connection| {
+                connection
+                    .execute(
+                        "UPDATE knowledge_catalog_state SET catalog_generation_seq=catalog_generation_seq+1 WHERE singleton_id=1",
+                        [],
+                    )
+                    .unwrap();
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            store.search_active_vectors_for_generation(
+                request.clone(),
+                &query,
+                Some(&during_probe),
+            ),
+            Err(ContractError::KbRetrievalFailed),
+            "a switch during HTTP probe must invalidate vector search"
+        );
+
+        let mut corruptions = vec![None];
+        corruptions.extend(invalid_blobs.into_iter().map(Some));
+        for corruption in corruptions {
+            store
+                .with_writer(|connection| {
+                    connection
+                        .execute(
+                            "UPDATE knowledge_chunks SET embedding=?1 WHERE chunk_key=?2",
+                            params![corruption, encoded.chunk_key],
+                        )
+                        .unwrap();
+                    Ok(())
+                })
+                .unwrap();
+            assert_eq!(
+                store.search_active_vectors(request.clone(), &query),
+                Err(ContractError::KbRetrievalFailed)
+            );
+        }
         let _ = fs::remove_dir_all(data_dir);
     }
 }

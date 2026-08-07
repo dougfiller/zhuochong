@@ -279,3 +279,21 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | M2 feature 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'` | 退出 0；仅有仓库既有/尚未接线代码的 unused/dead-code 警告和 `block v0.1.6` future-incompat 提示。 | 通过 |
 | 范围内格式与空白 | `rustfmt --edition 2021 --check <本步骤 4 个 Rust 文件>`；`git diff --check -- <本步骤路径>` | 两项退出 0；未格式化或修改范围外既有 dirty 文件。 | 通过 |
 | Windows/真实微信/真实导出性能 | 受控 Windows 11 x64 与脱敏的大规模性能样本 | 本步骤在 macOS 仅运行 bundled SQLite 合成测试；未读取真实微信/导出，也未做 Windows 真机和大规模性能验收。 | not-run |
+
+## 复用嵌入向量 RRF 并强制本地 Loopback（2026-08-07）
+
+检测脚本：`kaifa/kaifa_test/verify_knowledge_embedding_loopback.py`。它只读取步骤 21 源码，不打开数据库、不读取正文、不访问网络。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 共享 semantic primitive | `cargo test --manifest-path desktop/crates/core/Cargo.toml semantic::` | 3/3 通过；覆盖 exact/compatible BLOB、finite/zero norm、流式 Top-K、RRF 重复键和稳定同分排序。 | 通过 |
+| endpoint/HTTP/hybrid | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge::embedding::tests:: --no-default-features --features 'wechat-contract-check,wechat-m2'` | 6 passed、1 ignored；覆盖 endpoint 零调用拒绝、localhost 单次解析/pin、混合 DNS、302、timeout/unavailable 和 stable chunk_key RRF。 | 通过 |
+| knowledge 全回归 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features --features 'wechat-contract-check,wechat-m2'` | 53 passed、1 ignored；archive/lineage/candidate chunk/FTS 和严格 embedding Store 同时通过。 | 通过 |
+| 屏幕语义记忆兼容 | Rust command 定向测试 + `node --test desktop/src/SemanticMemoryIntegration.test.js` | Rust 3/3、Node 5/5 通过。 | 通过 |
+| 静态边界 | 新门禁 + 步骤 16/17/19/20 四个既有门禁 | 新门禁输出 `KNOWLEDGE_EMBEDDING_GATE status=pass`，报告 network_calls/database_opens/content_reads 均为 0；既有四门禁均 pass。 | 通过 |
+| M2 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'` | exit 0；有既有/预留未接线代码的 dead-code/unused warning，无编译错误。 | 通过 |
+| 格式/空白 | 新模块/Store `rustfmt --check`；步骤 21 scoped `git diff --check` | 两项 exit 0。 | 通过 |
+| 真实中文质量 | 显式执行 ignored probe，但未提供本地 endpoint/model | 输出 `KNOWLEDGE_LOOPBACK_PROBE status=not-run reason=missing_explicit_local_config`。 | not-run |
+
+- `not-run` 不是 Recall@5、dimension、延迟或 Windows 真机通过证据；没有用 fake server 分数冒充真实语义质量。
+- fake loopback server 只验证 DNS pin、禁止重定向、超时和服务不可用，不读取真实聊天、用户数据库或外网。

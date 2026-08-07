@@ -3,11 +3,11 @@
   "feature": "步骤 20：冻结候选索引代际并实现会话内分块与隔离 FTS5；dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-20",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-07T07:43:37+00:00",
-  "updated_at": "2026-08-07T08:38:45+00:00",
-  "status": "active",
+  "updated_at": "2026-08-07T08:51:42+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fdb5f-edbe-7ec0-a216-79f60b612c81",
-  "next_poll_at": "2026-08-07T08:41:45+00:00",
+  "next_poll_at": "",
   "threads": {
     "1": "019fdb2d-c60b-7c82-b1e5-6ab789c4380f",
     "2": "019fdb3f-f2fc-7721-be9d-ef8bcc870bd1",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-07T07:50:03+00:00 phase 1 gate failed: done file is missing",

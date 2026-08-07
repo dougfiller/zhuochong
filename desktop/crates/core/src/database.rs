@@ -380,29 +380,17 @@ pub struct SemanticMemoryStats {
 
 /// 把归一化 f32 向量编码为 LE 字节（存 BLOB）。
 pub fn encode_embedding(vector: &[f32]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(vector.len() * 4);
-    for v in vector {
-        out.extend_from_slice(&v.to_le_bytes());
-    }
-    out
+    crate::semantic::encode_embedding(vector)
 }
 
 /// BLOB → f32 向量（长度非 4 的倍数时丢弃尾部残字节）。
 pub fn decode_embedding(blob: &[u8]) -> Vec<f32> {
-    blob.chunks_exact(4)
-        .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
-        .collect()
+    crate::semantic::decode_embedding_compatible(blob)
 }
 
 /// 向量 L2 归一化（零向量原样返回，检索时点积为 0 自然沉底）。
-pub fn normalize_embedding(mut vector: Vec<f32>) -> Vec<f32> {
-    let norm = vector.iter().map(|v| v * v).sum::<f32>().sqrt();
-    if norm > f32::EPSILON {
-        for v in &mut vector {
-            *v /= norm;
-        }
-    }
-    vector
+pub fn normalize_embedding(vector: Vec<f32>) -> Vec<f32> {
+    crate::semantic::normalize_embedding(vector)
 }
 
 /// 助手会话（持久化于 SQLite，替代 localStorage 40 条上限）
@@ -3698,24 +3686,12 @@ impl Database {
         )?;
         let mut rows = stmt.query([])?;
 
-        // 小顶堆语义：保留分数最高的 limit 条（用 Vec + 阈值淘汰，K 很小）
-        let mut top: Vec<SemanticMemoryHit> = Vec::with_capacity(limit + 1);
+        let mut top = crate::semantic::StreamingCosineTopK::new(limit);
         while let Some(row) = rows.next()? {
             let blob: Vec<u8> = row.get(6)?;
             let vector = decode_embedding(&blob);
             if vector.len() != query_embedding.len() {
                 continue; // 维度不匹配（换过嵌入模型的旧块），跳过
-            }
-            let score: f32 = vector
-                .iter()
-                .zip(query_embedding.iter())
-                .map(|(a, b)| a * b)
-                .sum();
-            let score = f64::from(score);
-            if top.len() >= limit
-                && top.last().map(|h| h.score).unwrap_or(f64::MIN) >= score
-            {
-                continue;
             }
             let content: String = row.get(5)?;
             let hit = SemanticMemoryHit {
@@ -3725,21 +3701,19 @@ impl Database {
                 title: row.get(3)?,
                 browser_url: row.get(4)?,
                 excerpt: truncate_excerpt(&content, 240),
-                score,
+                score: 0.0,
             };
-            let pos = top
-                .binary_search_by(|h| {
-                    score
-                        .partial_cmp(&h.score)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .unwrap_or_else(|p| p);
-            top.insert(pos, hit);
-            if top.len() > limit {
-                top.pop();
-            }
+            top.push(hit, &vector, query_embedding)
+                .map_err(|_| AppError::Unknown("semantic vector validation failed".into()))?;
         }
-        Ok(top)
+        Ok(top
+            .into_sorted()
+            .into_iter()
+            .map(|entry| SemanticMemoryHit {
+                score: entry.score,
+                ..entry.item
+            })
+            .collect())
     }
 
 

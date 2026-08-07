@@ -20,6 +20,7 @@ mod commands;
 mod config;
 mod database;
 mod dingtalk_bot;
+mod embedding;
 mod error;
 mod feishu_bot;
 mod idle_detector;

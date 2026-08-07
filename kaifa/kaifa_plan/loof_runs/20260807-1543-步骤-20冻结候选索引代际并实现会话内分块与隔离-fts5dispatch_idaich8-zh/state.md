@@ -5,8 +5,8 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fdb5f-edbe-7ec0-a216-79f60b612c81
-- next_poll_at: 2026-08-07T08:41:45+00:00
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月07日15点55分-冻结候选索引代际并实现会话内分块与隔离FTS5.md

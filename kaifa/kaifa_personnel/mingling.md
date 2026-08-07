@@ -286,3 +286,32 @@ git diff --check -- desktop/src-tauri/src/knowledge/mod.rs desktop/src-tauri/src
 
 - 新静态脚本确认 v4 migration、纯分块模块、building-only 生产 builder、catalog/ready/stable-scope/time/topK SQL 过滤和无 `LIKE` 回退；脚本不会执行数据库或读取用户内容。
 - Rust 行为测试使用 `rusqlite = 0.30` 的 bundled SQLite/FTS5，固定版本为 `chunk-v1`、`token-counter-v1`、`fts-pretoken-v1`；macOS 结果不替代 Windows 真机验收。
+
+# 2026-08-07：步骤 21 复用嵌入向量 RRF 并强制本地 Loopback
+
+```bash
+# 纯静态边界门禁；仅读源码，不打开数据库、不读取正文、不访问网络。
+python3 -B kaifa/kaifa_test/verify_knowledge_embedding_loopback.py --project-root .
+
+# 共享 f32-LE、严格解码、归一化、流式 Top-K 与 RRF 纯算法。
+cargo test --manifest-path desktop/crates/core/Cargo.toml semantic::
+
+# endpoint、DNS pin、redirect、timeout/unavailable 与稳定 chunk_key RRF。
+# HTTP 行为测试只绑定系统分配的本机 loopback 临时端口，不访问外网。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge::embedding::tests:: --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# frozen building/active、NULL 续作与严格 BLOB 行为。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge::store::tests::embedding_store_is_frozen_resumable_and_exact_blob_fail_closed --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# 知识库回归、M2 编译和屏幕语义记忆兼容回归。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features --features 'wechat-contract-check,wechat-m2'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+cargo test --manifest-path desktop/src-tauri/Cargo.toml commands::semantic_memory::tests:: --no-default-features --features 'wechat-contract-check,wechat-m2'
+node --test desktop/src/SemanticMemoryIntegration.test.js
+
+# 真实中文质量探针：必须由用户显式提供本地 endpoint/model；没有参数时输出 not-run。
+AICH8_KNOWLEDGE_PROBE_ENDPOINT='<显式本地http-loopback地址>' AICH8_KNOWLEDGE_PROBE_MODEL='<本地模型精确名称>' cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge::embedding::tests::real_chinese_quality_probe --no-default-features --features 'wechat-contract-check,wechat-m2' -- --ignored --nocapture
+```
+
+- 质量探针复用生产 validator/client/parser；只输出短 digest、dimension、batch sizes、p50/p95、Recall@5 和 verdict，不输出正文、向量或完整 endpoint。
+- 新静态门禁不替代 Rust HTTP/SQLite 行为测试。

@@ -6,8 +6,10 @@
 //! 接口需用户在设置里显式选择。
 
 use crate::database::{
-    encode_embedding, normalize_embedding, Activity, SemanticMemoryHit, SemanticMemoryStats,
+    encode_embedding, normalize_embedding, Activity, MemorySearchItem, SemanticMemoryHit,
+    SemanticMemoryStats,
 };
+use crate::embedding::{embedding_payload, parse_embedding_response, EmbeddingWireFormat};
 use crate::error::AppError;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
@@ -94,9 +96,9 @@ async fn embed_texts(
         } else {
             format!("{}/v1/embeddings", config.endpoint)
         };
-        let mut request = client
-            .post(&url)
-            .json(&serde_json::json!({ "model": config.model, "input": texts }));
+        let body = embedding_payload(EmbeddingWireFormat::OpenAiBatch, &config.model, texts)
+            .map_err(|_| AppError::Analysis("嵌入请求参数无效".to_string()))?;
+        let mut request = client.post(&url).json(&body);
         if let Some(key) = config.api_key.as_deref().filter(|k| !k.trim().is_empty()) {
             request = request.header("Authorization", format!("Bearer {key}"));
         }
@@ -121,43 +123,30 @@ async fn embed_texts(
             .json()
             .await
             .map_err(|e| AppError::Analysis(format!("嵌入响应解析失败: {e}")))?;
-        let data = payload["data"]
-            .as_array()
-            .ok_or_else(|| AppError::Analysis("嵌入响应缺少 data 字段".to_string()))?;
-        let mut vectors = Vec::with_capacity(texts.len());
-        for item in data {
-            let vector: Vec<f32> = item["embedding"]
-                .as_array()
-                .ok_or_else(|| AppError::Analysis("嵌入响应缺少 embedding 字段".to_string()))?
-                .iter()
-                .filter_map(|v| v.as_f64().map(|f| f as f32))
+        let vectors =
+            parse_embedding_response(EmbeddingWireFormat::OpenAiBatch, payload, texts.len())
+                .map_err(|_| AppError::Analysis("嵌入响应格式或数量无效".to_string()))?
+                .into_iter()
+                .map(normalize_embedding)
                 .collect();
-            vectors.push(normalize_embedding(vector));
-        }
-        if vectors.len() != texts.len() {
-            return Err(AppError::Analysis(format!(
-                "嵌入结果数量不匹配: 期望 {} 实际 {}",
-                texts.len(),
-                vectors.len()
-            )));
-        }
         Ok(vectors)
     } else {
         // Ollama /api/embeddings：逐条请求（本地服务，延迟低）
         let url = format!("{}/api/embeddings", config.endpoint);
         let mut vectors = Vec::with_capacity(texts.len());
         for text in texts {
-            let response = client
-                .post(&url)
-                .json(&serde_json::json!({ "model": config.model, "prompt": text }))
-                .send()
-                .await
-                .map_err(|e| {
-                    AppError::Analysis(format!(
-                        "Ollama 嵌入请求失败（请确认 Ollama 已启动并已拉取模型 {}）: {e}",
-                        config.model
-                    ))
-                })?;
+            let body = embedding_payload(
+                EmbeddingWireFormat::OllamaLegacyPrompt,
+                &config.model,
+                std::slice::from_ref(text),
+            )
+            .map_err(|_| AppError::Analysis("Ollama 嵌入请求参数无效".to_string()))?;
+            let response = client.post(&url).json(&body).send().await.map_err(|e| {
+                AppError::Analysis(format!(
+                    "Ollama 嵌入请求失败（请确认 Ollama 已启动并已拉取模型 {}）: {e}",
+                    config.model
+                ))
+            })?;
             if !response.status().is_success() {
                 let status = response.status();
                 let body: String = response
@@ -175,14 +164,11 @@ async fn embed_texts(
                 .json()
                 .await
                 .map_err(|e| AppError::Analysis(format!("Ollama 嵌入响应解析失败: {e}")))?;
-            let vector: Vec<f32> = payload["embedding"]
-                .as_array()
-                .ok_or_else(|| {
-                    AppError::Analysis("Ollama 嵌入响应缺少 embedding 字段".to_string())
-                })?
-                .iter()
-                .filter_map(|v| v.as_f64().map(|f| f as f32))
-                .collect();
+            let vector =
+                parse_embedding_response(EmbeddingWireFormat::OllamaLegacyPrompt, payload, 1)
+                    .map_err(|_| AppError::Analysis("Ollama 嵌入响应格式无效".to_string()))?
+                    .pop()
+                    .ok_or_else(|| AppError::Analysis("Ollama 嵌入响应为空".to_string()))?;
             vectors.push(normalize_embedding(vector));
         }
         Ok(vectors)
@@ -466,51 +452,92 @@ pub(crate) async fn search_semantic_memory_inner(
         }
     };
 
-    // ② 关键词召回（复用既有 FTS 检索），RRF 融合：score = Σ 1/(60+rank)
+    // ② 关键词召回（复用既有 FTS 检索），通过共享 primitive 做 RRF 融合。
     let fts_hits = database
         .search_memory(query, None, None, limit.max(20))
         .unwrap_or_default();
 
-    const RRF_K: f64 = 60.0;
-    let mut fused: HashMap<String, SemanticMemoryHit> = HashMap::new();
-    for (rank, hit) in semantic_hits.into_iter().enumerate() {
+    fuse_screen_results(semantic_hits, fts_hits, limit)
+}
+
+fn fuse_screen_results(
+    semantic_hits: Vec<SemanticMemoryHit>,
+    fts_hits: Vec<MemorySearchItem>,
+    limit: usize,
+) -> Result<Vec<SemanticMemoryHit>, AppError> {
+    let mut payloads: HashMap<String, SemanticMemoryHit> = HashMap::new();
+    let mut semantic_keys = Vec::new();
+    for hit in semantic_hits {
         if hit.app_name == "__cursor__" {
             continue;
         }
         let key = format!("{}|{}|{}", hit.date, hit.app_name, hit.title);
-        let entry = fused
-            .entry(key)
-            .or_insert_with(|| SemanticMemoryHit { score: 0.0, ..hit });
-        entry.score += 1.0 / (RRF_K + rank as f64 + 1.0);
+        if !payloads.contains_key(&key) {
+            semantic_keys.push(key.clone());
+            payloads.insert(key, hit);
+        }
     }
-    for (rank, item) in fts_hits.into_iter().enumerate() {
+    let mut fts_keys = Vec::new();
+    for item in fts_hits {
         let app_name = item.app_name.clone().unwrap_or_default();
         let key = format!("{}|{}|{}", item.date, app_name, item.title);
-        let entry = fused.entry(key).or_insert_with(|| SemanticMemoryHit {
+        if !fts_keys.contains(&key) {
+            fts_keys.push(key.clone());
+        }
+        payloads.entry(key).or_insert_with(|| SemanticMemoryHit {
             chunk_id: 0,
-            date: item.date.clone(),
+            date: item.date,
             app_name,
-            title: item.title.clone(),
-            browser_url: item.browser_url.clone(),
-            excerpt: item.excerpt.clone(),
+            title: item.title,
+            browser_url: item.browser_url,
+            excerpt: item.excerpt,
             score: 0.0,
         });
-        entry.score += 1.0 / (RRF_K + rank as f64 + 1.0);
     }
-
-    let mut results: Vec<SemanticMemoryHit> = fused.into_values().collect();
-    results.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    results.truncate(limit);
-    Ok(results)
+    work_review_core::semantic::reciprocal_rank_fusion(&[semantic_keys, fts_keys], limit)
+        .map_err(|_| AppError::Unknown("semantic RRF input invalid".into()))?
+        .into_iter()
+        .map(|fused| {
+            let mut hit = payloads
+                .remove(&fused.key)
+                .ok_or_else(|| AppError::Unknown("semantic RRF payload missing".into()))?;
+            hit.score = fused.score;
+            Ok(hit)
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::OsString;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    static PROXY_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    struct EnvVarGuard {
+        key: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl EnvVarGuard {
+        fn set(key: &'static str, value: &str) -> Self {
+            let previous = std::env::var_os(key);
+            std::env::set_var(key, value);
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            if let Some(previous) = self.previous.take() {
+                std::env::set_var(self.key, previous);
+            } else {
+                std::env::remove_var(self.key);
+            }
+        }
+    }
 
     fn activity(
         id: i64,
@@ -535,6 +562,152 @@ mod tests {
             semantic_confidence: None,
             screenshot_url: None,
         }
+    }
+
+    async fn respond_json(stream: &mut tokio::net::TcpStream, body: &str) {
+        stream
+            .write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(), body
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn screen_openai_batch_keeps_authorization_wire_shape_and_normalization() {
+        let _proxy_lock = PROXY_ENV_LOCK.lock().unwrap();
+        let _no_proxy_upper = EnvVarGuard::set("NO_PROXY", "localhost,127.0.0.1");
+        let _no_proxy_lower = EnvVarGuard::set("no_proxy", "localhost,127.0.0.1");
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let captured = Arc::new(Mutex::new(String::new()));
+        let captured_task = captured.clone();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut buffer = [0_u8; 8192];
+            let read = stream.read(&mut buffer).await.unwrap();
+            *captured_task.lock().unwrap() = String::from_utf8_lossy(&buffer[..read]).into_owned();
+            respond_json(
+                &mut stream,
+                r#"{"data":[{"embedding":[3,4]},{"embedding":[0,2]}]}"#,
+            )
+            .await;
+        });
+        let vectors = embed_texts(
+            &EmbeddingConfig {
+                provider: "openai".into(),
+                endpoint: format!("http://localhost:{}", address.port()),
+                model: "screen-model".into(),
+                api_key: Some("screen-secret".into()),
+            },
+            &["虚构甲".into(), "虚构乙".into()],
+        )
+        .await
+        .unwrap();
+        server.await.unwrap();
+        assert!((vectors[0][0] - 0.6).abs() < 1e-6);
+        assert!((vectors[0][1] - 0.8).abs() < 1e-6);
+        assert_eq!(vectors[1], vec![0.0, 1.0]);
+        let request = captured.lock().unwrap();
+        assert!(request.starts_with("POST /v1/embeddings HTTP/1.1"));
+        assert!(request.contains("authorization: Bearer screen-secret"));
+        assert!(request.contains(r#""model":"screen-model""#));
+        assert!(request.contains(r#""input":["虚构甲","虚构乙"]"#));
+    }
+
+    #[tokio::test]
+    async fn screen_ollama_legacy_keeps_per_prompt_shape_without_authorization() {
+        let _proxy_lock = PROXY_ENV_LOCK.lock().unwrap();
+        let _no_proxy_upper = EnvVarGuard::set("NO_PROXY", "localhost,127.0.0.1");
+        let _no_proxy_lower = EnvVarGuard::set("no_proxy", "localhost,127.0.0.1");
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let captured_task = captured.clone();
+        let server = tokio::spawn(async move {
+            for body in [r#"{"embedding":[3,4]}"#, r#"{"embedding":[0,2]}"#] {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut buffer = [0_u8; 8192];
+                let read = stream.read(&mut buffer).await.unwrap();
+                captured_task
+                    .lock()
+                    .unwrap()
+                    .push(String::from_utf8_lossy(&buffer[..read]).into_owned());
+                respond_json(&mut stream, body).await;
+            }
+        });
+        let vectors = embed_texts(
+            &EmbeddingConfig {
+                provider: "ollama".into(),
+                endpoint: format!("http://localhost:{}", address.port()),
+                model: "screen-model".into(),
+                api_key: Some("must-not-be-sent".into()),
+            },
+            &["虚构甲".into(), "虚构乙".into()],
+        )
+        .await
+        .unwrap();
+        server.await.unwrap();
+        assert_eq!(vectors.len(), 2);
+        let requests = captured.lock().unwrap();
+        assert!(requests
+            .iter()
+            .all(|request| request.starts_with("POST /api/embeddings HTTP/1.1")));
+        assert!(requests
+            .iter()
+            .all(|request| !request.to_ascii_lowercase().contains("authorization")));
+        assert!(requests[0].contains(r#""prompt":"虚构甲""#));
+        assert!(requests[1].contains(r#""prompt":"虚构乙""#));
+    }
+
+    #[test]
+    fn screen_fts_fallback_and_rrf_keep_date_app_title_identity_and_order() {
+        let semantic = vec![SemanticMemoryHit {
+            chunk_id: 1,
+            date: "2026-08-07".into(),
+            app_name: "Codex".into(),
+            title: "任务".into(),
+            browser_url: None,
+            excerpt: "向量正文".into(),
+            score: 1.0,
+        }];
+        let fts = vec![
+            MemorySearchItem {
+                source_type: "memory".into(),
+                source_id: Some(1),
+                date: "2026-08-07".into(),
+                timestamp: 0,
+                title: "任务".into(),
+                excerpt: "FTS 同一项".into(),
+                app_name: Some("Codex".into()),
+                browser_url: None,
+                duration: None,
+                score: 0,
+            },
+            MemorySearchItem {
+                source_type: "memory".into(),
+                source_id: Some(2),
+                date: "2026-08-06".into(),
+                timestamp: 0,
+                title: "另一项".into(),
+                excerpt: "纯 FTS".into(),
+                app_name: Some("Chrome".into()),
+                browser_url: None,
+                duration: None,
+                score: 0,
+            },
+        ];
+        let fused = fuse_screen_results(semantic, fts.clone(), 5).unwrap();
+        assert_eq!(fused.len(), 2);
+        assert_eq!(fused[0].excerpt, "向量正文");
+        let fallback = fuse_screen_results(Vec::new(), fts, 5).unwrap();
+        assert_eq!(fallback.len(), 2);
+        assert_eq!(fallback[0].excerpt, "FTS 同一项");
+        assert_eq!(fallback[1].excerpt, "纯 FTS");
     }
 
     #[test]

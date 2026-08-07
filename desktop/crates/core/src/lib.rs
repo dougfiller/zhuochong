@@ -7,4 +7,5 @@ pub mod error;
 pub mod knowledge;
 pub mod policy;
 pub mod privacy;
+pub mod semantic;
 pub mod work_intelligence;
