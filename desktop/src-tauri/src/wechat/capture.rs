@@ -36,6 +36,25 @@ pub(crate) struct WechatCaptureSlices {
     pub(crate) header_identity_rgba: RgbaImage,
 }
 
+/// Header-only observation. It deliberately has no request or CaptureVersion:
+/// binding observations must not replace the chat capture generation.
+pub(crate) struct HeaderObservationFrame {
+    pub(crate) rgba: RgbaImage,
+}
+
+pub(crate) fn header_for_identity(
+    frame: EphemeralCapturedFrame,
+    identity: &WechatWindowIdentity,
+) -> Result<HeaderObservationFrame, ContractError> {
+    Ok(HeaderObservationFrame {
+        rgba: frame.crop_window_roi(
+            identity.bounds_px(),
+            identity.dpi(),
+            identity.header_identity_roi(),
+        )?,
+    })
+}
+
 pub(crate) fn slices_for_identity(
     frame: EphemeralCapturedFrame,
     identity: &WechatWindowIdentity,

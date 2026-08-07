@@ -5,6 +5,7 @@
   import { t } from '$lib/i18n/index.js';
   import { confirm } from '$lib/stores/confirm.js';
   import { showToast } from '$lib/stores/toast.js';
+  import KnowledgeScopePicker from '$lib/components/KnowledgeScopePicker.svelte';
 
   export let config;
   const dispatch = createEventDispatcher();
@@ -28,6 +29,10 @@
     finally { loading = false; }
   }
   function changed() { dispatch('change', config); refresh(); }
+  function saveScopeHints(keys) {
+    config.knowledge.lastScopeHintKeys = keys;
+    changed();
+  }
   function startPolling() {
     if (!polling) polling = setInterval(refresh, 750);
   }
@@ -85,15 +90,7 @@
   <p class="settings-card-desc">{t('settingsKnowledge.notReady')}</p>
   <p class="mb-4 text-sm text-amber-700 dark:text-amber-200" role="status">{t('settingsKnowledge.m1NoM2')}</p>
   <div class="space-y-4">
-    <label class="block text-sm font-medium">
-      {t('settingsKnowledge.scope')}
-      <select class="settings-input mt-1 w-full" bind:value={config.knowledge.scopeMode} on:change={changed}>
-        <option value={null}>{t('settingsKnowledge.scopeUnset')}</option>
-        <option value="conversation">{t('settingsKnowledge.scopeConversation')}</option>
-        <option value="selected_conversations">{t('settingsKnowledge.scopeSelected')}</option>
-        <option value="global_user_selected">{t('settingsKnowledge.scopeGlobal')}</option>
-      </select>
-    </label>
+    <KnowledgeScopePicker hintKeys={config.knowledge.lastScopeHintKeys || []} onHintsChange={saveScopeHints} />
     <div class="grid grid-cols-2 gap-3">
       <label class="block text-sm font-medium">{t('settingsKnowledge.topK')}<input class="settings-input mt-1 w-full" type="number" min="1" max="12" bind:value={config.knowledge.topK} on:change={changed} /></label>
       <label class="block text-sm font-medium">{t('settingsKnowledge.tokenBudget')}<input class="settings-input mt-1 w-full" type="number" min="256" max="4096" bind:value={config.knowledge.tokenBudget} on:change={changed} /></label>

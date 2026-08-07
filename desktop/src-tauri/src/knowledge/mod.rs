@@ -8,7 +8,7 @@ pub(crate) mod embedding;
 mod migrations;
 mod retrieve;
 pub(crate) mod runtime;
-mod store;
+pub(crate) mod store;
 pub(crate) mod types;
 
 #[allow(unused_imports)]

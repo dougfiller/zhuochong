@@ -11,6 +11,7 @@ pub(crate) struct CompatibilityProfile {
     enabled: bool,
     pub(crate) profile_version: String,
     pub(crate) wechat_product_version: String,
+    pub(crate) reply_surface: String,
     pub(crate) windows_build: String,
     probe_evidence_sha256: String,
     pub(crate) theme: String,
@@ -155,6 +156,7 @@ struct RawProfile {
     enabled: bool,
     profile_version: String,
     wechat_product_version: String,
+    reply_surface: String,
     theme: String,
     display_topology: RawDisplayTopology,
     executable: RawExecutableProfile,
@@ -235,6 +237,7 @@ impl TryFrom<RawProfile> for CompatibilityProfile {
         if blank(&raw.id)
             || raw.profile_version != SUPPORTED_PROFILE_VERSION
             || blank(&raw.wechat_product_version)
+            || raw.reply_surface != "single_chat"
             || !matches!(raw.theme.as_str(), "light" | "dark")
             || raw.display_topology.monitors == 0
             || blank(&raw.display_topology.target_monitor)
@@ -282,6 +285,7 @@ impl TryFrom<RawProfile> for CompatibilityProfile {
             enabled: raw.enabled,
             profile_version: raw.profile_version,
             wechat_product_version: raw.wechat_product_version,
+            reply_surface: raw.reply_surface,
             windows_build: raw.probe_evidence.windows_build,
             probe_evidence_sha256: raw.probe_evidence.evidence_sha256,
             theme: raw.theme,
@@ -360,6 +364,7 @@ mod tests {
         "enabled": true,
         "profile_version": "1",
         "wechat_product_version": "4.0.1.26",
+        "reply_surface": "single_chat",
         "theme": "light",
         "display_topology": { "monitors": 1, "target_monitor": "primary" },
         "executable": {
@@ -392,6 +397,23 @@ mod tests {
     fn valid_frozen_profile_is_loaded() {
         let catalog = CompatibilityCatalog::parse(VALID_PROFILE).unwrap();
         assert_eq!(catalog.enabled_profiles().count(), 1);
+    }
+
+    #[test]
+    fn profile_requires_a_probe_backed_single_chat_reply_surface() {
+        assert_eq!(
+            CompatibilityCatalog::parse(
+                &VALID_PROFILE.replace("        \"reply_surface\": \"single_chat\",\n", "")
+            ),
+            Err(CatalogError::InvalidCatalog)
+        );
+        assert_eq!(
+            CompatibilityCatalog::parse(&VALID_PROFILE.replace(
+                "\"reply_surface\": \"single_chat\"",
+                "\"reply_surface\": \"group_chat\""
+            )),
+            Err(CatalogError::InvalidCatalog)
+        );
     }
 
     #[test]

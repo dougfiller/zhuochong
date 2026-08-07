@@ -14,6 +14,262 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, State};
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct BindingCasInput {
+    session_nonce: String,
+    expected_binding_generation: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct RequestedKnowledgeScopeInput {
+    kind: String,
+    #[serde(default)]
+    keys: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ConfirmKnowledgeScopeBindingInput {
+    session_nonce: String,
+    expected_binding_generation: u64,
+    expected_observation_version: u64,
+    expected_catalog_generation: u64,
+    scope: RequestedKnowledgeScopeInput,
+    header_confirmed: bool,
+    global_confirmed: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ConfirmScopeForRequestInput {
+    session_nonce: String,
+    expected_binding_generation: u64,
+    expected_observation_version: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct OneShotConfirmationReceipt {
+    one_shot_epoch: u64,
+}
+
+#[tauri::command]
+pub(crate) async fn get_knowledge_scope_binding_status(
+    binding: State<'_, super::binding::KnowledgeScopeBinding>,
+) -> Result<super::binding::KnowledgeScopeBindingStatus, AppError> {
+    binding.status().map_err(contract_error)
+}
+
+#[tauri::command]
+pub(crate) async fn begin_knowledge_scope_observation(
+    input: BindingCasInput,
+    app: AppHandle,
+    state: State<'_, Arc<Mutex<AppState>>>,
+    runtime: State<'_, WechatReplyRuntime>,
+    coordinator: State<'_, super::CaptureCoordinator>,
+    binding: State<'_, super::binding::KnowledgeScopeBinding>,
+) -> Result<super::binding::HeaderObservationResponse, AppError> {
+    let status = binding.status().map_err(contract_error)?;
+    if status.session_nonce != input.session_nonce
+        || status.binding_generation != input.expected_binding_generation
+    {
+        return Err(contract_error(super::types::ContractError::WxRequestStale));
+    }
+    let screenshot_service = state
+        .lock()
+        .map_err(|error| AppError::Unknown(error.to_string()))?
+        .screenshot_service
+        .clone();
+    let identity = runtime
+        .validate_foreground_wechat()
+        .map_err(contract_error)?;
+    let (header, current) = runtime
+        .capture_header_identity_observation(
+            app.clone(),
+            &coordinator,
+            screenshot_service,
+            identity,
+            std::time::Duration::from_secs(5),
+        )
+        .await
+        .map_err(contract_error)?;
+    let (response, mutation) = binding
+        .record_observation(
+            &input.session_nonce,
+            input.expected_binding_generation,
+            super::binding::BindingWindowIdentity::from(&current),
+            header,
+        )
+        .map_err(contract_error)?;
+    if let Some(mutation) = mutation {
+        apply_binding_mutation(&app, &runtime, &coordinator, mutation).map_err(contract_error)?;
+    }
+    Ok(response)
+}
+
+#[allow(dead_code)]
+pub(crate) fn begin_m2_binding_request(
+    app: &AppHandle,
+    store: &crate::knowledge::KnowledgeStore,
+    runtime: &WechatReplyRuntime,
+    coordinator: &super::CaptureCoordinator,
+    binding: &super::binding::KnowledgeScopeBinding,
+) -> Result<super::binding::BindingRequestSnapshot, super::types::ContractError> {
+    binding
+        .begin_m2_request(store)
+        .map_err(|failure| apply_binding_failure(app, runtime, coordinator, failure))
+}
+
+#[allow(dead_code)]
+pub(crate) async fn revalidate_knowledge_binding_for_stage(
+    app: &AppHandle,
+    screenshot_service: crate::screenshot::ScreenshotService,
+    runtime: &WechatReplyRuntime,
+    coordinator: &super::CaptureCoordinator,
+    binding: &super::binding::KnowledgeScopeBinding,
+    request: &mut super::binding::BindingRequestSnapshot,
+    stage: super::binding::BindingStage,
+) -> Result<super::types::BindingObservationVersion, super::types::ContractError> {
+    let identity = runtime.validate_foreground_wechat()?;
+    let (header, current) = runtime
+        .capture_header_identity_observation(
+            app.clone(),
+            coordinator,
+            screenshot_service,
+            identity,
+            std::time::Duration::from_secs(5),
+        )
+        .await?;
+    let observation = binding
+        .record_stage_observation(
+            request,
+            stage,
+            super::binding::BindingWindowIdentity::from(&current),
+            header,
+        )
+        .map_err(|failure| apply_binding_failure(app, runtime, coordinator, failure))?;
+    runtime.update_m2_observation(request.binding_generation, observation)?;
+    Ok(observation)
+}
+
+#[tauri::command]
+pub(crate) async fn confirm_knowledge_scope_binding(
+    input: ConfirmKnowledgeScopeBindingInput,
+    app: AppHandle,
+    store: State<'_, crate::knowledge::KnowledgeStore>,
+    runtime: State<'_, WechatReplyRuntime>,
+    coordinator: State<'_, super::CaptureCoordinator>,
+    binding: State<'_, super::binding::KnowledgeScopeBinding>,
+) -> Result<super::binding::KnowledgeScopeBindingStatus, AppError> {
+    let requested_scope = match input.scope.kind.as_str() {
+        "conversation" if input.scope.keys.len() == 1 => {
+            crate::knowledge::store::RequestedScopeKeys::Conversation(input.scope.keys[0].clone())
+        }
+        "selected_conversations" => {
+            crate::knowledge::store::RequestedScopeKeys::Selected(input.scope.keys)
+        }
+        "global_user_selected" if input.scope.keys.is_empty() => {
+            crate::knowledge::store::RequestedScopeKeys::GlobalUserSelected
+        }
+        _ => {
+            return Err(contract_error(
+                super::types::ContractError::KbScopeUnresolved,
+            ))
+        }
+    };
+    let (status, mutation) = binding
+        .confirm_binding(
+            &store,
+            super::binding::ConfirmBindingInput {
+                session_nonce: input.session_nonce,
+                expected_binding_generation: input.expected_binding_generation,
+                expected_observation_version: input.expected_observation_version,
+                expected_catalog_generation: input.expected_catalog_generation,
+                requested_scope,
+                header_confirmed: input.header_confirmed,
+                global_confirmed: input.global_confirmed,
+            },
+        )
+        .map_err(contract_error)?;
+    apply_binding_mutation(&app, &runtime, &coordinator, mutation).map_err(contract_error)?;
+    Ok(status)
+}
+
+#[tauri::command]
+pub(crate) async fn confirm_knowledge_scope_for_next_request(
+    input: ConfirmScopeForRequestInput,
+    binding: State<'_, super::binding::KnowledgeScopeBinding>,
+) -> Result<OneShotConfirmationReceipt, AppError> {
+    binding
+        .confirm_scope_for_next_request(
+            &input.session_nonce,
+            input.expected_binding_generation,
+            input.expected_observation_version,
+        )
+        .map(|one_shot_epoch| OneShotConfirmationReceipt { one_shot_epoch })
+        .map_err(contract_error)
+}
+
+#[tauri::command]
+pub(crate) async fn clear_knowledge_scope_binding(
+    input: BindingCasInput,
+    app: AppHandle,
+    runtime: State<'_, WechatReplyRuntime>,
+    coordinator: State<'_, super::CaptureCoordinator>,
+    binding: State<'_, super::binding::KnowledgeScopeBinding>,
+) -> Result<super::binding::KnowledgeScopeBindingStatus, AppError> {
+    let (status, mutation) = binding
+        .clear(&input.session_nonce, input.expected_binding_generation)
+        .map_err(contract_error)?;
+    apply_binding_mutation(&app, &runtime, &coordinator, mutation).map_err(contract_error)?;
+    Ok(status)
+}
+
+fn apply_binding_mutation(
+    app: &AppHandle,
+    runtime: &WechatReplyRuntime,
+    coordinator: &super::CaptureCoordinator,
+    mutation: super::binding::BindingMutation,
+) -> Result<(), super::types::ContractError> {
+    let payload = compensate_binding_mutation(runtime, coordinator, mutation)?;
+    if let Some(payload) = payload {
+        avatar_engine::emit_avatar_bubble(app, &payload);
+    }
+    Ok(())
+}
+
+fn compensate_binding_mutation(
+    runtime: &WechatReplyRuntime,
+    coordinator: &super::CaptureCoordinator,
+    mutation: super::binding::BindingMutation,
+) -> Result<Option<AvatarBubblePayload>, super::types::ContractError> {
+    coordinator.invalidate_current_capture()?;
+    let payload = runtime.invalidate_m2_binding(mutation.old_generation)?;
+    log::info!(
+        "knowledge_binding_mutation reason={:?} old_generation={} new_generation={} clear_checked=true",
+        mutation.reason,
+        mutation.old_generation.value(),
+        mutation.new_generation.value()
+    );
+    Ok(payload)
+}
+
+fn apply_binding_failure(
+    app: &AppHandle,
+    runtime: &WechatReplyRuntime,
+    coordinator: &super::CaptureCoordinator,
+    failure: super::binding::BindingFailure,
+) -> super::types::ContractError {
+    if let Some(mutation) = failure.mutation {
+        if let Err(error) = apply_binding_mutation(app, runtime, coordinator, mutation) {
+            return error;
+        }
+    }
+    failure.error
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TraceQueryInput {
     request_id: Option<String>,
@@ -260,6 +516,10 @@ fn status_for(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::wechat::runtime::BeginReplySnapshot;
+    use crate::wechat::state_machine::ReplyMode;
+    use crate::wechat::types::{BindingGeneration, BindingObservationVersion};
+    use std::time::Duration;
 
     #[test]
     fn unknown_profile_fails_closed() {
@@ -269,5 +529,85 @@ mod tests {
         assert!(!status.selected_profile_valid);
         assert_eq!(status.not_ready_reason, Some("WX_PROFILE_UNSUPPORTED"));
         assert!(!status.auto_trigger);
+    }
+
+    #[test]
+    fn binding_compensation_invalidates_capture_m2_lease_and_exact_suggestion_only() {
+        let coordinator = super::super::CaptureCoordinator::default();
+        let capture = coordinator.next_capture_version();
+        let binding_generation = BindingGeneration::new(9);
+        let runtime = WechatReplyRuntime::default();
+        let trace_dir = std::env::temp_dir().join(format!(
+            "wechat-binding-compensation-{}",
+            uuid::Uuid::new_v4()
+        ));
+        runtime
+            .begin_reply(
+                BeginReplySnapshot {
+                    mode: ReplyMode::M2,
+                    binding_generation,
+                    observation_version: BindingObservationVersion::new(3),
+                    capture_version: Some(capture),
+                    timeout: Duration::from_secs(5),
+                },
+                ReplyTraceStore::new(&trace_dir),
+            )
+            .unwrap();
+        let (request_id, suggestion_generation) =
+            runtime.install_presented_suggestion_fixture(Some(binding_generation));
+        let payload = compensate_binding_mutation(
+            &runtime,
+            &coordinator,
+            super::super::binding::BindingMutation {
+                old_generation: binding_generation,
+                new_generation: BindingGeneration::new(10),
+                reason: super::super::binding::BindingMutationReason::HeaderChanged,
+            },
+        )
+        .unwrap()
+        .unwrap();
+
+        assert!(!coordinator.is_current_capture(capture));
+        assert_eq!(runtime.request_phase(), "idle");
+        let request_id_text = request_id.to_string();
+        assert_eq!(
+            payload.request_id.as_deref(),
+            Some(request_id_text.as_str())
+        );
+        assert_eq!(
+            payload.suggestion_generation,
+            Some(suggestion_generation.value())
+        );
+        assert_eq!(payload.binding_generation, Some(binding_generation.value()));
+        assert!(payload.clear);
+        assert_eq!(
+            runtime.request_suggestion_copy(
+                &request_id,
+                suggestion_generation,
+                Some(binding_generation)
+            ),
+            Err(super::super::types::ContractError::WxRequestStale)
+        );
+
+        let m1_runtime = WechatReplyRuntime::default();
+        let (m1_request, m1_suggestion) = m1_runtime.install_presented_suggestion_fixture(None);
+        assert!(compensate_binding_mutation(
+            &m1_runtime,
+            &super::super::CaptureCoordinator::default(),
+            super::super::binding::BindingMutation {
+                old_generation: binding_generation,
+                new_generation: BindingGeneration::new(10),
+                reason: super::super::binding::BindingMutationReason::ActiveCatalogChanged,
+            },
+        )
+        .unwrap()
+        .is_none());
+        assert_eq!(
+            m1_runtime
+                .request_suggestion_copy(&m1_request, m1_suggestion, None)
+                .unwrap(),
+            "虚构建议"
+        );
+        let _ = std::fs::remove_dir_all(trace_dir);
     }
 }

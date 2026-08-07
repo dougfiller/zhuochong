@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 test('微信和知识库设置使用与save_config相同的camelCase payload', async () => {
-  const [settings, wechat, knowledge] = await Promise.all([
+  const [settings, wechat, knowledge, scopePicker] = await Promise.all([
     readFile(new URL('./Settings.svelte', import.meta.url), 'utf8'),
     readFile(new URL('./components/SettingsWechat.svelte', import.meta.url), 'utf8'),
     readFile(new URL('./components/SettingsKnowledge.svelte', import.meta.url), 'utf8'),
+    readFile(new URL('../../lib/components/KnowledgeScopePicker.svelte', import.meta.url), 'utf8'),
   ]);
 
   assert.match(settings, /invoke\('save_config', \{ config \}\)/);
@@ -23,7 +24,7 @@ test('微信和知识库设置使用与save_config相同的camelCase payload', a
     assert.match(wechat, new RegExp(`config\\.wechat\\.${field}`));
   }
   for (const field of [
-    'scopeMode',
+    'lastScopeHintKeys',
     'topK',
     'tokenBudget',
     'sameConversationBoost',
@@ -34,6 +35,13 @@ test('微信和知识库设置使用与save_config相同的camelCase payload', a
   assert.doesNotMatch(wechat, /config\.wechat\.[a-z]+_[a-z_]+/);
   assert.doesNotMatch(knowledge, /config\.knowledge\.[a-z]+_[a-z_]+/);
   assert.doesNotMatch(knowledge, /config\.knowledge\.knowledgeSources/);
+  assert.doesNotMatch(knowledge, /bind:value=\{config\.knowledge\.scopeMode\}/);
+  assert.match(scopePicker, /bindOne/);
+  assert.match(scopePicker, /selectMany/);
+  assert.match(scopePicker, /confirmGlobal/);
+  assert.match(scopePicker, /let selectedKeys = \[\]/);
+  assert.match(scopePicker, /historyHint/);
+  assert.doesNotMatch(scopePicker, /selectedKeys\s*=\s*hintKeys/);
   assert.match(knowledge, /openDialog\(\{ directory: true, multiple: false \}\)/);
   assert.match(knowledge, /invoke\('start_knowledge_source_import'/);
   assert.match(knowledge, /invoke\('list_knowledge_sources'\)/);

@@ -8,6 +8,63 @@ use crate::ocr::{OcrService, WindowsMemoryOcrResult};
 use image::RgbaImage;
 
 const MAX_CHAT_PIXELS: u64 = 16_000_000;
+const MAX_HEADER_BYTES: usize = 256;
+const MAX_HEADER_SCALARS: usize = 128;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct HeaderIdentityClue {
+    text: String,
+    reliable: bool,
+}
+
+impl HeaderIdentityClue {
+    pub(crate) fn from_backend(result: WindowsMemoryOcrResult) -> Self {
+        let WindowsMemoryOcrResult::Text(raw) = result else {
+            return Self {
+                text: String::new(),
+                reliable: false,
+            };
+        };
+        let normalized = raw.replace("\r\n", "\n").replace('\r', "\n");
+        let lines = normalized
+            .split('\n')
+            .map(|line| {
+                line.chars()
+                    .filter(|character| !character.is_control())
+                    .collect::<String>()
+            })
+            .map(|line| line.trim().to_owned())
+            .filter(|line| !line.is_empty())
+            .collect::<Vec<_>>();
+        let text = lines.first().cloned().unwrap_or_default();
+        if text.len() > MAX_HEADER_BYTES || text.chars().count() > MAX_HEADER_SCALARS {
+            return Self {
+                text: String::new(),
+                reliable: false,
+            };
+        }
+        let generic =
+            matches!(text.to_ascii_lowercase().as_str(), "wechat" | "weixin") || text == "微信";
+        let has_letter = text.chars().any(char::is_alphabetic);
+        let reliable = lines.len() == 1 && !generic && has_letter;
+        Self { text, reliable }
+    }
+
+    pub(crate) fn text(&self) -> &str {
+        &self.text
+    }
+    pub(crate) fn reliable(&self) -> bool {
+        self.reliable
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fixture(text: &str, reliable: bool) -> Self {
+        Self {
+            text: text.to_owned(),
+            reliable,
+        }
+    }
+}
 
 /// Minimal, redacted OCR observability. It never carries text, image geometry,
 /// paths, window handles, error details, or fallback parameters.
@@ -106,6 +163,18 @@ where
             }
             result => self.finish(slices, captured, audit_sink, result, "WindowsOCR"),
         }
+    }
+
+    pub(crate) fn recognize_header(
+        &mut self,
+        frame: &super::capture::HeaderObservationFrame,
+    ) -> Result<HeaderIdentityClue, ContractError> {
+        if !valid_chat_image(&frame.rgba) {
+            return Err(ContractError::WxOcrFailed);
+        }
+        Ok(HeaderIdentityClue::from_backend(
+            self.primary.recognize(&frame.rgba),
+        ))
     }
 
     fn finish<S: WechatOcrAuditSink>(
@@ -271,7 +340,7 @@ mod tests {
     const PROFILE: &str = r#"{
       "schema_version": 1, "catalog_version": "windows-wechat-v1", "profiles": [{
         "id": "wechat-windows-4.0.1-light-96-primary", "enabled": true, "profile_version": "1",
-        "wechat_product_version": "4.0.1.26", "theme": "light",
+        "wechat_product_version": "4.0.1.26", "reply_surface": "single_chat", "theme": "light",
         "display_topology": { "monitors": 1, "target_monitor": "primary" },
         "executable": { "file_name": "WeChat.exe", "normalized_paths": ["c:\\program files\\tencent\\wechat\\wechat.exe"], "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "product_version": "4.0.1.26" },
         "dpi": 96, "window_size_px": { "width": 1280, "height": 900, "tolerance_px": 2 },
@@ -284,7 +353,7 @@ mod tests {
     const PROFILE_WITH_AUDIT: &str = r#"{
       "schema_version": 1, "catalog_version": "windows-wechat-v1", "profiles": [{
         "id": "wechat-windows-4.0.1-light-96-primary", "enabled": true, "profile_version": "1",
-        "wechat_product_version": "4.0.1.26", "theme": "light",
+        "wechat_product_version": "4.0.1.26", "reply_surface": "single_chat", "theme": "light",
         "display_topology": { "monitors": 1, "target_monitor": "primary" },
         "executable": { "file_name": "WeChat.exe", "normalized_paths": ["c:\\program files\\tencent\\wechat\\wechat.exe"], "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "product_version": "4.0.1.26" },
         "dpi": 96, "window_size_px": { "width": 1280, "height": 900, "tolerance_px": 2 },
@@ -311,6 +380,40 @@ mod tests {
         assert_eq!(reply.text(), "第一行\n第二行");
         assert_eq!(events.0[0].outcome, "text");
         assert_eq!(events.0[0].provider, "WindowsOCR");
+    }
+
+    #[test]
+    fn header_clue_never_retains_text_over_the_byte_or_scalar_limit() {
+        for raw in ["a".repeat(257), "界".repeat(86), "a".repeat(129)] {
+            let clue = HeaderIdentityClue::from_backend(WindowsMemoryOcrResult::Text(raw));
+            assert_eq!(clue.text(), "");
+            assert!(!clue.reliable());
+        }
+
+        let byte_boundary = HeaderIdentityClue::from_backend(WindowsMemoryOcrResult::Text(
+            format!("{}a", "界".repeat(85)),
+        ));
+        assert_eq!(byte_boundary.text().len(), 256);
+        assert!(byte_boundary.reliable());
+        let scalar_boundary =
+            HeaderIdentityClue::from_backend(WindowsMemoryOcrResult::Text("a".repeat(128)));
+        assert_eq!(scalar_boundary.text().chars().count(), 128);
+        assert!(scalar_boundary.reliable());
+    }
+
+    #[test]
+    fn multiline_header_is_bounded_and_unreliable() {
+        let clue =
+            HeaderIdentityClue::from_backend(WindowsMemoryOcrResult::Text("第一行\n第二行".into()));
+        assert_eq!(clue.text(), "第一行");
+        assert!(!clue.reliable());
+
+        let oversized = HeaderIdentityClue::from_backend(WindowsMemoryOcrResult::Text(format!(
+            "{}\n第二行",
+            "a".repeat(257)
+        )));
+        assert_eq!(oversized.text(), "");
+        assert!(!oversized.reliable());
     }
 
     #[test]

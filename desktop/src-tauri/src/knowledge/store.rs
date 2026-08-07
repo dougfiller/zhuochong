@@ -16,7 +16,7 @@ use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExten
 use sha2::{Digest, Sha256};
 #[cfg(test)]
 use std::cell::Cell;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -221,6 +221,7 @@ pub(crate) struct NewSource {
     pub(crate) coverage_hash: String,
     pub(crate) exported_at_ms: i64,
     pub(crate) coverage_kind: CoverageKind,
+    pub(crate) display_metadata_json: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -228,6 +229,46 @@ pub(crate) struct StagingImport {
     id: String,
     conversation_id: String,
     source_id: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct KnowledgeConversationOption {
+    pub(crate) scope_key: String,
+    pub(crate) display_name: String,
+    pub(crate) is_group: bool,
+    pub(crate) started_at_ms: Option<i64>,
+    pub(crate) ended_at_ms: Option<i64>,
+    pub(crate) message_count: u64,
+    #[serde(skip)]
+    single_bindable: bool,
+}
+
+#[derive(Clone, Debug, serde::Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ActiveConversationCatalog {
+    pub(crate) catalog_generation: u64,
+    pub(crate) conversations: Vec<KnowledgeConversationOption>,
+    #[serde(skip)]
+    pub(crate) active_scope_digest: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum RequestedScopeKeys {
+    Conversation(String),
+    Selected(Vec<String>),
+    GlobalUserSelected,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ResolvedActiveScope {
+    pub(crate) knowledge_scope: KnowledgeScope,
+    pub(crate) scope_keys: Vec<String>,
+    pub(crate) catalog_generation: u64,
+    pub(crate) active_scope_digest: String,
+    pub(crate) conversation_count: u64,
+    pub(crate) bound_conversation_key: Option<String>,
+    pub(crate) bound_conversation_is_group: bool,
 }
 
 impl StagingImport {
@@ -362,7 +403,7 @@ pub(crate) struct FrozenEmbeddingRead {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum AuthorizedScope {
-    Conversations(Vec<String>),
+    Conversations(Vec<StableConversationKey>),
     GlobalUserSelected,
 }
 
@@ -508,6 +549,7 @@ struct KnowledgeStoreInner {
     writer: Mutex<Option<Connection>>,
     active_readers: Mutex<usize>,
     maintenance: Mutex<MaintenanceRegistry>,
+    pending_display_metadata: Mutex<HashMap<String, String>>,
 }
 
 #[derive(Clone)]
@@ -542,6 +584,7 @@ impl KnowledgeStore {
                 writer: Mutex::new(Some(writer)),
                 active_readers: Mutex::new(0),
                 maintenance: Mutex::new(MaintenanceRegistry::default()),
+                pending_display_metadata: Mutex::new(HashMap::new()),
             }),
         })
     }
@@ -554,6 +597,7 @@ impl KnowledgeStore {
                 writer: Mutex::new(None),
                 active_readers: Mutex::new(0),
                 maintenance: Mutex::new(MaintenanceRegistry::default()),
+                pending_display_metadata: Mutex::new(HashMap::new()),
             }),
         }
     }
@@ -581,6 +625,85 @@ impl KnowledgeStore {
                 source_id: row.get(0)?, coverage_kind: row.get(1)?, source_state: row.get(2)?, import_status: row.get(3)?, lineage_count: row.get(4)?, message_count: row.get(5)?, conversation_count: row.get(6)?, checked_at_ms: row.get(7)?,
             })).map_err(|_| ContractError::KbNotReady)?;
             rows.collect::<Result<Vec<_>, _>>().map_err(|_| ContractError::KbNotReady)
+        })
+    }
+
+    pub(crate) fn list_active_conversations(
+        &self,
+    ) -> Result<ActiveConversationCatalog, ContractError> {
+        if self.inner.availability != StoreAvailability::Ready
+            || self.maintenance_status()?.maintenance == "closed"
+        {
+            return Err(ContractError::KbNotReady);
+        }
+        self.with_reader(load_active_conversation_catalog)
+    }
+
+    pub(crate) fn resolve_scope_keys(
+        &self,
+        expected_catalog_generation: u64,
+        requested: &RequestedScopeKeys,
+    ) -> Result<ResolvedActiveScope, ContractError> {
+        let catalog = self.list_active_conversations()?;
+        if catalog.catalog_generation != expected_catalog_generation {
+            return Err(ContractError::KbScopeUnresolved);
+        }
+        let by_key = catalog
+            .conversations
+            .iter()
+            .map(|conversation| (conversation.scope_key.as_str(), conversation))
+            .collect::<BTreeMap<_, _>>();
+        let (knowledge_scope, scope_keys, bound_conversation_key, bound_conversation_is_group) =
+            match requested {
+                RequestedScopeKeys::Conversation(key) => {
+                    let conversation = by_key
+                        .get(key.as_str())
+                        .copied()
+                        .ok_or(ContractError::KbScopeUnresolved)?;
+                    let ambiguity_count = catalog
+                        .conversations
+                        .iter()
+                        .filter(|candidate| same_display_facts(candidate, conversation))
+                        .count();
+                    if !conversation.single_bindable || ambiguity_count != 1 {
+                        return Err(ContractError::KbScopeUnresolved);
+                    }
+                    (
+                        KnowledgeScope::Conversation { id: key.clone() },
+                        vec![key.clone()],
+                        Some(key.clone()),
+                        conversation.is_group,
+                    )
+                }
+                RequestedScopeKeys::Selected(keys) => {
+                    if keys.is_empty()
+                        || keys.len() > 32
+                        || keys.iter().collect::<BTreeSet<_>>().len() != keys.len()
+                        || keys.iter().any(|key| !by_key.contains_key(key.as_str()))
+                    {
+                        return Err(ContractError::KbScopeUnresolved);
+                    }
+                    let mut keys = keys.clone();
+                    keys.sort();
+                    (
+                        KnowledgeScope::SelectedConversations { ids: keys.clone() },
+                        keys,
+                        None,
+                        false,
+                    )
+                }
+                RequestedScopeKeys::GlobalUserSelected => {
+                    (KnowledgeScope::GlobalUserSelected, Vec::new(), None, false)
+                }
+            };
+        Ok(ResolvedActiveScope {
+            knowledge_scope,
+            scope_keys,
+            catalog_generation: catalog.catalog_generation,
+            active_scope_digest: catalog.active_scope_digest,
+            conversation_count: catalog.conversations.len() as u64,
+            bound_conversation_key,
+            bound_conversation_is_group,
         })
     }
 
@@ -808,7 +931,22 @@ impl KnowledgeStore {
         &self,
         input: NewSource,
     ) -> Result<StagingImport, ContractError> {
+        let display_metadata = input
+            .display_metadata_json
+            .as_deref()
+            .map(validate_display_metadata_json)
+            .transpose()?;
         self.with_writer(|connection| {
+            let mut pending_display_metadata = if display_metadata.is_some() {
+                Some(
+                    self.inner
+                        .pending_display_metadata
+                        .lock()
+                        .map_err(|_| ContractError::KbNotReady)?,
+                )
+            } else {
+                None
+            };
             let transaction = connection
                 .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
                 .map_err(|_| ContractError::KbNotReady)?;
@@ -921,6 +1059,12 @@ impl KnowledgeStore {
                 }
             }
             transaction.commit().map_err(|_| ContractError::KbNotReady)?;
+            if let Some(metadata) = display_metadata {
+                pending_display_metadata
+                    .as_mut()
+                    .ok_or(ContractError::KbNotReady)?
+                    .insert(generation_id.clone(), metadata);
+            }
             Ok(StagingImport { id: generation_id, conversation_id, source_id })
         })
     }
@@ -1021,7 +1165,8 @@ impl KnowledgeStore {
                 "UPDATE knowledge_import_generations SET message_count=(SELECT COUNT(*) FROM knowledge_import_generation_members WHERE import_generation_id=?1) WHERE id=?1 AND status='staging'",
                 [&staging.id],
             ).map_err(|_| ContractError::KbNotReady)?;
-            transaction.commit().map_err(|_| ContractError::KbNotReady)
+            transaction.commit().map_err(|_| ContractError::KbNotReady)?;
+            Ok(())
         })
     }
 
@@ -1059,7 +1204,8 @@ impl KnowledgeStore {
                 "UPDATE knowledge_sources SET import_status=?1,checked_at_ms=?2 WHERE id=?3",
                 params![verdict.as_str(), now_ms(), staging.source_id],
             ).map_err(|_| ContractError::KbNotReady)?;
-            transaction.commit().map_err(|_| ContractError::KbNotReady)
+            transaction.commit().map_err(|_| ContractError::KbNotReady)?;
+            Ok(())
         })
     }
 
@@ -1103,7 +1249,16 @@ impl KnowledgeStore {
                 transaction.execute("DELETE FROM knowledge_message_sources WHERE source_id=?1 AND NOT EXISTS(SELECT 1 FROM knowledge_import_generations WHERE trigger_source_id=?1)", [&staging.source_id]).map_err(|_| ContractError::KbNotReady)?;
                 transaction.execute("DELETE FROM knowledge_sources WHERE id=?1 AND NOT EXISTS(SELECT 1 FROM knowledge_import_generations WHERE trigger_source_id=?1)", [&staging.source_id]).map_err(|_| ContractError::KbNotReady)?;
             }
-            transaction.commit().map_err(|_| ContractError::KbNotReady)
+            transaction.commit().map_err(|_| ContractError::KbNotReady)?;
+            let mut pending = self
+                .inner
+                .pending_display_metadata
+                .lock()
+                .map_err(|_| ContractError::KbNotReady)?;
+            for staging in stagings {
+                pending.remove(&staging.id);
+            }
+            Ok(())
         })
     }
 
@@ -1112,6 +1267,19 @@ impl KnowledgeStore {
             let transaction = connection
                 .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
                 .map_err(|_| ContractError::KbNotReady)?;
+            let candidate_ids = {
+                let mut statement = transaction
+                    .prepare(
+                        "SELECT id FROM knowledge_import_generations WHERE trigger_source_id=?1 AND status IN ('staging','ready_candidate')",
+                    )
+                    .map_err(|_| ContractError::KbNotReady)?;
+                let ids = statement
+                    .query_map([source_id], |row| row.get::<_, String>(0))
+                    .map_err(|_| ContractError::KbNotReady)?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| ContractError::KbNotReady)?;
+                ids
+            };
             transaction
                 .execute(
                     "DELETE FROM knowledge_index_generation_imports WHERE import_generation_id IN (SELECT id FROM knowledge_import_generations WHERE trigger_source_id=?1 AND status IN ('staging','ready_candidate'))",
@@ -1154,7 +1322,16 @@ impl KnowledgeStore {
                     [source_id],
                 )
                 .map_err(|_| ContractError::KbNotReady)?;
-            transaction.commit().map_err(|_| ContractError::KbNotReady)
+            transaction.commit().map_err(|_| ContractError::KbNotReady)?;
+            let mut pending = self
+                .inner
+                .pending_display_metadata
+                .lock()
+                .map_err(|_| ContractError::KbNotReady)?;
+            for generation_id in candidate_ids {
+                pending.remove(&generation_id);
+            }
+            Ok(())
         })
     }
 
@@ -1483,25 +1660,23 @@ impl KnowledgeStore {
     pub(in crate::knowledge) fn retrieval_scope_authorizes(
         &self,
         frozen: &FrozenRetrievalRead,
-        conversation_id: &str,
+        scope_key: &str,
     ) -> Result<bool, ContractError> {
-        if conversation_id.trim().is_empty() || conversation_id.contains('\0') {
+        if !valid_scope_key(scope_key) {
             return Err(ContractError::KbScopeUnresolved);
         }
         self.with_reader(|connection| {
             ensure_retrieval_active(connection, frozen)?;
             match &frozen.scope.scope {
-                AuthorizedScope::Conversations(ids) => Ok(ids.iter().any(|id| id == conversation_id)),
-                AuthorizedScope::GlobalUserSelected => {
-                    let count: i64 = connection
-                        .query_row(
-                            "SELECT COUNT(*) FROM knowledge_catalog_state catalog JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=catalog.active_index_generation_id JOIN knowledge_conversations conversation ON conversation.id=mapping.conversation_id AND conversation.active_import_generation_id=mapping.import_generation_id JOIN knowledge_import_generations import_generation ON import_generation.id=mapping.import_generation_id AND import_generation.status='active' WHERE catalog.singleton_id=1 AND catalog.catalog_generation_seq=?1 AND catalog.active_index_generation_id=?2 AND catalog.active_snapshot_hash=?3 AND conversation.conversation_stable_id=?4",
-                            params![frozen.scope.catalog_generation, frozen.scope.index_generation_id, frozen.scope.snapshot_hash, conversation_id],
-                            |row| row.get(0),
-                        )
-                        .map_err(|_| ContractError::KbRetrievalFailed)?;
-                    Ok(count == 1)
+                AuthorizedScope::Conversations(keys) => {
+                    Ok(keys.iter().any(|key| knowledge_scope_key(key) == scope_key))
                 }
+                AuthorizedScope::GlobalUserSelected => Ok(resolve_active_scope_key(
+                    connection,
+                    &frozen.scope.index_generation_id,
+                    scope_key,
+                )?
+                .is_some()),
             }
         })
         .map_err(|_| ContractError::KbRetrievalFailed)
@@ -1523,7 +1698,7 @@ impl KnowledgeStore {
             };
             let (mut sql, mut parameters) = authorized_chunk_query(
                 &frozen.scope,
-                "chunk.id,conversation.conversation_stable_id,chunk.started_at_ms,chunk.ended_at_ms,knowledge_chunks_fts.rank",
+                "chunk.id,conversation.account_stable_id,conversation.conversation_stable_id,chunk.started_at_ms,chunk.ended_at_ms,knowledge_chunks_fts.rank",
                 "JOIN knowledge_chunks_fts ON knowledge_chunks_fts.chunk_id=chunk.id AND knowledge_chunks_fts.index_generation_id=chunk.index_generation_id",
             );
             sql.push_str(" AND knowledge_chunks_fts MATCH ? ORDER BY knowledge_chunks_fts.rank,chunk.id LIMIT ?");
@@ -1536,10 +1711,13 @@ impl KnowledgeStore {
                 .query_map(params_from_iter(parameters), |row| {
                     Ok(RetrievalCandidate {
                         chunk_id: row.get(0)?,
-                        conversation_id: row.get(1)?,
-                        started_at_ms: row.get(2)?,
-                        ended_at_ms: row.get(3)?,
-                        score: row.get(4)?,
+                        conversation_id: knowledge_scope_key(&StableConversationKey {
+                            account_stable_id: row.get(1)?,
+                            conversation_stable_id: row.get(2)?,
+                        }),
+                        started_at_ms: row.get(3)?,
+                        ended_at_ms: row.get(4)?,
+                        score: row.get(5)?,
                     })
                 })
                 .map_err(|_| ContractError::KbRetrievalFailed)?
@@ -1574,7 +1752,7 @@ impl KnowledgeStore {
             }
             let (mut sql, parameters) = authorized_chunk_query(
                 &frozen.scope,
-                "chunk.id,conversation.conversation_stable_id,chunk.started_at_ms,chunk.ended_at_ms,chunk.embedding",
+                "chunk.id,conversation.account_stable_id,conversation.conversation_stable_id,chunk.started_at_ms,chunk.ended_at_ms,chunk.embedding",
                 "",
             );
             sql.push_str(" ORDER BY chunk.id");
@@ -1587,7 +1765,7 @@ impl KnowledgeStore {
             let mut top = StreamingCosineTopK::new(usize::from(candidate_k));
             while let Some(row) = rows.next().map_err(|_| ContractError::KbRetrievalFailed)? {
                 let blob = row
-                    .get::<_, Option<Vec<u8>>>(4)
+                    .get::<_, Option<Vec<u8>>>(5)
                     .map_err(|_| ContractError::KbRetrievalFailed)?
                     .ok_or(ContractError::KbRetrievalFailed)?;
                 let vector = decode_unit_embedding(&blob, frozen.embedding.dimension as usize)
@@ -1595,9 +1773,12 @@ impl KnowledgeStore {
                 top.push(
                     RetrievalCandidate {
                         chunk_id: row.get(0).map_err(|_| ContractError::KbRetrievalFailed)?,
-                        conversation_id: row.get(1).map_err(|_| ContractError::KbRetrievalFailed)?,
-                        started_at_ms: row.get(2).map_err(|_| ContractError::KbRetrievalFailed)?,
-                        ended_at_ms: row.get(3).map_err(|_| ContractError::KbRetrievalFailed)?,
+                        conversation_id: knowledge_scope_key(&StableConversationKey {
+                            account_stable_id: row.get(1).map_err(|_| ContractError::KbRetrievalFailed)?,
+                            conversation_stable_id: row.get(2).map_err(|_| ContractError::KbRetrievalFailed)?,
+                        }),
+                        started_at_ms: row.get(3).map_err(|_| ContractError::KbRetrievalFailed)?,
+                        ended_at_ms: row.get(4).map_err(|_| ContractError::KbRetrievalFailed)?,
                         score: 0.0,
                     },
                     &vector,
@@ -1641,7 +1822,7 @@ impl KnowledgeStore {
             for chunk_id in ordered_chunk_ids {
                 let (mut sql, mut parameters) = authorized_chunk_query(
                     &frozen.scope,
-                    "chunk.id,conversation.conversation_stable_id,chunk.started_at_ms,chunk.ended_at_ms,chunk.content",
+                    "chunk.id,conversation.account_stable_id,conversation.conversation_stable_id,chunk.started_at_ms,chunk.ended_at_ms,chunk.content",
                     "",
                 );
                 sql.push_str(" AND chunk.id=?");
@@ -1651,9 +1832,10 @@ impl KnowledgeStore {
                         Ok((
                             row.get::<_, String>(0)?,
                             row.get::<_, String>(1)?,
-                            row.get::<_, i64>(2)?,
+                            row.get::<_, String>(2)?,
                             row.get::<_, i64>(3)?,
-                            row.get::<_, String>(4)?,
+                            row.get::<_, i64>(4)?,
+                            row.get::<_, String>(5)?,
                         ))
                     })
                     .optional()
@@ -1681,18 +1863,21 @@ impl KnowledgeStore {
                 };
                 let first_message_id = message_ids.first().cloned().ok_or(ContractError::KbRetrievalFailed)?;
                 let last_message_id = message_ids.last().cloned().ok_or(ContractError::KbRetrievalFailed)?;
-                if source_paths.is_empty() || row.0 != *chunk_id || row.2 > row.3 {
+                if source_paths.is_empty() || row.0 != *chunk_id || row.3 > row.4 {
                     return Err(ContractError::KbRetrievalFailed);
                 }
                 payloads.push(AuthorizedHitPayload {
                     chunk_id: row.0,
-                    conversation_id: row.1,
+                    conversation_id: knowledge_scope_key(&StableConversationKey {
+                        account_stable_id: row.1,
+                        conversation_stable_id: row.2,
+                    }),
                     first_message_id,
                     last_message_id,
-                    started_at_ms: row.2,
-                    ended_at_ms: row.3,
+                    started_at_ms: row.3,
+                    ended_at_ms: row.4,
                     source_paths,
-                    content: row.4,
+                    content: row.5,
                 });
             }
             ensure_retrieval_active(&transaction, frozen)?;
@@ -1899,6 +2084,25 @@ impl KnowledgeStore {
                 if pointed != 1 {
                     return Err(ContractError::KbNotReady);
                 }
+                if let Some(metadata) = self
+                    .inner
+                    .pending_display_metadata
+                    .lock()
+                    .map_err(|_| ContractError::KbNotReady)?
+                    .get(import_id)
+                    .cloned()
+                {
+                    if transaction
+                        .execute(
+                            "UPDATE knowledge_conversations SET display_metadata_json=?1 WHERE id=?2",
+                            params![metadata, conversation_id],
+                        )
+                        .map_err(|_| ContractError::KbNotReady)?
+                        != 1
+                    {
+                        return Err(ContractError::KbNotReady);
+                    }
+                }
                 #[cfg(test)]
                 activation_test_checkpoint("pointer_updated")?;
             }
@@ -1932,6 +2136,14 @@ impl KnowledgeStore {
             transaction.commit().map_err(|_| ContractError::KbNotReady)?;
             #[cfg(test)]
             activation_test_checkpoint("after_commit")?;
+            let mut pending = self
+                .inner
+                .pending_display_metadata
+                .lock()
+                .map_err(|_| ContractError::KbNotReady)?;
+            for (_, import_id, _, _, _) in &mappings {
+                pending.remove(import_id);
+            }
             Ok(ActivationReceipt {
                 index_generation_id: index_generation_id.into(),
                 snapshot_hash,
@@ -2238,9 +2450,17 @@ impl KnowledgeStore {
             if changed != 1 { return Err(ContractError::KbNotReady); }
             transaction.execute("UPDATE knowledge_import_generations SET status='superseded' WHERE conversation_id=?1 AND id<>?2 AND status='active'", params![candidate.0.conversation_id, candidate.0.id]).map_err(|_| ContractError::KbNotReady)?;
             transaction.execute("UPDATE knowledge_conversations SET active_import_generation_id=?1 WHERE id=?2", params![candidate.0.id, candidate.0.conversation_id]).map_err(|_| ContractError::KbNotReady)?;
+            if let Some(metadata) = self.inner.pending_display_metadata.lock().map_err(|_| ContractError::KbNotReady)?.get(&candidate.0.id).cloned() {
+                transaction.execute("UPDATE knowledge_conversations SET display_metadata_json=?1 WHERE id=?2", params![metadata, candidate.0.conversation_id]).map_err(|_| ContractError::KbNotReady)?;
+            }
             let next: u64 = transaction.query_row("SELECT catalog_generation_seq+1 FROM knowledge_catalog_state WHERE singleton_id=1", [], |row| row.get(0)).map_err(|_| ContractError::KbNotReady)?;
             transaction.execute("UPDATE knowledge_catalog_state SET catalog_generation_seq=?1,active_snapshot_hash=?2,active_index_generation_id=?3,activated_at_ms=?4 WHERE singleton_id=1", params![next as i64, ready_index.snapshot_hash, ready_index.id, now_ms()]).map_err(|_| ContractError::KbNotReady)?;
             transaction.commit().map_err(|_| ContractError::KbNotReady)?;
+            self.inner
+                .pending_display_metadata
+                .lock()
+                .map_err(|_| ContractError::KbNotReady)?
+                .remove(&candidate.0.id);
             Ok(next)
         })
     }
@@ -2284,10 +2504,21 @@ impl KnowledgeStore {
                     "UPDATE knowledge_conversations SET active_import_generation_id=?1 WHERE id=?2",
                     params![candidate.0.id, candidate.0.conversation_id],
                 ).map_err(|_| ContractError::KbNotReady)?;
+                if let Some(metadata) = self.inner.pending_display_metadata.lock().map_err(|_| ContractError::KbNotReady)?.get(&candidate.0.id).cloned() {
+                    transaction.execute("UPDATE knowledge_conversations SET display_metadata_json=?1 WHERE id=?2", params![metadata, candidate.0.conversation_id]).map_err(|_| ContractError::KbNotReady)?;
+                }
             }
             let next: u64 = transaction.query_row("SELECT catalog_generation_seq+1 FROM knowledge_catalog_state WHERE singleton_id=1", [], |row| row.get(0)).map_err(|_| ContractError::KbNotReady)?;
             transaction.execute("UPDATE knowledge_catalog_state SET catalog_generation_seq=?1,active_snapshot_hash=?2,active_index_generation_id=?3,activated_at_ms=?4 WHERE singleton_id=1", params![next as i64, ready_index.snapshot_hash, ready_index.id, now_ms()]).map_err(|_| ContractError::KbNotReady)?;
             transaction.commit().map_err(|_| ContractError::KbNotReady)?;
+            let mut pending = self
+                .inner
+                .pending_display_metadata
+                .lock()
+                .map_err(|_| ContractError::KbNotReady)?;
+            for candidate in &candidates {
+                pending.remove(&candidate.0.id);
+            }
             Ok(next)
         })
     }
@@ -2696,20 +2927,16 @@ fn resolve_retrieval_scope(
     {
         return Err(ContractError::KbScopeUnresolved);
     }
+    let mut resolved = Vec::with_capacity(ids.len());
     for id in &ids {
-        let count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM knowledge_index_generation_imports mapping JOIN knowledge_conversations conversation ON conversation.id=mapping.conversation_id AND conversation.active_import_generation_id=mapping.import_generation_id JOIN knowledge_import_generations import_generation ON import_generation.id=mapping.import_generation_id AND import_generation.status='active' WHERE mapping.index_generation_id=?1 AND conversation.conversation_stable_id=?2",
-                params![index_generation_id, id],
-                |row| row.get(0),
-            )
-            .map_err(|_| ContractError::KbRetrievalFailed)?;
-        if count != 1 {
-            return Err(ContractError::KbScopeUnresolved);
-        }
+        resolved.push(
+            resolve_active_scope_key(connection, index_generation_id, id)?
+                .ok_or(ContractError::KbScopeUnresolved)?,
+        );
     }
     ids.sort();
-    Ok(AuthorizedScope::Conversations(ids))
+    resolved.sort();
+    Ok(AuthorizedScope::Conversations(resolved))
 }
 
 fn authorized_chunk_query(
@@ -2724,13 +2951,18 @@ fn authorized_chunk_query(
     ];
     let scope_predicate = match &token.scope {
         AuthorizedScope::Conversations(ids) => {
-            parameters.extend(ids.iter().cloned().map(Value::Text));
+            for id in ids {
+                parameters.push(Value::Text(id.account_stable_id.clone()));
+                parameters.push(Value::Text(id.conversation_stable_id.clone()));
+            }
             format!(
-                " AND conversation.conversation_stable_id IN ({})",
-                std::iter::repeat("?")
-                    .take(ids.len())
-                    .collect::<Vec<_>>()
-                    .join(",")
+                " AND ({})",
+                std::iter::repeat(
+                    "(conversation.account_stable_id=? AND conversation.conversation_stable_id=?)"
+                )
+                .take(ids.len())
+                .collect::<Vec<_>>()
+                .join(" OR ")
             )
         }
         AuthorizedScope::GlobalUserSelected => String::new(),
@@ -3258,6 +3490,174 @@ fn snapshot_hash(selections: &[IndexImportSelection]) -> String {
     hex::encode(hash.finalize())
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ConversationDisplayMetadataV1 {
+    schema_version: String,
+    display_name: String,
+    is_group: bool,
+}
+
+fn validate_display_metadata_json(raw: &str) -> Result<String, ContractError> {
+    let mut metadata: ConversationDisplayMetadataV1 =
+        serde_json::from_str(raw).map_err(|_| ContractError::KbSourceUnsupported)?;
+    if metadata.schema_version != "conversation-display-v1" {
+        return Err(ContractError::KbSourceUnsupported);
+    }
+    metadata.display_name = metadata
+        .display_name
+        .chars()
+        .filter(|character| !character.is_control())
+        .collect::<String>()
+        .trim()
+        .to_owned();
+    if metadata.display_name.is_empty()
+        || metadata.display_name.len() > 512
+        || metadata.display_name.chars().count() > 256
+    {
+        return Err(ContractError::KbSourceUnsupported);
+    }
+    serde_json::to_string(&metadata).map_err(|_| ContractError::KbSourceUnsupported)
+}
+
+fn load_active_conversation_catalog(
+    connection: &Connection,
+) -> Result<ActiveConversationCatalog, ContractError> {
+    let mut statement = connection
+        .prepare(
+            "SELECT catalog.catalog_generation_seq,conversation.account_stable_id,conversation.conversation_stable_id,conversation.display_metadata_json,import_generation.message_count,MIN(normalization.created_at_ms),MAX(normalization.created_at_ms),COUNT(member.message_id) FROM knowledge_catalog_state catalog JOIN knowledge_index_generations index_generation ON index_generation.id=catalog.active_index_generation_id AND index_generation.status='ready' AND index_generation.completed_at_ms IS NOT NULL AND index_generation.snapshot_hash=catalog.active_snapshot_hash JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=index_generation.id JOIN knowledge_conversations conversation ON conversation.id=mapping.conversation_id AND conversation.active_import_generation_id=mapping.import_generation_id JOIN knowledge_import_generations import_generation ON import_generation.id=mapping.import_generation_id AND import_generation.conversation_id=conversation.id AND import_generation.status='active' LEFT JOIN knowledge_import_generation_members member ON member.import_generation_id=import_generation.id LEFT JOIN knowledge_message_normalizations normalization ON normalization.message_version_id=member.message_version_id WHERE catalog.singleton_id=1 AND catalog.activated_at_ms IS NOT NULL AND NOT EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.conversation_id=conversation.id OR denial.message_id=member.message_id) AND NOT EXISTS(SELECT 1 FROM knowledge_import_generation_members scoped_member WHERE scoped_member.import_generation_id=import_generation.id AND NOT EXISTS(SELECT 1 FROM knowledge_message_sources provenance JOIN knowledge_import_generation_sources source_mapping ON source_mapping.import_generation_id=import_generation.id AND source_mapping.source_id=provenance.source_id JOIN knowledge_sources source ON source.id=provenance.source_id AND source.source_state='active' WHERE provenance.message_version_id=scoped_member.message_version_id AND NOT EXISTS(SELECT 1 FROM knowledge_denials source_denial WHERE source_denial.source_id=source.id))) GROUP BY catalog.catalog_generation_seq,conversation.id,conversation.account_stable_id,conversation.conversation_stable_id,conversation.display_metadata_json,import_generation.message_count ORDER BY conversation.account_stable_id,conversation.conversation_stable_id",
+        )
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, i64>(4)?,
+                row.get::<_, Option<i64>>(5)?,
+                row.get::<_, Option<i64>>(6)?,
+                row.get::<_, i64>(7)?,
+            ))
+        })
+        .map_err(|_| ContractError::KbRetrievalFailed)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    if rows.is_empty() {
+        return Err(ContractError::KbNotReady);
+    }
+    let catalog_generation =
+        u64::try_from(rows[0].0).map_err(|_| ContractError::KbRetrievalFailed)?;
+    let mut conversations = Vec::with_capacity(rows.len());
+    for (generation, account, conversation, raw_metadata, declared_count, start, end, count) in rows
+    {
+        if generation != catalog_generation as i64 || declared_count < 0 || count != declared_count
+        {
+            return Err(ContractError::KbRetrievalFailed);
+        }
+        let (display_name, is_group, single_bindable) = if raw_metadata.trim() == "{}" {
+            ("未提供名称".to_owned(), false, false)
+        } else {
+            let canonical = validate_display_metadata_json(&raw_metadata)
+                .map_err(|_| ContractError::KbRetrievalFailed)?;
+            let metadata: ConversationDisplayMetadataV1 =
+                serde_json::from_str(&canonical).map_err(|_| ContractError::KbRetrievalFailed)?;
+            (metadata.display_name, metadata.is_group, true)
+        };
+        conversations.push(KnowledgeConversationOption {
+            scope_key: knowledge_scope_key(&StableConversationKey {
+                account_stable_id: account,
+                conversation_stable_id: conversation,
+            }),
+            display_name,
+            is_group,
+            started_at_ms: start,
+            ended_at_ms: end,
+            message_count: u64::try_from(count).map_err(|_| ContractError::KbRetrievalFailed)?,
+            single_bindable,
+        });
+    }
+    conversations.sort_by(|left, right| {
+        left.display_name
+            .cmp(&right.display_name)
+            .then_with(|| left.is_group.cmp(&right.is_group))
+            .then_with(|| left.started_at_ms.cmp(&right.started_at_ms))
+            .then_with(|| left.ended_at_ms.cmp(&right.ended_at_ms))
+            .then_with(|| left.scope_key.cmp(&right.scope_key))
+    });
+    let mut digest = Sha256::new();
+    digest.update(b"knowledge-active-scope-v1");
+    for conversation in &conversations {
+        digest.update((conversation.scope_key.len() as u64).to_be_bytes());
+        digest.update(conversation.scope_key.as_bytes());
+    }
+    Ok(ActiveConversationCatalog {
+        catalog_generation,
+        conversations,
+        active_scope_digest: hex::encode(digest.finalize()),
+    })
+}
+
+fn same_display_facts(
+    left: &KnowledgeConversationOption,
+    right: &KnowledgeConversationOption,
+) -> bool {
+    left.display_name == right.display_name
+        && left.is_group == right.is_group
+        && left.started_at_ms == right.started_at_ms
+        && left.ended_at_ms == right.ended_at_ms
+        && left.message_count == right.message_count
+}
+
+pub(crate) fn knowledge_scope_key(key: &StableConversationKey) -> String {
+    let mut hash = Sha256::new();
+    hash.update(b"knowledge-scope-key-v1\0");
+    hash.update(key.account_stable_id.as_bytes());
+    hash.update(b"\0");
+    hash.update(key.conversation_stable_id.as_bytes());
+    format!("ksc1_{}", hex::encode(hash.finalize()))
+}
+
+fn valid_scope_key(value: &str) -> bool {
+    value.len() == 69
+        && value.starts_with("ksc1_")
+        && value[5..].bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn resolve_active_scope_key(
+    connection: &Connection,
+    index_generation_id: &str,
+    scope_key: &str,
+) -> Result<Option<StableConversationKey>, ContractError> {
+    if !valid_scope_key(scope_key) {
+        return Err(ContractError::KbScopeUnresolved);
+    }
+    let mut statement = connection.prepare(
+        "SELECT conversation.account_stable_id,conversation.conversation_stable_id FROM knowledge_index_generation_imports mapping JOIN knowledge_conversations conversation ON conversation.id=mapping.conversation_id AND conversation.active_import_generation_id=mapping.import_generation_id JOIN knowledge_import_generations import_generation ON import_generation.id=mapping.import_generation_id AND import_generation.status='active' WHERE mapping.index_generation_id=?1 AND NOT EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.conversation_id=conversation.id OR denial.message_id IN (SELECT member.message_id FROM knowledge_import_generation_members member WHERE member.import_generation_id=import_generation.id)) AND NOT EXISTS(SELECT 1 FROM knowledge_import_generation_members scoped_member WHERE scoped_member.import_generation_id=import_generation.id AND NOT EXISTS(SELECT 1 FROM knowledge_message_sources provenance JOIN knowledge_import_generation_sources source_mapping ON source_mapping.import_generation_id=import_generation.id AND source_mapping.source_id=provenance.source_id JOIN knowledge_sources source ON source.id=provenance.source_id AND source.source_state='active' WHERE provenance.message_version_id=scoped_member.message_version_id AND NOT EXISTS(SELECT 1 FROM knowledge_denials source_denial WHERE source_denial.source_id=source.id))) ORDER BY conversation.account_stable_id,conversation.conversation_stable_id"
+    ).map_err(|_| ContractError::KbRetrievalFailed)?;
+    let matches = statement
+        .query_map([index_generation_id], |row| {
+            Ok(StableConversationKey {
+                account_stable_id: row.get(0)?,
+                conversation_stable_id: row.get(1)?,
+            })
+        })
+        .map_err(|_| ContractError::KbRetrievalFailed)?
+        .filter_map(|row| match row {
+            Ok(key) if knowledge_scope_key(&key) == scope_key => Some(Ok(key)),
+            Ok(_) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    match matches.as_slice() {
+        [] => Ok(None),
+        [key] => Ok(Some(key.clone())),
+        _ => Err(ContractError::KbScopeUnresolved),
+    }
+}
+
 fn opaque_id(prefix: &str) -> String {
     format!("{prefix}_{}", Uuid::new_v4().simple())
 }
@@ -3606,6 +4006,7 @@ mod tests {
                 coverage_hash: "coverage".into(),
                 exported_at_ms: 1,
                 coverage_kind: CoverageKind::Full,
+                display_metadata_json: None,
             })
             .unwrap();
         store
@@ -3691,6 +4092,7 @@ mod tests {
             coverage_hash: format!("coverage-{export_id}"),
             exported_at_ms: 1,
             coverage_kind: CoverageKind::Full,
+            display_metadata_json: None,
         }
     }
 
@@ -4725,22 +5127,38 @@ mod tests {
     fn discarding_a_failed_multi_conversation_import_removes_staging_and_source_audit() {
         let data_dir = temp_dir();
         let store = KnowledgeStore::open(&data_dir).unwrap();
-        let first = store
-            .begin_staging_source(source_at("first", 1, CoverageKind::Full))
-            .unwrap();
+        let display_metadata = serde_json::json!({
+            "schemaVersion": "conversation-display-v1",
+            "displayName": "虚构待清理会话",
+            "isGroup": false
+        })
+        .to_string();
+        let mut first_source = source_at("first", 1, CoverageKind::Full);
+        first_source.display_metadata_json = Some(display_metadata.clone());
+        let first = store.begin_staging_source(first_source).unwrap();
         store
             .append_staging_messages(&first, &[message("one", "first")])
             .unwrap();
-        let second = store
-            .begin_staging_source(NewSource {
-                conversation_stable_id: "other".into(),
-                ..source_at("second", 2, CoverageKind::Full)
-            })
-            .unwrap();
+        let mut second_source = NewSource {
+            conversation_stable_id: "other".into(),
+            ..source_at("second", 2, CoverageKind::Full)
+        };
+        second_source.display_metadata_json = Some(display_metadata);
+        let second = store.begin_staging_source(second_source).unwrap();
         store
             .append_staging_messages(&second, &[message("one", "second")])
             .unwrap();
+        assert_eq!(
+            store.inner.pending_display_metadata.lock().unwrap().len(),
+            2
+        );
         store.discard_stagings(&[first, second]).unwrap();
+        assert!(store
+            .inner
+            .pending_display_metadata
+            .lock()
+            .unwrap()
+            .is_empty());
 
         let database =
             Connection::open(data_dir.join("wechat_knowledge/knowledge.sqlite")).unwrap();
@@ -4757,6 +5175,36 @@ mod tests {
                 .unwrap();
             assert_eq!(count, 0, "{table}");
         }
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn discarding_source_candidates_removes_pending_display_metadata() {
+        let data_dir = temp_dir();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let mut input = source("discard-source-metadata");
+        input.display_metadata_json = Some(
+            serde_json::json!({
+                "schemaVersion": "conversation-display-v1",
+                "displayName": "虚构待丢弃来源",
+                "isGroup": false
+            })
+            .to_string(),
+        );
+        let staging = store.begin_staging_source(input).unwrap();
+        assert_eq!(
+            store.inner.pending_display_metadata.lock().unwrap().len(),
+            1
+        );
+        store
+            .discard_source_candidates(staging.source_id())
+            .unwrap();
+        assert!(store
+            .inner
+            .pending_display_metadata
+            .lock()
+            .unwrap()
+            .is_empty());
         let _ = fs::remove_dir_all(data_dir);
     }
 
@@ -5134,6 +5582,23 @@ mod tests {
             "final_reread",
         ] {
             let (data_dir, store, candidate, expected, scope) = prepare_activation_switch();
+            let import_id: String = store
+                .with_reader(|connection| {
+                    connection
+                        .query_row(
+                            "SELECT import_generation_id FROM knowledge_index_generation_imports WHERE index_generation_id=?1",
+                            [&candidate.index_generation_id],
+                            |row| row.get(0),
+                        )
+                        .map_err(|_| ContractError::KbNotReady)
+                })
+                .unwrap();
+            store
+                .inner
+                .pending_display_metadata
+                .lock()
+                .unwrap()
+                .insert(import_id.clone(), "fixture-metadata".into());
             let before = activation_state(&store, &scope);
             set_activation_test_hook(checkpoint, false);
             assert_eq!(
@@ -5147,6 +5612,12 @@ mod tests {
                 before,
                 "checkpoint {checkpoint}"
             );
+            assert!(store
+                .inner
+                .pending_display_metadata
+                .lock()
+                .unwrap()
+                .contains_key(&import_id));
             let _ = fs::remove_dir_all(data_dir);
         }
     }
@@ -5631,6 +6102,122 @@ mod tests {
                 Err(ContractError::KbRetrievalFailed)
             );
         }
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn active_conversation_catalog_is_redacted_and_publishes_metadata_only_on_activation() {
+        let data_dir = temp_dir();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let mut input = source("catalog-display");
+        input.display_metadata_json = Some(
+            serde_json::json!({
+                "schemaVersion": "conversation-display-v1",
+                "displayName": "虚构项目组",
+                "isGroup": true
+            })
+            .to_string(),
+        );
+        let candidate = ready_candidate(&store, input);
+        assert_eq!(
+            store.inner.pending_display_metadata.lock().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            store.list_active_conversations(),
+            Err(ContractError::KbNotReady)
+        );
+        let index = store
+            .register_ready_index(&candidate, "catalog-snapshot".into())
+            .unwrap();
+        store.activate_candidate(candidate, index).unwrap();
+        assert!(store
+            .inner
+            .pending_display_metadata
+            .lock()
+            .unwrap()
+            .is_empty());
+
+        let catalog = store.list_active_conversations().unwrap();
+        assert_eq!(catalog.conversations.len(), 1);
+        let conversation = &catalog.conversations[0];
+        assert_eq!(conversation.display_name, "虚构项目组");
+        assert!(conversation.is_group);
+        assert_eq!(conversation.message_count, 1);
+        assert!(conversation.scope_key.starts_with("ksc1_"));
+        let serialized = serde_json::to_value(&catalog).unwrap().to_string();
+        for forbidden in [
+            "account",
+            "content",
+            "sender",
+            "source",
+            "manifest",
+            "path",
+            "conversationId",
+        ] {
+            assert!(!serialized.contains(forbidden));
+        }
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn opaque_scope_keys_include_account_and_identical_display_facts_block_single_binding() {
+        let data_dir = temp_dir();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let metadata = serde_json::json!({
+            "schemaVersion": "conversation-display-v1",
+            "displayName": "同名会话",
+            "isGroup": false
+        })
+        .to_string();
+        let mut first_source = source("ambiguous-a");
+        first_source.conversation_stable_id = "shared".into();
+        first_source.display_metadata_json = Some(metadata.clone());
+        let first = ready_candidate(&store, first_source);
+        let mut second_source = source("ambiguous-b");
+        second_source.account_stable_id = "other-account".into();
+        second_source.conversation_stable_id = "shared".into();
+        second_source.display_metadata_json = Some(metadata);
+        let second = ready_candidate(&store, second_source);
+        let index = store
+            .register_ready_index_set(&[first.clone(), second.clone()])
+            .unwrap();
+        store
+            .activate_candidates(vec![first, second], index)
+            .unwrap();
+        assert!(store
+            .inner
+            .pending_display_metadata
+            .lock()
+            .unwrap()
+            .is_empty());
+
+        let catalog = store.list_active_conversations().unwrap();
+        assert_eq!(catalog.conversations.len(), 2);
+        assert_ne!(
+            catalog.conversations[0].scope_key,
+            catalog.conversations[1].scope_key
+        );
+        assert_eq!(
+            store.resolve_scope_keys(
+                catalog.catalog_generation,
+                &RequestedScopeKeys::Conversation(catalog.conversations[0].scope_key.clone())
+            ),
+            Err(ContractError::KbScopeUnresolved)
+        );
+        let selected = store
+            .resolve_scope_keys(
+                catalog.catalog_generation,
+                &RequestedScopeKeys::Selected(
+                    catalog
+                        .conversations
+                        .iter()
+                        .map(|item| item.scope_key.clone())
+                        .collect(),
+                ),
+            )
+            .unwrap();
+        assert_eq!(selected.scope_keys.len(), 2);
         let _ = fs::remove_dir_all(data_dir);
     }
 }

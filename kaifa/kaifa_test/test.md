@@ -336,3 +336,24 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 - 默认沙箱运行新增门面套件时，18 个需要临时端口的用例在 fixture/loopback bind 处因 `Operation not permitted` 失败；同一命令在获准的本机 loopback 环境 23/23 通过。该记录是环境边界，不是产品失败或 Windows 证据。
 - `frozen_result_hash` 使用 `knowledge-retrieval-result-v1` canonical schema，覆盖请求策略、status/mode、命中顺序和每个 hit 的确定性字段；`elapsed_ms` 刻意不参与冻结值，以保持同结果重试稳定。
 - retriever 的编译期接口只有 `&KnowledgeStore + KnowledgeRetrieveRequest`，且 `retrieve.rs` 没有回复模型 import/参数；23 个 success/no-hit/fallback/error 路径均经该接口执行。这里记录的是编译期依赖隔离，不把静态字符串检查冒充运行时 model spy。
+
+## 会话范围绑定、重名消歧与代际失效（2026-08-07）
+
+检测脚本：`kaifa/kaifa_test/verify_knowledge_scope_binding.py`。脚本只读取步骤 24 的 Rust/Svelte 源码；不启动产品、不打开用户 `knowledge.sqlite` 或微信导出、不读取截图/正文、不连接模型或外网。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 静态安全边界 | `python3 -B kaifa/kaifa_test/verify_knowledge_scope_binding.py --project-root .` | 输出 `knowledge scope binding static gate: PASS`；确认唯一 binding owner、opaque key、account-scoped 解析、header-only 共用捕获、single-chat profile、hint-only 配置、双 UI 三入口与安全错误展示。 | 通过 |
+| Binding 行为 | `cargo test ... 'wechat::binding::tests' ...` | 5/5 通过：新进程 nonce/unbound/gen0、checked overflow、同 header 只推进 observation、HWND/bounds/header 变化分别失效、unreliable header 一次性确认只能消费一次且绑定 observation。 | 通过 |
+| Store 行为 | `cargo test ... 'knowledge::store::tests' ...` | 30/30 通过；新增用例覆盖 active 激活时才发布显示元数据、脱敏目录、跨 account 相同 conversation stable id 产生不同 scopeKey、允许显示事实完全相同则 single 不可绑定。 | 通过 |
+| Retrieval 行为 | `cargo test ... 'knowledge::retrieve::tests' ... -- --test-threads=1`（沙箱外获准 loopback） | 23/23 通过；opaque key 贯穿 FTS/vector/payload，selected/global 不扩权，deny/retire 后 fail closed，双 provenance 保持授权，boost 不改变候选集合。 | 通过 |
+| 完整 knowledge 回归 | `cargo test ... knowledge:: ... -- --test-threads=1`（沙箱外获准 loopback） | 93 passed、0 failed、1 ignored；ignored 为必须显式提供本地 endpoint/model 的真实中文质量探针。 | 通过 |
+| 原始并行 knowledge 命令 | `cargo test ... knowledge:: ...` | 81 passed 后出现 12 个失败；首个 fault-injection/临时目录全局 hook 被并行用例交叉消费，随后 hook mutex poison。相同代码单线程完整回归全绿，故记录为既有测试夹具并发限制，不记为产品通过或产品失败。 | 环境/夹具限制 |
+| 完整 wechat 回归 | `cargo test ... wechat:: ...` | 65/65 通过，包含 profile、window identity、capture guard、OCR、runtime 精确 M2 清泡、M1 不受 binding 失效影响和状态机 stale gate。 | 通过 |
+| 配置归一化 | `cargo test --manifest-path desktop/Cargo.toml -p work-review-core 'config::tests::微信留存和知识库选择归一化为安全范围'` | 1/1 通过；旧 `scope_mode` 归零，hint key 校验、去重、排序并限制 32 项。 | 通过 |
+| 前端与构建 | 4 个 Node 定向文件；`npm run build` | 50/50 通过；Vite 5.4.21 构建成功（245 modules）。 | 通过 |
+| M2 编译、格式与空白 | `cargo check ... wechat-m2`；`cargo fmt ... --check`；scoped `git diff --check` | 均退出 0；编译仅有仓库既有/步骤 25 尚未接线接口的 unused/dead-code warning 与 `block v0.1.6` future-incompat 提示。 | 通过 |
+| Windows 真机纵向 UAT | 受控 Windows 11 x64、冻结 production profile、真实前台微信/header OCR/窗口切换 | 当前 macOS 合成/SQLite/源码门禁不能替代；production profile 继续为空。 | not-run |
+
+- loopback 测试只使用完全虚构账号、会话、正文与系统临时目录，不访问外网或真实数据。
+- `not-run` 不是 Windows profile、OCR 稳定性、真实微信窗口切换或完整步骤 25 M2 编排通过证据。

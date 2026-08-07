@@ -854,6 +854,7 @@ mod tests {
                 coverage_hash: "coverage".into(),
                 exported_at_ms: 1,
                 coverage_kind: CoverageKind::Full,
+                display_metadata_json: None,
             })
             .unwrap();
         let first = IncomingMessage {

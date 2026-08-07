@@ -837,3 +837,13 @@ test('桌宠气泡面板在非紧凑文案下应允许更长的英文文字换�
   assert.match(popoverSource, /overflow-wrap: anywhere/);
   assert.doesNotMatch(popoverSource, /line-break: strict/);
 });
+
+test('桌宠气泡应复用显式知识范围选择器且不默认选择范围', () => {
+  const popoverSource = readFileSync(new URL('./AvatarPopover.svelte', import.meta.url), 'utf8');
+  const pickerSource = readFileSync(new URL('../KnowledgeScopePicker.svelte', import.meta.url), 'utf8');
+
+  assert.match(popoverSource, /KnowledgeScopePicker compact/);
+  assert.match(pickerSource, /let mode = null/);
+  assert.match(pickerSource, /let selectedKeys = \[\]/);
+  assert.match(pickerSource, /clear_knowledge_scope_binding/);
+});

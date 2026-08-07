@@ -84,6 +84,22 @@ pub(crate) struct WechatWindowIdentity {
 }
 
 impl WechatWindowIdentity {
+    pub(crate) fn instance(&self) -> WindowInstanceToken {
+        self.instance
+    }
+
+    pub(crate) fn pid(&self) -> u32 {
+        self.pid
+    }
+
+    pub(crate) fn profile_id(&self) -> &str {
+        &self.profile_id
+    }
+
+    pub(crate) fn profile_version(&self) -> &str {
+        &self.profile_version
+    }
+
     pub(crate) fn is_current(&self, other: &Self) -> bool {
         self.instance == other.instance
             && self.pid == other.pid
@@ -138,7 +154,9 @@ pub(crate) fn validate_foreground(
 
     let matches: Vec<_> = catalog
         .enabled_profiles()
-        .filter(|profile| profile_matches(profile, &evidence))
+        .filter(|profile| {
+            profile.reply_surface == "single_chat" && profile_matches(profile, &evidence)
+        })
         .collect();
     if matches.len() != 1 {
         return Err(ContractError::WxProfileUnsupported);
@@ -252,6 +270,7 @@ mod tests {
         "enabled": true,
         "profile_version": "1",
         "wechat_product_version": "4.0.1.26",
+        "reply_surface": "single_chat",
         "theme": "light",
         "display_topology": { "monitors": 1, "target_monitor": "primary" },
         "executable": { "file_name": "WeChat.exe", "normalized_paths": ["c:\\program files\\tencent\\wechat\\wechat.exe"], "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "product_version": "4.0.1.26" },

@@ -597,6 +597,7 @@ impl<'a> WechatJsonArchiveImporter<'a> {
             coverage_hash: fingerprint.coverage_signature.clone(),
             exported_at_ms,
             coverage_kind: coverage,
+            display_metadata_json: None,
         };
         let mut conversation_count = 0;
         let mut message_count = 0;
@@ -697,6 +698,14 @@ impl<'a> WechatJsonArchiveImporter<'a> {
         }
         let staging = self.store.begin_staging_source(NewSource {
             conversation_stable_id: conversation.stable_id.clone(),
+            display_metadata_json: Some(
+                serde_json::json!({
+                    "schemaVersion": "conversation-display-v1",
+                    "displayName": meta.display_name,
+                    "isGroup": meta.is_group,
+                })
+                .to_string(),
+            ),
             ..source.clone()
         })?;
         let source_id = staging.source_id().to_owned();

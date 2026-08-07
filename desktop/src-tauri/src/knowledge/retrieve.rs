@@ -60,7 +60,7 @@ pub(crate) struct KnowledgeRetrieveRequest {
     pub(crate) request_id: RequestId,
     pub(crate) query_text: String,
     pub(crate) binding_generation: BindingGeneration,
-    pub(crate) bound_conversation_id: String,
+    pub(crate) bound_conversation_id: Option<String>,
     pub(crate) scope: KnowledgeScope,
     pub(crate) top_k: u8,
     pub(crate) token_budget: u32,
@@ -300,11 +300,13 @@ impl KnowledgeStore {
                 request.top_k,
             )
             .map_err(KnowledgeError::from)?;
-        if !self
-            .retrieval_scope_authorizes(&frozen, &request.bound_conversation_id)
-            .map_err(KnowledgeError::from)?
-        {
-            return Err(KnowledgeError::ScopeUnresolved);
+        if let Some(bound) = request.bound_conversation_id.as_deref() {
+            if !self
+                .retrieval_scope_authorizes(&frozen, bound)
+                .map_err(KnowledgeError::from)?
+            {
+                return Err(KnowledgeError::ScopeUnresolved);
+            }
         }
 
         let candidate_k = request.top_k.saturating_mul(4).max(20);
@@ -340,7 +342,7 @@ impl KnowledgeStore {
             .collect::<BTreeSet<_>>();
         apply_same_conversation_boost(
             &mut ranked,
-            &request.bound_conversation_id,
+            request.bound_conversation_id.as_deref(),
             request.same_conversation_boost,
         );
         if chunks_before
@@ -434,10 +436,19 @@ impl KnowledgeStore {
 
 fn apply_same_conversation_boost(
     ranked: &mut [RankedCandidate],
-    bound_conversation_id: &str,
+    bound_conversation_id: Option<&str>,
     enabled: bool,
 ) {
     if enabled {
+        let Some(bound_conversation_id) = bound_conversation_id else {
+            ranked.sort_by(|left, right| {
+                right
+                    .score
+                    .total_cmp(&left.score)
+                    .then_with(|| left.candidate.chunk_id.cmp(&right.candidate.chunk_id))
+            });
+            return;
+        };
         for candidate in ranked.iter_mut() {
             if candidate.candidate.conversation_id == bound_conversation_id {
                 candidate.score += SAME_CONVERSATION_BOOST_V1;
@@ -634,7 +645,7 @@ fn result_hash(
         request.request_id.to_string(),
         normalized_query.to_owned(),
         request.binding_generation.value().to_string(),
-        request.bound_conversation_id.clone(),
+        request.bound_conversation_id.clone().unwrap_or_default(),
         request.same_conversation_boost.to_string(),
         frozen.scope.catalog_generation.to_string(),
         frozen.scope.authorization_epoch.to_string(),
@@ -769,9 +780,10 @@ mod tests {
     use crate::knowledge::archive_store::CompletenessVerdict;
     use crate::knowledge::chunk::{chunk_messages, CHUNK_SCHEMA_VERSION, FTS_PRETOKEN_VERSION};
     use crate::knowledge::store::{
-        fail_reader_at, set_active_fts_after_scan_hook, set_active_vector_after_scan_hook,
-        CandidateChecks, DeletionRequest, EncodedEmbedding, FrozenEmbeddingIdentity,
-        FrozenIndexBuildSpec, IncomingMessage, NewSource,
+        fail_reader_at, knowledge_scope_key, set_active_fts_after_scan_hook,
+        set_active_vector_after_scan_hook, CandidateChecks, DeletionRequest, EncodedEmbedding,
+        FrozenEmbeddingIdentity, FrozenIndexBuildSpec, IncomingMessage, NewSource,
+        StableConversationKey,
     };
     use std::fs;
     use std::net::SocketAddr;
@@ -912,6 +924,14 @@ mod tests {
                 coverage_hash: "fixture-coverage".into(),
                 exported_at_ms: 1,
                 coverage_kind: CoverageKind::Full,
+                display_metadata_json: Some(
+                    serde_json::json!({
+                        "schemaVersion": "conversation-display-v1",
+                        "displayName": "虚构会话",
+                        "isGroup": false
+                    })
+                    .to_string(),
+                ),
             })
             .unwrap();
         store
@@ -1014,15 +1034,21 @@ mod tests {
         (data_dir, store)
     }
 
+    fn fixture_scope_key() -> String {
+        knowledge_scope_key(&StableConversationKey {
+            account_stable_id: "fixture-account".into(),
+            conversation_stable_id: "fixture-conversation".into(),
+        })
+    }
+
     fn request(query: &str) -> KnowledgeRetrieveRequest {
+        let scope_key = fixture_scope_key();
         KnowledgeRetrieveRequest {
             request_id: RequestId::new(),
             query_text: query.into(),
             binding_generation: BindingGeneration::new(7),
-            bound_conversation_id: "fixture-conversation".into(),
-            scope: KnowledgeScope::Conversation {
-                id: "fixture-conversation".into(),
-            },
+            bound_conversation_id: Some(scope_key.clone()),
+            scope: KnowledgeScope::Conversation { id: scope_key },
             top_k: 4,
             token_budget: 512,
             token_counter_version: TOKEN_COUNTER_VERSION.into(),
@@ -1077,8 +1103,8 @@ mod tests {
         let ranked = fuse_candidates(vec![first.clone(), second], vec![first]).unwrap();
         let mut disabled = ranked.clone();
         let mut enabled = ranked;
-        apply_same_conversation_boost(&mut disabled, "bound", false);
-        apply_same_conversation_boost(&mut enabled, "bound", true);
+        apply_same_conversation_boost(&mut disabled, Some("bound"), false);
+        apply_same_conversation_boost(&mut enabled, Some("bound"), true);
         assert_eq!(
             disabled
                 .iter()
@@ -1198,7 +1224,7 @@ mod tests {
 
         let mut request_variants = Vec::new();
         let mut changed = base_request.clone();
-        changed.bound_conversation_id = "other-bound".into();
+        changed.bound_conversation_id = Some("other-bound".into());
         request_variants.push(("bound conversation", changed));
         let mut changed = base_request.clone();
         changed.same_conversation_boost = false;
@@ -1342,7 +1368,7 @@ mod tests {
         assert_eq!(reply.binding_generation(), request.binding_generation);
         assert!(!reply.frozen_result_hash().is_empty());
         assert_eq!(reply.hits.len(), 1);
-        assert_eq!(reply.hits[0].conversation_id, "fixture-conversation");
+        assert_eq!(reply.hits[0].conversation_id, fixture_scope_key());
         assert_eq!(reply.hits[0].source_paths, ["archive/messages.jsonl"]);
         assert_eq!(
             calls.lock().unwrap().as_slice(),
@@ -1402,10 +1428,10 @@ mod tests {
         };
         cases.push(outside);
         let mut blank = request("虚构项目");
-        blank.bound_conversation_id = "  ".into();
+        blank.bound_conversation_id = Some("  ".into());
         cases.push(blank);
         let mut nul = request("虚构项目");
-        nul.bound_conversation_id = "fixture\0conversation".into();
+        nul.bound_conversation_id = Some("fixture\0conversation".into());
         cases.push(nul);
         for request in cases {
             assert_eq!(
@@ -1417,7 +1443,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn global_duplicate_bound_conversation_is_scope_unresolved() {
+    async fn global_cross_account_same_stable_id_keeps_opaque_scope_unique() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         drop(listener);
@@ -1445,10 +1471,9 @@ mod tests {
 
         let mut request = request("虚构项目");
         request.scope = KnowledgeScope::GlobalUserSelected;
-        assert_eq!(
-            store.knowledge_retrieve(request).await,
-            Err(KnowledgeError::ScopeUnresolved)
-        );
+        let reply = store.knowledge_retrieve(request).await.unwrap();
+        assert_eq!(reply.hits.len(), 1);
+        assert_eq!(reply.hits[0].conversation_id, fixture_scope_key());
         let _ = fs::remove_dir_all(data_dir);
     }
 
@@ -1460,7 +1485,7 @@ mod tests {
         let (data_dir, store) = build_retrieval_fixture(format!("http://{address}"));
         for scope in [
             KnowledgeScope::SelectedConversations {
-                ids: vec!["fixture-conversation".into()],
+                ids: vec![fixture_scope_key()],
             },
             KnowledgeScope::GlobalUserSelected,
         ] {
@@ -1471,7 +1496,7 @@ mod tests {
             assert!(reply
                 .hits
                 .iter()
-                .all(|hit| hit.conversation_id == "fixture-conversation"));
+                .all(|hit| hit.conversation_id == fixture_scope_key()));
         }
         let _ = fs::remove_dir_all(data_dir);
     }
@@ -1487,9 +1512,10 @@ mod tests {
             .execute("UPDATE knowledge_sources SET source_state='retired'", [])
             .unwrap();
 
-        let reply = store.knowledge_retrieve(request("虚构项目")).await.unwrap();
-        assert_eq!(reply.status, RetrievalStatus::NoHit);
-        assert!(reply.hits.is_empty());
+        assert_eq!(
+            store.knowledge_retrieve(request("虚构项目")).await,
+            Err(KnowledgeError::ScopeUnresolved)
+        );
         let _ = fs::remove_dir_all(data_dir);
     }
 
@@ -1523,9 +1549,11 @@ mod tests {
                 _ => unreachable!(),
             };
             store.deny_or_delete(denial_request).unwrap();
-            let reply = store.knowledge_retrieve(request("虚构项目")).await.unwrap();
-            assert_eq!(reply.status, RetrievalStatus::NoHit, "{denied_kind}");
-            assert!(reply.hits.is_empty(), "{denied_kind}");
+            assert_eq!(
+                store.knowledge_retrieve(request("虚构项目")).await,
+                Err(KnowledgeError::ScopeUnresolved),
+                "{denied_kind}"
+            );
             let _ = fs::remove_dir_all(data_dir);
         }
     }

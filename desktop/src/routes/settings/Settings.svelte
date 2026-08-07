@@ -83,7 +83,7 @@
         config.wechat = { compatibilityProfileId: null, textModelProfileId: null, autoTrigger: false, contentRetentionEnabled: false, contentRetentionDays: 0 };
       }
       if (!config.knowledge || typeof config.knowledge !== 'object') {
-        config.knowledge = { recentPickerDir: null, scopeMode: null, topK: 6, tokenBudget: 1200, tokenCounterVersion: 'v1', sameConversationBoost: false, localEmbedding: { provider: 'ollama_loopback', endpoint: 'http://127.0.0.1', model: '' }, knowledgeSources: [] };
+        config.knowledge = { recentPickerDir: null, scopeMode: null, lastScopeHintKeys: [], topK: 6, tokenBudget: 1200, tokenCounterVersion: 'v1', sameConversationBoost: false, localEmbedding: { provider: 'ollama_loopback', endpoint: 'http://127.0.0.1', model: '' }, knowledgeSources: [] };
       }
       if (!config.knowledge.localEmbedding || typeof config.knowledge.localEmbedding !== 'object') {
         config.knowledge.localEmbedding = { provider: 'ollama_loopback', endpoint: 'http://127.0.0.1', model: '' };

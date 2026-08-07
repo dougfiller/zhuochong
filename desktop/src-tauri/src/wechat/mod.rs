@@ -1,3 +1,4 @@
+pub(crate) mod binding;
 pub(crate) mod capture;
 pub(crate) mod commands;
 pub(crate) mod config;

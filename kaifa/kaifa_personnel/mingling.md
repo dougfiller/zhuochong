@@ -376,3 +376,35 @@ git diff --check -- desktop/src-tauri/src/knowledge kaifa/kaifa_test/verify_know
 - retire/deny/delete 必须在同一写事务中递增冻结授权 epoch；payload 正文、message range、source paths 和末次授权校验必须在同一 SQLite read transaction，返回前还要用新 reader 重验 catalog/authorization token。
 - `frozen_result_hash` 的 `knowledge-retrieval-result-v1` schema 覆盖请求策略、status/mode、命中顺序与全部确定性 hit 字段；`elapsed_ms` 明确排除，以保持同结果重试稳定。
 - `MIN_VECTOR_SCORE_V1=0.20` 是版本化保守默认，仅有合成行为证据；真实中文 Recall@5 与 Windows 性能仍为 not-run，不能写成质量通过。
+
+# 2026-08-07：步骤 24 会话范围绑定与代际失效
+
+```bash
+# 步骤 24 纯静态安全门禁；仅读取本次 Rust/Svelte 源码，不打开用户数据库、微信导出、截图或网络。
+python3 -B kaifa/kaifa_test/verify_knowledge_scope_binding.py --project-root .
+
+# 进程内 binding 的 nonce、代际、窗口/header 变化、溢出与一次性确认行为。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::binding::tests' --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# 微信 runtime/profile/header/capture 与知识 Store/retrieval 回归。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml wechat:: --no-default-features --features 'wechat-contract-check,wechat-m2'
+cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features --features 'wechat-contract-check,wechat-m2' -- --test-threads=1
+
+# knowledge 测试中的虚构 embedding fixture 只绑定系统分配的 127.0.0.1 临时端口，不访问外网；
+# 当前仓库的若干 fault-injection hook 是进程全局状态，因此完整 knowledge 回归使用单线程隔离。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'knowledge::retrieve::tests' --no-default-features --features 'wechat-contract-check,wechat-m2' -- --test-threads=1
+
+# M2 feature 编译，不启动 Tauri、微信或模型。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# 两个既有 UI 表面的范围选择器、显式触发与安全错误展示。
+(cd desktop && node --test src/routes/settings/SettingsWechatKnowledge.test.js src/routes/avatar/WechatExplicitTrigger.test.js src/lib/components/Avatar/avatarWindow.test.js src/lib/utils/errorDisplay.test.js)
+(cd desktop && npm run build)
+
+# Rust 格式与本步骤范围空白。
+cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check
+git diff --check -- desktop kaifa/kaifa_test kaifa/kaifa_personnel/mingling.md
+```
+
+- `verify_knowledge_scope_binding.py` 只验证唯一进程内 binding、opaque scope key、header-only 内存路径、single-chat profile 门禁、hint-only 配置、双 UI 三操作和禁止自动化能力等稳定源码边界；它不替代行为测试。
+- 默认沙箱不允许 loopback bind；knowledge HTTP fixture 需在获准环境运行。真实 Windows 前台微信、冻结 production profile、header OCR 与窗口切换 UAT 仍为 `not-run`。

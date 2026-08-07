@@ -95,6 +95,23 @@ impl Default for WechatReplyRuntime {
 }
 
 impl WechatReplyRuntime {
+    #[cfg(test)]
+    pub(super) fn install_presented_suggestion_fixture(
+        &self,
+        binding_generation: Option<BindingGeneration>,
+    ) -> (RequestId, SuggestionGeneration) {
+        let request_id = RequestId::new();
+        let suggestion_generation = SuggestionGeneration::new(41);
+        self.inner.lock().unwrap().presented_suggestion = Some(PresentedSuggestion {
+            request_id: request_id.clone(),
+            suggestion_generation,
+            binding_generation,
+            text: "虚构建议".into(),
+            state: PresentedSuggestionState::Ready,
+        });
+        (request_id, suggestion_generation)
+    }
+
     /// A deliberately small public status view for settings UI. It has no
     /// request identifier, reply body, trace location, or error detail.
     pub(crate) fn request_phase(&self) -> &'static str {
@@ -612,6 +629,58 @@ impl WechatReplyRuntime {
         Ok(should_clear)
     }
 
+    pub(crate) fn invalidate_m2_binding(
+        &self,
+        binding_generation: BindingGeneration,
+    ) -> Result<Option<AvatarBubblePayload>, ContractError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| ContractError::WxContractViolation)?;
+        if inner.active.as_ref().is_some_and(|active| {
+            active.state.mode() == ReplyMode::M2
+                && active.state.binding_generation() == binding_generation
+        }) {
+            if let Some(active) = inner.active.as_mut() {
+                let _ = active.cancel.send(true);
+                transition_terminal(
+                    active,
+                    ReplyState::Cancelled,
+                    Some(ContractError::WxRequestStale),
+                )?;
+            }
+            inner.active = None;
+        }
+        let payload = inner.presented_suggestion.as_ref().and_then(|suggestion| {
+            (suggestion.binding_generation == Some(binding_generation)).then(|| {
+                AvatarBubblePayload::clear_wechat_suggestion(
+                    suggestion.request_id.to_string(),
+                    suggestion.suggestion_generation.value(),
+                    suggestion.binding_generation.map(BindingGeneration::value),
+                )
+            })
+        });
+        if payload.is_some() {
+            inner.presented_suggestion = None;
+        }
+        Ok(payload)
+    }
+
+    pub(crate) fn update_m2_observation(
+        &self,
+        binding_generation: BindingGeneration,
+        observation_version: BindingObservationVersion,
+    ) -> Result<(), ContractError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| ContractError::WxContractViolation)?;
+        let active = inner.active.as_mut().ok_or(ContractError::WxRequestStale)?;
+        active
+            .state
+            .update_m2_observation(binding_generation, observation_version)
+    }
+
     #[cfg(feature = "wechat-m1")]
     pub(super) async fn generate_m1_reply_with_client(
         &self,
@@ -1051,6 +1120,17 @@ impl CaptureCoordinator {
                 .latest_capture_version
                 .load(std::sync::atomic::Ordering::Relaxed)
     }
+
+    pub(crate) fn invalidate_current_capture(&self) -> Result<(), super::types::ContractError> {
+        self.latest_capture_version
+            .fetch_update(
+                std::sync::atomic::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+                |value| value.checked_add(1),
+            )
+            .map(|_| ())
+            .map_err(|_| super::types::ContractError::WxContractViolation)
+    }
 }
 
 async fn cancellation_requested(cancel: &mut Option<tokio::sync::watch::Receiver<bool>>) {
@@ -1177,6 +1257,73 @@ impl WechatReplyRuntime {
             },
             current,
         ))
+    }
+
+    #[cfg(target_os = "windows")]
+    pub(crate) async fn capture_header_identity_observation(
+        &self,
+        app: tauri::AppHandle,
+        coordinator: &CaptureCoordinator,
+        screenshot_service: crate::screenshot::ScreenshotService,
+        identity: super::window_identity::WechatWindowIdentity,
+        timeout: std::time::Duration,
+    ) -> Result<
+        (
+            super::ocr::HeaderIdentityClue,
+            super::window_identity::WechatWindowIdentity,
+        ),
+        super::types::ContractError,
+    > {
+        let _permit = coordinator
+            .try_acquire()
+            .ok_or(super::types::ContractError::WxBusy)?;
+        let guard = super::capture::WechatCaptureGuard::begin(
+            super::capture::TauriWechatWindowPort::new(app),
+        )?;
+        let mut cancel = None;
+        let (frame, current) = run_guarded_capture(
+            guard,
+            || self.revalidate_foreground_wechat(&identity).map(|_| ()),
+            || {
+                let target_window = identity.capture_target_window();
+                tokio::task::spawn_blocking(move || {
+                    screenshot_service
+                        .capture_ephemeral_for_window(&target_window)
+                        .map_err(|_| super::types::ContractError::WxCaptureFailed)
+                })
+            },
+            || self.revalidate_foreground_wechat(&identity),
+            timeout,
+            &mut cancel,
+        )
+        .await?;
+        let header = super::capture::header_for_identity(
+            super::capture::EphemeralCapturedFrame::new(frame),
+            &current,
+        )?;
+        let mut dispatcher = super::ocr::WechatOcrDispatcher::new(
+            super::ocr::WindowsMemoryPrimary,
+            super::ocr::DisabledLocalFallback,
+        );
+        Ok((dispatcher.recognize_header(&header)?, current))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    pub(crate) async fn capture_header_identity_observation(
+        &self,
+        _app: tauri::AppHandle,
+        _coordinator: &CaptureCoordinator,
+        _screenshot_service: crate::screenshot::ScreenshotService,
+        _identity: super::window_identity::WechatWindowIdentity,
+        _timeout: std::time::Duration,
+    ) -> Result<
+        (
+            super::ocr::HeaderIdentityClue,
+            super::window_identity::WechatWindowIdentity,
+        ),
+        super::types::ContractError,
+    > {
+        Err(super::types::ContractError::WxWindowUnsupported)
     }
 }
 

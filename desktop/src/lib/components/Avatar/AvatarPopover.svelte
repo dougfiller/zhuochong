@@ -1,6 +1,7 @@
 <script>
   import { formatBubbleMessage } from './bubbleMessage.js';
   import { t } from '$lib/i18n/index.js';
+  import KnowledgeScopePicker from '$lib/components/KnowledgeScopePicker.svelte';
 
   export let bubble = null;
   export let flipLeft = false;
@@ -116,6 +117,7 @@
               {/if}
             </div>
             <p class="relative mt-2 text-[10px] leading-snug text-slate-500">{t('avatar.wechatManualReview')}</p>
+            <div class="relative mt-2"><KnowledgeScopePicker compact /></div>
           {/if}
         </div>
         <div

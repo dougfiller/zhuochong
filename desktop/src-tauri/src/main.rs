@@ -4195,6 +4195,7 @@ async fn main() {
         .manage(app_lifecycle_state.clone())
         .manage(wechat::WechatReplyRuntime::default())
         .manage(wechat::CaptureCoordinator::default())
+        .manage(wechat::binding::KnowledgeScopeBinding::default())
         .manage(knowledge_store)
         // 系统托盘在 setup 中创建 (Tauri v2)
         .on_window_event(|window, event| {
@@ -4575,9 +4576,15 @@ async fn main() {
             wechat::commands::request_wechat_suggestion_copy,
             wechat::commands::confirm_wechat_suggestion_copy,
             wechat::commands::dismiss_wechat_suggestion,
+            wechat::commands::get_knowledge_scope_binding_status,
+            wechat::commands::begin_knowledge_scope_observation,
+            wechat::commands::confirm_knowledge_scope_binding,
+            wechat::commands::confirm_knowledge_scope_for_next_request,
+            wechat::commands::clear_knowledge_scope_binding,
             knowledge::commands::get_knowledge_settings_status,
             knowledge::commands::validate_knowledge_local_embedding,
             knowledge::commands::list_knowledge_sources,
+            knowledge::commands::list_knowledge_conversations,
             knowledge::commands::get_knowledge_maintenance_status,
             knowledge::commands::start_knowledge_source_import,
             knowledge::commands::retire_knowledge_source,

@@ -966,13 +966,18 @@ pub struct KnowledgeSourceRegistration {
 pub struct KnowledgeConfig {
     #[serde(default, alias = "recent_picker_dir")]
     pub recent_picker_dir: Option<String>,
-    #[serde(default, alias = "scope_mode")]
+    #[serde(default, alias = "scope_mode", skip_serializing_if = "Option::is_none")]
     pub scope_mode: Option<KnowledgeScopeMode>,
+    #[serde(default, alias = "last_scope_hint_keys")]
+    pub last_scope_hint_keys: Vec<String>,
     #[serde(default = "default_knowledge_top_k", alias = "top_k")]
     pub top_k: u8,
     #[serde(default = "default_knowledge_token_budget", alias = "token_budget")]
     pub token_budget: u32,
-    #[serde(default = "default_knowledge_token_counter_version", alias = "token_counter_version")]
+    #[serde(
+        default = "default_knowledge_token_counter_version",
+        alias = "token_counter_version"
+    )]
     pub token_counter_version: String,
     #[serde(default, alias = "same_conversation_boost")]
     pub same_conversation_boost: bool,
@@ -987,6 +992,7 @@ impl Default for KnowledgeConfig {
         Self {
             recent_picker_dir: None,
             scope_mode: None,
+            last_scope_hint_keys: Vec::new(),
             top_k: default_knowledge_top_k(),
             token_budget: default_knowledge_token_budget(),
             token_counter_version: default_knowledge_token_counter_version(),
@@ -2180,7 +2186,8 @@ fn normalize_optional_string(value: Option<String>) -> Option<String> {
 }
 
 fn normalize_wechat_config(config: &mut WechatConfig) {
-    config.compatibility_profile_id = normalize_optional_string(config.compatibility_profile_id.take());
+    config.compatibility_profile_id =
+        normalize_optional_string(config.compatibility_profile_id.take());
     config.text_model_profile_id = normalize_optional_string(config.text_model_profile_id.take());
     if !config.content_retention_enabled {
         config.content_retention_days = 0;
@@ -2191,13 +2198,27 @@ fn normalize_wechat_config(config: &mut WechatConfig) {
 
 fn normalize_knowledge_config(config: &mut KnowledgeConfig) {
     config.recent_picker_dir = normalize_optional_string(config.recent_picker_dir.take());
+    config.scope_mode = None;
+    config.last_scope_hint_keys.sort();
+    config.last_scope_hint_keys.dedup();
+    config.last_scope_hint_keys.retain(|key| {
+        key.len() == 69
+            && key.starts_with("ksc1_")
+            && key[5..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    });
+    config.last_scope_hint_keys.truncate(32);
     config.top_k = config.top_k.clamp(1, 12);
     config.token_budget = config.token_budget.clamp(256, 4096);
     if config.token_counter_version != "v1" {
         config.token_counter_version = default_knowledge_token_counter_version();
     }
     config.local_embedding.provider = config.local_embedding.provider.trim().to_string();
-    config.local_embedding.endpoint = config.local_embedding.endpoint.trim().trim_end_matches('/').to_string();
+    config.local_embedding.endpoint = config
+        .local_embedding
+        .endpoint
+        .trim()
+        .trim_end_matches('/')
+        .to_string();
     config.local_embedding.model = config.local_embedding.model.trim().to_string();
 
     let mut source_ids = std::collections::HashSet::new();
@@ -2273,28 +2294,49 @@ mod tests {
     fn 微信知识库camelcase_get_save往返保留设置修改() {
         let mut payload = serde_json::to_value(AppConfig::default()).expect("默认配置应可序列化");
         let wechat = payload["wechat"].as_object_mut().expect("微信配置应为对象");
-        wechat.insert("compatibilityProfileId".into(), serde_json::json!("wechat-desktop-v1"));
-        wechat.insert("textModelProfileId".into(), serde_json::json!("default-text-model"));
+        wechat.insert(
+            "compatibilityProfileId".into(),
+            serde_json::json!("wechat-desktop-v1"),
+        );
+        wechat.insert(
+            "textModelProfileId".into(),
+            serde_json::json!("default-text-model"),
+        );
         wechat.insert("contentRetentionEnabled".into(), serde_json::json!(true));
         wechat.insert("contentRetentionDays".into(), serde_json::json!(7));
-        let knowledge = payload["knowledge"].as_object_mut().expect("知识库配置应为对象");
+        let knowledge = payload["knowledge"]
+            .as_object_mut()
+            .expect("知识库配置应为对象");
         knowledge.insert("scopeMode".into(), serde_json::json!("conversation"));
         knowledge.insert("topK".into(), serde_json::json!(8));
-        knowledge.insert("localEmbedding".into(), serde_json::json!({
-            "provider": "ollama_loopback",
-            "endpoint": "http://127.0.0.1:11434",
-            "model": "nomic"
-        }));
+        knowledge.insert(
+            "localEmbedding".into(),
+            serde_json::json!({
+                "provider": "ollama_loopback",
+                "endpoint": "http://127.0.0.1:11434",
+                "model": "nomic"
+            }),
+        );
 
-        let mut config: AppConfig = serde_json::from_value(payload).expect("页面 payload 应可反序列化");
+        let mut config: AppConfig =
+            serde_json::from_value(payload).expect("页面 payload 应可反序列化");
         config.normalize();
-        assert_eq!(config.wechat.compatibility_profile_id.as_deref(), Some("wechat-desktop-v1"));
-        assert_eq!(config.wechat.text_model_profile_id.as_deref(), Some("default-text-model"));
+        assert_eq!(
+            config.wechat.compatibility_profile_id.as_deref(),
+            Some("wechat-desktop-v1")
+        );
+        assert_eq!(
+            config.wechat.text_model_profile_id.as_deref(),
+            Some("default-text-model")
+        );
         assert!(config.wechat.content_retention_enabled);
         assert_eq!(config.wechat.content_retention_days, 7);
-        assert_eq!(config.knowledge.scope_mode, Some(super::KnowledgeScopeMode::Conversation));
+        assert!(config.knowledge.scope_mode.is_none());
         assert_eq!(config.knowledge.top_k, 8);
-        assert_eq!(config.knowledge.local_embedding.endpoint, "http://127.0.0.1:11434");
+        assert_eq!(
+            config.knowledge.local_embedding.endpoint,
+            "http://127.0.0.1:11434"
+        );
         assert_eq!(config.knowledge.local_embedding.model, "nomic");
     }
 
@@ -2331,16 +2373,22 @@ mod tests {
 
         let mut config: AppConfig = serde_json::from_value(payload).expect("错误预发布配置应迁移");
         config.normalize();
-        assert_eq!(config.wechat.compatibility_profile_id.as_deref(), Some("wechat-desktop-v1"));
-        assert_eq!(config.wechat.text_model_profile_id.as_deref(), Some("default-text-model"));
-        assert_eq!(config.knowledge.scope_mode, Some(super::KnowledgeScopeMode::Conversation));
+        assert_eq!(
+            config.wechat.compatibility_profile_id.as_deref(),
+            Some("wechat-desktop-v1")
+        );
+        assert_eq!(
+            config.wechat.text_model_profile_id.as_deref(),
+            Some("default-text-model")
+        );
+        assert!(config.knowledge.scope_mode.is_none());
         assert_eq!(config.knowledge.top_k, 8);
         assert_eq!(config.knowledge.local_embedding.model, "nomic");
         assert_eq!(config.knowledge.knowledge_sources.len(), 1);
 
         let saved = serde_json::to_value(config).expect("迁移后的配置应可序列化");
         assert!(saved["wechat"].get("compatibilityProfileId").is_some());
-        assert!(saved["knowledge"].get("scopeMode").is_some());
+        assert!(saved["knowledge"].get("scopeMode").is_none());
         assert!(saved["knowledge"].get("topK").is_some());
         assert!(saved["knowledge"].get("localEmbedding").is_some());
         assert!(saved["knowledge"].get("knowledgeSources").is_some());
@@ -2360,6 +2408,13 @@ mod tests {
         config.knowledge.top_k = 0;
         config.knowledge.token_budget = 99999;
         config.knowledge.token_counter_version = "unknown".into();
+        config.knowledge.scope_mode = Some(super::KnowledgeScopeMode::GlobalUserSelected);
+        config.knowledge.last_scope_hint_keys = vec![
+            format!("ksc1_{}", "b".repeat(64)),
+            "invalid".into(),
+            format!("ksc1_{}", "b".repeat(64)),
+            format!("ksc1_{}", "a".repeat(64)),
+        ];
         config.normalize();
 
         assert_eq!(config.wechat.content_retention_days, 0);
@@ -2367,6 +2422,14 @@ mod tests {
         assert_eq!(config.knowledge.top_k, 1);
         assert_eq!(config.knowledge.token_budget, 4096);
         assert_eq!(config.knowledge.token_counter_version, "v1");
+        assert!(config.knowledge.scope_mode.is_none());
+        assert_eq!(
+            config.knowledge.last_scope_hint_keys,
+            vec![
+                format!("ksc1_{}", "a".repeat(64)),
+                format!("ksc1_{}", "b".repeat(64)),
+            ]
+        );
     }
 
     #[test]
@@ -2620,9 +2683,8 @@ mod tests {
         let original_bytes = b"old-config";
         std::fs::write(&path, original_bytes).expect("应写入原主配置");
 
-        let result = update_config_backup_with_sync(&path, |_| {
-            Err(io::Error::other("模拟父目录同步失败"))
-        });
+        let result =
+            update_config_backup_with_sync(&path, |_| Err(io::Error::other("模拟父目录同步失败")));
 
         assert!(result.is_ok());
         assert_eq!(

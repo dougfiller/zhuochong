@@ -75,6 +75,7 @@ fn command_error() -> AppError {
 #[tauri::command]
 pub(crate) async fn get_knowledge_settings_status(
     store: State<'_, KnowledgeStore>,
+    binding: State<'_, crate::wechat::binding::KnowledgeScopeBinding>,
     state: State<'_, Arc<Mutex<AppState>>>,
 ) -> Result<KnowledgeSettingsStatus, AppError> {
     let config = {
@@ -84,6 +85,10 @@ pub(crate) async fn get_knowledge_settings_status(
         state.config.knowledge.clone()
     };
     let mut status = status_for(&config);
+    status.scope_selected = binding
+        .status()
+        .map(|status| status.state == "bound")
+        .unwrap_or(false);
     let sources = store.list_sources().map_err(|_| command_error())?;
     let maintenance = store.maintenance_status().map_err(|_| command_error())?;
     status.source_count = sources.len();
@@ -108,6 +113,17 @@ pub(crate) async fn list_knowledge_sources(
 ) -> Result<KnowledgeSourcesStatus, AppError> {
     Ok(KnowledgeSourcesStatus {
         sources: store.list_sources().map_err(|_| command_error())?,
+    })
+}
+
+#[tauri::command]
+pub(crate) async fn list_knowledge_conversations(
+    store: State<'_, KnowledgeStore>,
+) -> Result<super::store::ActiveConversationCatalog, AppError> {
+    store.list_active_conversations().map_err(|error| {
+        AppError::Unknown(
+            serde_json::to_string(&error).unwrap_or_else(|_| "\"KB_RETRIEVAL_FAILED\"".into()),
+        )
     })
 }
 
@@ -199,7 +215,7 @@ pub(crate) async fn validate_knowledge_local_embedding(
 
 fn status_for(config: &KnowledgeConfig) -> KnowledgeSettingsStatus {
     let embedding = validate_local_embedding(&config.local_embedding);
-    let scope_selected = config.scope_mode.is_some();
+    let scope_selected = false;
     let local_embedding_error = embedding.err();
     let not_ready_reason = if !scope_selected {
         "KB_SCOPE_UNRESOLVED"

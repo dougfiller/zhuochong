@@ -172,6 +172,30 @@ impl StateMachine {
         self.observation_version
     }
 
+    pub(crate) fn update_m2_observation(
+        &mut self,
+        binding: BindingGeneration,
+        observation: BindingObservationVersion,
+    ) -> Result<(), ContractError> {
+        if self.mode != ReplyMode::M2
+            || self.binding_generation != binding
+            || matches!(
+                self.state,
+                ReplyState::Idle
+                    | ReplyState::ReplyReady
+                    | ReplyState::Copied
+                    | ReplyState::Dismissed
+                    | ReplyState::Cancelled
+                    | ReplyState::Failed
+            )
+            || observation <= self.observation_version
+        {
+            return Err(ContractError::WxRequestStale);
+        }
+        self.observation_version = observation;
+        Ok(())
+    }
+
     fn is_legal(&self, next: ReplyState) -> bool {
         use ReplyState::*;
         match (self.state, next) {

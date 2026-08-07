@@ -5,8 +5,8 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fdc5b-2b36-7643-b8d2-d0063513812d
-- next_poll_at: 2026-08-07T13:16:16+00:00
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月07日20点16分-实现唯一knowledge_retrieve混合检索门面.md
