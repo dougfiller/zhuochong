@@ -3,7 +3,8 @@ use super::KnowledgeStore;
 use crate::config::{KnowledgeConfig, LocalEmbeddingConfig};
 use crate::error::AppError;
 use crate::AppState;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
@@ -25,16 +26,159 @@ pub(crate) struct LocalEmbeddingValidation {
     error_code: Option<&'static str>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct SelectedRoot {
+    selected_root: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct SelectedRoots {
+    selected_roots: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct OperationQuery {
+    operation_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct SourceMutation {
+    source_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct KnowledgeSourcesStatus {
+    sources: Vec<super::store::KnowledgeSourceStatus>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct KnowledgeMutationReceipt {
+    ok: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct KnowledgeOperationReceipt {
+    operation_id: String,
+}
+
+fn command_error() -> AppError {
+    AppError::Unknown("KB_NOT_READY".into())
+}
+
 #[tauri::command]
 pub(crate) async fn get_knowledge_settings_status(
-    _store: State<'_, KnowledgeStore>,
+    store: State<'_, KnowledgeStore>,
     state: State<'_, Arc<Mutex<AppState>>>,
 ) -> Result<KnowledgeSettingsStatus, AppError> {
     let config = {
-        let state = state.lock().map_err(|error| AppError::Unknown(error.to_string()))?;
+        let state = state
+            .lock()
+            .map_err(|error| AppError::Unknown(error.to_string()))?;
         state.config.knowledge.clone()
     };
-    Ok(status_for(&config))
+    let mut status = status_for(&config);
+    let sources = store.list_sources().map_err(|_| command_error())?;
+    let maintenance = store.maintenance_status().map_err(|_| command_error())?;
+    status.source_count = sources.len();
+    status.active_source_count = sources
+        .iter()
+        .filter(|source| source.source_state == "active")
+        .count();
+    if maintenance.maintenance == "closed" {
+        status.not_ready_reason = "KB_MAINTENANCE";
+    } else if status.active_source_count > 0
+        && status.scope_selected
+        && status.local_embedding_valid
+    {
+        status.not_ready_reason = "KB_NOT_READY";
+    }
+    Ok(status)
+}
+
+#[tauri::command]
+pub(crate) async fn list_knowledge_sources(
+    store: State<'_, KnowledgeStore>,
+) -> Result<KnowledgeSourcesStatus, AppError> {
+    Ok(KnowledgeSourcesStatus {
+        sources: store.list_sources().map_err(|_| command_error())?,
+    })
+}
+
+#[tauri::command]
+pub(crate) async fn get_knowledge_maintenance_status(
+    input: OperationQuery,
+    store: State<'_, KnowledgeStore>,
+) -> Result<super::store::MaintenanceStatus, AppError> {
+    store
+        .maintenance_status_for(input.operation_id.as_deref())
+        .map_err(|_| command_error())
+}
+
+#[tauri::command]
+pub(crate) async fn start_knowledge_source_import(
+    input: SelectedRoot,
+    store: State<'_, KnowledgeStore>,
+) -> Result<KnowledgeOperationReceipt, AppError> {
+    let root = PathBuf::from(input.selected_root);
+    if root.as_os_str().is_empty() {
+        return Err(command_error());
+    }
+    let operation_id = store
+        .start_source_import(root)
+        .map_err(|_| command_error())?;
+    Ok(KnowledgeOperationReceipt { operation_id })
+}
+
+#[tauri::command]
+pub(crate) async fn retire_knowledge_source(
+    input: SourceMutation,
+    store: State<'_, KnowledgeStore>,
+) -> Result<KnowledgeMutationReceipt, AppError> {
+    if input.source_id.is_empty() {
+        return Err(command_error());
+    }
+    store
+        .retire_source(&input.source_id)
+        .map_err(|_| command_error())?;
+    Ok(KnowledgeMutationReceipt { ok: true })
+}
+
+#[tauri::command]
+pub(crate) async fn deny_knowledge_source(
+    input: SourceMutation,
+    store: State<'_, KnowledgeStore>,
+) -> Result<KnowledgeMutationReceipt, AppError> {
+    if input.source_id.is_empty() {
+        return Err(command_error());
+    }
+    store
+        .deny_source(&input.source_id)
+        .map_err(|_| command_error())?;
+    Ok(KnowledgeMutationReceipt { ok: true })
+}
+
+#[tauri::command]
+pub(crate) async fn start_knowledge_rebuild(
+    input: SelectedRoots,
+    store: State<'_, KnowledgeStore>,
+) -> Result<KnowledgeOperationReceipt, AppError> {
+    let roots = input
+        .selected_roots
+        .into_iter()
+        .map(PathBuf::from)
+        .collect::<Vec<_>>();
+    if roots.is_empty() {
+        return Err(command_error());
+    }
+    let operation_id = store.start_rebuild(roots).map_err(|_| command_error())?;
+    Ok(KnowledgeOperationReceipt { operation_id })
 }
 
 #[tauri::command]
@@ -42,8 +186,14 @@ pub(crate) async fn validate_knowledge_local_embedding(
     local_embedding: LocalEmbeddingConfig,
 ) -> LocalEmbeddingValidation {
     match validate_local_embedding(&local_embedding) {
-        Ok(()) => LocalEmbeddingValidation { valid: true, error_code: None },
-        Err(error_code) => LocalEmbeddingValidation { valid: false, error_code: Some(error_code) },
+        Ok(()) => LocalEmbeddingValidation {
+            valid: true,
+            error_code: None,
+        },
+        Err(error_code) => LocalEmbeddingValidation {
+            valid: false,
+            error_code: Some(error_code),
+        },
     }
 }
 
@@ -66,7 +216,12 @@ fn status_for(config: &KnowledgeConfig) -> KnowledgeSettingsStatus {
         active_source_count: config
             .knowledge_sources
             .iter()
-            .filter(|source| matches!(source.source_state, crate::config::KnowledgeSourceState::Active))
+            .filter(|source| {
+                matches!(
+                    source.source_state,
+                    crate::config::KnowledgeSourceState::Active
+                )
+            })
             .count(),
         scope_selected,
         local_embedding_valid: local_embedding_error.is_none(),
@@ -101,7 +256,10 @@ mod tests {
             .await;
 
             assert!(!result.valid);
-            assert_eq!(result.error_code, Some("KB_EMBEDDING_ENDPOINT_NOT_LOOPBACK"));
+            assert_eq!(
+                result.error_code,
+                Some("KB_EMBEDDING_ENDPOINT_NOT_LOOPBACK")
+            );
         }
     }
 }

@@ -255,3 +255,9 @@ git diff --check -- desktop/src-tauri/src/knowledge desktop/src-tauri/src/main.r
 # 2026-08-06：步骤 17 源 lineage 与不可变消息版本
 
 - `python3 -B kaifa/kaifa_test/verify_knowledge_lineage_generations.py --project-root .`：只读静态门禁，检查 knowledge schema v2、流式 staging、不可变版本与原子 activation 的必要源码边界；不读取用户导出或数据库。
+
+# 2026-08-07：步骤 19 知识源管理与安全重建 UI
+
+- `python3 -B kaifa/kaifa_test/verify_knowledge_source_management.py`：只读静态门禁，核对知识源 Store 门面、维护状态、Tauri command、单次目录选择与截短 opaque ID 渲染；不读取用户 dataDir、真实导出或网络。
+- `node --test desktop/src/routes/settings/SettingsWechatKnowledge.test.js`：检查知识设置使用 camelCase command payload，目录选择与来源清单不回写旧 `config.knowledge.knowledgeSources`。
+- `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'`：编译知识源 command/Store 与现有 archive 边界，不启动应用或访问真实微信数据。

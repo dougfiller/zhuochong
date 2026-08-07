@@ -28,10 +28,21 @@ test('微信和知识库设置使用与save_config相同的camelCase payload', a
     'tokenBudget',
     'sameConversationBoost',
     'localEmbedding',
-    'knowledgeSources',
   ]) {
     assert.match(knowledge, new RegExp(`config\\.knowledge\\.${field}`));
   }
   assert.doesNotMatch(wechat, /config\.wechat\.[a-z]+_[a-z_]+/);
   assert.doesNotMatch(knowledge, /config\.knowledge\.[a-z]+_[a-z_]+/);
+  assert.doesNotMatch(knowledge, /config\.knowledge\.knowledgeSources/);
+  assert.match(knowledge, /openDialog\(\{ directory: true, multiple: false \}\)/);
+  assert.match(knowledge, /invoke\('start_knowledge_source_import'/);
+  assert.match(knowledge, /invoke\('list_knowledge_sources'\)/);
+  assert.match(knowledge, /let operationId = null/);
+  assert.match(knowledge, /operationId = receipt\.operationId/);
+  assert.match(knowledge, /await waitForOperation\(\)/);
+  assert.match(knowledge, /get_knowledge_maintenance_status', \{ input: \{ operationId \} \}/);
+  assert.match(knowledge, /if \(!selectedRoot \|\| Array\.isArray\(selectedRoot\)\) return/);
+  assert.match(knowledge, /\$: busy = Boolean\(operationId\)/);
+  assert.match(knowledge, /selectedRoots/);
+  assert.doesNotMatch(knowledge, /showToast\([^\n]*selectedRoot/);
 });

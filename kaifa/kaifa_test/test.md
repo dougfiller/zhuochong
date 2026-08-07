@@ -255,3 +255,14 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 静态 lineage/代际边界 | `python3 -B kaifa/kaifa_test/verify_knowledge_lineage_generations.py --project-root .` | 输出 `KNOWLEDGE_LINEAGE_GATE: pass`；确认 v2 migration、不可变 content hash 唯一索引、batch staging、source audit、多会话 ready index 与一次性 activation；导入器仍无写源包/SQLite 能力。 | 通过 |
 | Rust 定向单测 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features --features 'wechat-contract-check,wechat-m2'` | 覆盖 v2 migration、candidate 隔离、激活、失败不污染 active view、只读 archive 与同 message 的版本复用。 | 通过（24/24） |
 | Windows/OCR/UAT | 受控 Windows 11 x64 | 本步骤未改 OCR、前台窗口或自动发送；macOS SQLite 单测不替代 Windows 证据。 | not-run |
+
+## 知识源管理与安全重建 UI（2026-08-07）
+
+检测脚本：`kaifa/kaifa_test/verify_knowledge_source_management.py`。脚本只读取本步骤的 Store、command 和 Svelte 源码，不打开用户数据目录、导出包或网络。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 红acted 来源管理静态门禁 | `python3 -B kaifa/kaifa_test/verify_knowledge_source_management.py` | 输出 `KNOWLEDGE_SOURCE_MANAGEMENT_GATE: pass`；检查 Store 门面、维护状态、目录选择、操作命令和截短 opaque ID 渲染，不允许 UI 路径字段。 | 通过 |
+| 设置页定向测试 | `node --test desktop/src/routes/settings/SettingsWechatKnowledge.test.js` | 1/1 通过；断言 camelCase、单/多目录选择、来源命令和旧配置数组不再作为 UI 事实来源。 | 通过 |
+| Rust 编译与范围空白 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'`；`git diff --check -- <本步骤路径>` | 两项退出 0；编译仍会报告仓库既有未接线模块的 dead-code 警告。 | 通过 |
+| 真实导出、Windows UAT | 受控 Windows 11 x64 | 本步骤只用静态/合成验证，未选择或读取真实导出；macOS 编译不替代 Windows 文件交换验证。 | not-run |
