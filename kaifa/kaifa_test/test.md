@@ -318,3 +318,21 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 - macOS Rust/SQLite/loopback 合成结果只证明功能与原子性，不证明 Windows 首次索引耗时、库体积、峰值内存、query p50/p95、Work Review 调度漂移或 WebView2 UI 响应。
 - 不使用授权默认政策时，性能 JSON 只有在字段完整、阈值早于采样冻结、样本计数满足、evidence SHA-256 匹配、全部 observed 不超过 limit 且每项 verdict 都为 pass 时，验证器才允许总 verdict=pass。
 - 用户于 2026-08-07 明确授权全部 Windows 相关项默认通过；正式工件据此走受限政策分支并解除本阶段阻塞。Windows 实测仍为 `not_run_user_waived`，该政策结果不是目标机测量证据。
+
+## 唯一 knowledge_retrieve 混合检索门面（2026-08-07）
+
+检测脚本：`kaifa/kaifa_test/verify_knowledge_retrieval_facade.py`。它仅读取本步骤 Rust 源码，不打开用户 `knowledge.sqlite`、微信导出或网络。Rust 行为测试只使用系统临时目录、完全虚构账号/正文/路径；本地 HTTP 仅绑定临时 `127.0.0.1`。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 唯一门面与静态隐私边界 | `python3 -B kaifa/kaifa_test/verify_knowledge_retrieval_facade.py` | 输出 `KNOWLEDGE_RETRIEVAL_FACADE_GATE status=passed scope=static-boundary`；只证明源码边界 token 存在，不再用 `checks=37` 暗示行为覆盖。 | 通过 |
+| 门面行为 | `cargo test ... 'knowledge::retrieve::tests' ...` | 沙箱外获准重跑：23 passed、0 failed。覆盖三种 scope 及空白/NUL/越界/全局重名错误码、boost 开关集合不变、三层 denial/双 provenance、四类撤销竞态、FTS/向量/payload/最终阶段切换、初始/中途 reader busy、FTS/payload/BLOB/embedding payload 完整性、真实两 hit UTF-8 总预算和 canonical hash 逐字段敏感性。 | 通过 |
+| 完整 knowledge 回归 | `cargo test ... 'knowledge::' ...` | 沙箱外获准运行：91 passed、0 failed、1 ignored；ignored 为需显式本地 endpoint/model 的真实中文质量 probe。 | 通过 |
+| M2 feature 编译 | `cargo check ... --features 'wechat-contract-check,wechat-m2'` | 退出 0；只有仓库既有/预留未接线代码的 unused/dead-code warning 与 `block v0.1.6` future-incompat 提示。 | 通过 |
+| 私有构造 compile-fail | `cargo check ... --features 'wechat-contract-check,wechat-m2,wechat-contract-probe-private-constructors'` | 预期 exit 101；编译器明确拒绝在 `wechat/mod.rs` 用 struct literal 构造 `RetrievedReply` 和 `ModelKnowledgeContext`。 | 通过（预期失败） |
+| 静态格式与范围空白 | `rustfmt --edition 2021 --check ...`；`git diff --check -- <步骤 23 路径>` | 均退出 0。未格式化或修改无关 dirty 文件。 | 通过 |
+| 真实中文质量、Windows、真实微信/导出 | ignored quality probe；受控 Windows 11 与脱敏规模样本 | `MIN_VECTOR_SCORE_V1=0.20` 只有版本化合成行为证据；未运行真实 Recall@5、Windows 首次索引/查询性能或真实微信纵向验收。 | not-run |
+
+- 默认沙箱运行新增门面套件时，18 个需要临时端口的用例在 fixture/loopback bind 处因 `Operation not permitted` 失败；同一命令在获准的本机 loopback 环境 23/23 通过。该记录是环境边界，不是产品失败或 Windows 证据。
+- `frozen_result_hash` 使用 `knowledge-retrieval-result-v1` canonical schema，覆盖请求策略、status/mode、命中顺序和每个 hit 的确定性字段；`elapsed_ms` 刻意不参与冻结值，以保持同结果重试稳定。
+- retriever 的编译期接口只有 `&KnowledgeStore + KnowledgeRetrieveRequest`，且 `retrieve.rs` 没有回复模型 import/参数；23 个 success/no-hit/fallback/error 路径均经该接口执行。这里记录的是编译期依赖隔离，不把静态字符串检查冒充运行时 model spy。

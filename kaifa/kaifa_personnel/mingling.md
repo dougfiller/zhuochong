@@ -346,3 +346,33 @@ git diff --check -- desktop/src-tauri/src/knowledge desktop/docs/performance kai
 - 两个新增 Python 脚本都不会打开用户 `knowledge.sqlite`、微信导出或网络；activation gate 仅读源码，performance gate 仅读指定 JSON 与其中显式列出的仓库内脱敏 evidence 文件。
 - 当前 `knowledge-performance-gate-v1.json` 仅在完整列出五项 Windows 性能要求、保存用户原话/授权时间/授权范围，且 `evidenceStatus=not_run_user_waived` 时允许政策默认通过；验证器输出 `pass mode=authorized-defaults factualEvidence=not-run-user-waived` 并退出 0。
 - 删除授权、只声明部分默认项、扩大范围、伪造 evidence 状态或保留 blockers 都会 fail-closed。真实 Windows/冻结样本/阈值/观测/原始证据仍未运行，不能把该政策例外表述为实测通过。
+
+# 2026-08-07：步骤 23 唯一 knowledge_retrieve 混合检索门面
+
+```bash
+# 步骤 23 纯静态边界门禁；仅读取 knowledge Rust 源码，不打开数据库、导出包或网络。
+python3 -B kaifa/kaifa_test/verify_knowledge_retrieval_facade.py
+
+# 门面行为测试：使用系统临时目录中的完全虚构 knowledge.sqlite。
+# hybrid/fallback 用例只绑定系统分配的 127.0.0.1 临时端口，不访问外网。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'knowledge::retrieve::tests' --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# 完整 knowledge 回归；真实中文质量 probe 仍需显式本地模型，因此保持 ignored/not-run。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'knowledge::' --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# M2 feature 编译，不启动应用、微信或模型。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# 预期失败的隐私编译探针；必须因 RetrievedReply/ModelKnowledgeContext 私有字段而 exit 101。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2,wechat-contract-probe-private-constructors'
+
+# 范围内格式与空白。
+rustfmt --edition 2021 --check desktop/src-tauri/src/knowledge/{mod,types,retrieve,store,embedding}.rs
+git diff --check -- desktop/src-tauri/src/knowledge kaifa/kaifa_test/verify_knowledge_retrieval_facade.py kaifa/kaifa_personnel/mingling.md kaifa/kaifa_test/test.md kaifa/kaifa_log
+```
+
+- 静态脚本输出 `KNOWLEDGE_RETRIEVAL_FACADE_GATE status=passed scope=static-boundary`，只确认唯一业务定义、Store 授权 SQL/token、版本化 canonical hash、三种 scope/error wire、私有 success/no-hit 构造器和 IDs/scores-only trace 存在；脚本不替代 Rust 行为测试，也不再输出易被误解为行为覆盖数的 `checks=37`。
+- Rust loopback 用例在默认沙箱内会因临时监听端口受限而报 `Operation not permitted`；应在获准环境原命令重跑，不能把权限失败记成产品失败。
+- retire/deny/delete 必须在同一写事务中递增冻结授权 epoch；payload 正文、message range、source paths 和末次授权校验必须在同一 SQLite read transaction，返回前还要用新 reader 重验 catalog/authorization token。
+- `frozen_result_hash` 的 `knowledge-retrieval-result-v1` schema 覆盖请求策略、status/mode、命中顺序与全部确定性 hit 字段；`elapsed_ms` 明确排除，以保持同结果重试稳定。
+- `MIN_VECTOR_SCORE_V1=0.20` 是版本化保守默认，仅有合成行为证据；真实中文 Recall@5 与 Windows 性能仍为 not-run，不能写成质量通过。

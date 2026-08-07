@@ -1,6 +1,6 @@
 use super::store::{
-    ActiveFtsRequest, ActiveVectorRequest, EncodedEmbedding, FrozenEmbeddingIdentity, FtsHit,
-    KnowledgeStore, KnowledgeVectorHit, StableConversationKey,
+    ActiveFtsRequest, ActiveVectorRequest, EncodedEmbedding, FrozenEmbeddingIdentity,
+    FrozenRetrievalRead, FtsHit, KnowledgeStore, KnowledgeVectorHit, StableConversationKey,
 };
 use crate::config::LocalEmbeddingConfig;
 use crate::embedding::{embedding_payload, parse_embedding_response, EmbeddingWireFormat};
@@ -19,6 +19,12 @@ use work_review_core::semantic::{
 const EMBEDDING_BATCH_LIMIT: u8 = 32;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+
+#[derive(Clone, Debug, PartialEq)]
+pub(in crate::knowledge) enum QueryVectorAttempt {
+    Available(Vec<f32>),
+    Unavailable,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum EndpointClass {
@@ -276,6 +282,108 @@ async fn embed_batch(
         },
     ));
     result
+}
+
+pub(in crate::knowledge) async fn query_active_vector(
+    frozen: &FrozenRetrievalRead,
+    query: &str,
+) -> Result<QueryVectorAttempt, ContractError> {
+    let endpoint = validate_and_pin_loopback(&frozen.embedding.endpoint, &SystemEndpointResolver)
+        .await
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    let client = build_knowledge_embedding_client(&endpoint)
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+
+    let metadata_started = Instant::now();
+    let metadata_response = match client
+        .get(endpoint_url(&endpoint, "api/tags").map_err(|_| ContractError::KbRetrievalFailed)?)
+        .send()
+        .await
+    {
+        Ok(response) => response,
+        Err(error) if error.is_connect() || error.is_timeout() => {
+            LogEmbeddingAuditSink.record(audit_call(
+                &endpoint,
+                EmbeddingOperation::MetadataProbe,
+                0,
+                metadata_started,
+                "METADATA_UNAVAILABLE",
+            ));
+            return Ok(QueryVectorAttempt::Unavailable);
+        }
+        Err(_) => return Err(ContractError::KbRetrievalFailed),
+    };
+    if !metadata_response.status().is_success() || metadata_response.status().is_redirection() {
+        return Err(ContractError::KbRetrievalFailed);
+    }
+    let metadata: Value = metadata_response
+        .json()
+        .await
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    let fingerprint = parse_model_fingerprint(&metadata, &frozen.embedding.model)
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    LogEmbeddingAuditSink.record(audit_call(
+        &endpoint,
+        EmbeddingOperation::MetadataProbe,
+        0,
+        metadata_started,
+        "METADATA_OK",
+    ));
+    if fingerprint != frozen.embedding.fingerprint {
+        return Err(ContractError::KbRetrievalFailed);
+    }
+
+    let embed_started = Instant::now();
+    let texts = vec![query.to_owned()];
+    let body = embedding_payload(
+        EmbeddingWireFormat::OllamaBatchV1,
+        &frozen.embedding.model,
+        &texts,
+    )
+    .map_err(|_| ContractError::KbRetrievalFailed)?;
+    let embed_response = match client
+        .post(endpoint_url(&endpoint, "api/embed").map_err(|_| ContractError::KbRetrievalFailed)?)
+        .json(&body)
+        .send()
+        .await
+    {
+        Ok(response) => response,
+        Err(error) if error.is_connect() || error.is_timeout() => {
+            LogEmbeddingAuditSink.record(audit_call(
+                &endpoint,
+                EmbeddingOperation::Query,
+                1,
+                embed_started,
+                "QUERY_UNAVAILABLE",
+            ));
+            return Ok(QueryVectorAttempt::Unavailable);
+        }
+        Err(_) => return Err(ContractError::KbRetrievalFailed),
+    };
+    if !embed_response.status().is_success() || embed_response.status().is_redirection() {
+        return Err(ContractError::KbRetrievalFailed);
+    }
+    let payload = embed_response
+        .json()
+        .await
+        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    let vector = parse_embedding_response(EmbeddingWireFormat::OllamaBatchV1, payload, 1)
+        .map_err(|_| ContractError::KbRetrievalFailed)?
+        .pop()
+        .ok_or(ContractError::KbRetrievalFailed)?;
+    let vector =
+        normalize_embedding_strict(vector).map_err(|_| ContractError::KbRetrievalFailed)?;
+    if vector.len() != frozen.embedding.dimension as usize {
+        return Err(ContractError::KbRetrievalFailed);
+    }
+    LogEmbeddingAuditSink.record(audit_call(
+        &endpoint,
+        EmbeddingOperation::Query,
+        1,
+        embed_started,
+        "QUERY_OK",
+    ));
+    Ok(QueryVectorAttempt::Available(vector))
 }
 
 pub(crate) async fn probe_and_freeze_candidate(

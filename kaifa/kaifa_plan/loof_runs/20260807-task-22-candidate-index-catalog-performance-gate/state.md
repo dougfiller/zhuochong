@@ -5,8 +5,8 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fdc0b-402c-7923-89ec-b04b2c8d6538
-- next_poll_at: 2026-08-07T11:48:53+00:00
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月07日18点35分-校验候选索引原子切换Catalog并冻结性能门禁.md
