@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "releaseBatchId": "20260808-task-27-final-performance-uat-release-rollback",
+  "verdict": "blocked",
+  "blockers": [
+    "release inputs are not frozen or approved",
+    "same-batch Windows performance and business UAT evidence is absent",
+    "Authenticode, updater, package, asset authorization, recovery and rollback evidence is absent"
+  ],
+  "sections": {
+    "candidate": "blocked",
+    "environment": "not-run",
+    "performance": "not-run",
+    "businessUat": "not-run",
+    "m2Audit": "not-run",
+    "rebuild": "not-run",
+    "recovery": "not-run",
+    "installer": "not-run",
+    "signatures": "not-run",
+    "runtimeAudit": "not-run",
+    "assetAudit": "blocked",
+    "rollback": "not-run",
+    "releaseNotes": "not-run",
+    "approvals": "blocked"
+  },
+  "evidenceRefs": []
+}

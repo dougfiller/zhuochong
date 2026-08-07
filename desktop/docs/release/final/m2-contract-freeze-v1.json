@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "candidateCommit": "d15b7c934bcb2e940ddc8fc67e86fe6b4f8bbba8",
+  "candidateGitTree": "56a0af1460a1b0839a9197ebabb42f131cdbe7da",
+  "buildFeaturesRequired": ["custom-protocol", "wechat-m2"],
+  "m2Contract": "forced-rag",
+  "knowledge": {
+    "schemaHead": 5,
+    "chunkSchema": "chunk-v1",
+    "tokenCounter": "v1",
+    "ftsPretoken": "fts-pretoken-v1",
+    "sourceFilesSha256": {
+      "desktop/src-tauri/src/knowledge/migrations.rs": "157b46c02ccea546e407be49aa5614ca62fea7c4bea943726ee1f5bc9097c661",
+      "desktop/src-tauri/src/knowledge/chunk.rs": "1911823f6bb9b105c6b940bca6b63ee0bd9e7a9c24d9299dd2534c084db004bb"
+    }
+  },
+  "wechat": {
+    "contextSchema": "wechat-rag-context-v1",
+    "sourceFilesSha256": {
+      "desktop/src-tauri/src/wechat/model_contract.rs": "ae2ded5a593bbd8ea6ca299e98b5e4ea4b9021a534b6dc5acafeafb10e6a9a00",
+      "desktop/src-tauri/src/wechat/model_client.rs": "b75a2d74c793c18f513e109199d9252ad2a4e0c7245aea3de41af5af905c24f2",
+      "desktop/src-tauri/src/wechat/observability.rs": "706b20d12bd6453e806b873c2cc75b257d48210c60867a44b0738a94297d5f7f",
+      "desktop/src-tauri/src/wechat/ocr.rs": "b917e5cc9ee18232b70dded244945439e8133073d10777d30a5cc138f88f0c4e"
+    }
+  },
+  "embeddingFingerprint": null,
+  "embeddingDimension": null,
+  "profileSha256": null,
+  "releaseNoteSha256": null,
+  "status": "blocked"
+}

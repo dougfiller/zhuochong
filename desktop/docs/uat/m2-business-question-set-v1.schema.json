@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://work-review.invalid/schemas/m2-business-question-set-v1.schema.json",
+  "title": "M2 business UAT question set without message bodies",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "releaseBatchId", "candidateSha256", "questionSetSha256", "questions"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "releaseBatchId": {"type": "string", "minLength": 1},
+    "candidateSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "questionSetSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "questions": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["questionId", "category", "scopeKind", "expectedOutcome", "expectedSourceRule", "reviewerDecision"],
+        "properties": {
+          "questionId": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,80}$"},
+          "category": {"enum": ["singleConversation", "selectedConversations", "globalConfirmed", "noHit", "chineseKeyword", "chineseSemantic", "synonym", "sourceReview"]},
+          "scopeKind": {"enum": ["conversation", "selected", "globalUserConfirmed"]},
+          "expectedOutcome": {"enum": ["hit", "noHit", "rejected"]},
+          "expectedSourceRule": {"enum": ["boundOnly", "selectedOnly", "activeOnly", "none"]},
+          "reviewerDecision": {"enum": ["pass", "fail", "not-run"]}
+        }
+      }
+    }
+  }
+}

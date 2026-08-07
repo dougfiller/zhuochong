@@ -1,3 +1,22 @@
+## 全量性能、业务 UAT、签名发布与阶段感知回滚（2026-08-08）
+
+检测程序：`kaifa/kaifa_test/verify_final_m2_release_gate.py` 与 `kaifa/kaifa_test/test_verify_final_m2_release_gate.py`。前者只读取显式 freeze、manifest 与相对 evidence JSON，逐文件拒绝 symlink/path escape/重复 payload 并重算 raw performance；不启动产品、微信、模型、安装包、网络或发布。后者只使用 `fixtures/final_release/pass` 的完全虚构数据和系统临时目录。
+
+| 验收项 | 命令/方法 | 实际结果 |
+| --- | --- | --- |
+| 正反 gate 行为 | `python3 -B -m unittest kaifa/kaifa_test/test_verify_final_m2_release_gate.py` | 9/9 通过；覆盖 pass fixture、required null=blocked、policy bypass=fail、hash/path/symlink、M2 feature identity、晚批准/aggregate tamper、UAT 缺项、签名/素材/runtime/rollback。 |
+| 正式 blocked 状态 | `python3 -B ...verify_final_m2_release_gate.py --freeze desktop/docs/release/final/release-freeze-v1.json --manifest desktop/docs/release/final/final-release-after-gate.json` | exit 2，verdict=`blocked`；外部冻结字段、全部 Windows evidence、签名/授权/回滚证据均未伪造为 pass。 |
+| rebuild/recovery/隔离定向行为 | `cargo test ... private_rebuild_manifest`、`... rebuild_manifest_hash_drift`、`... invalid_candidate_manifest_rolls_back`、`... recovery_bundle` | 5 项定向行为通过；私有 manifest deny-unknown/hash drift 要求重新选择，候选失败恢复旧 DB/manifest/WAL/audit，recovery bundle 通过 SQLite/FTS integrity/reopen 并拒绝 data root 父子目录。 |
+| 微信 M2 回归 | `cargo test ... 'wechat::' --no-default-features --features 'wechat-contract-check,wechat-m2'` | 84 passed、0 failed；保留先 retrieval 后 model permit、audit/physical attempt、零降级和安全边界。 |
+| knowledge 回归 | `cargo test ... 'knowledge::' --no-default-features --features 'wechat-contract-check,wechat-m2'` | 沙箱内 70 passed、26 因绑定临时 loopback 端口报 `Operation not permitted`；获准的本机 loopback 原命令复跑为 96 passed、0 failed、1 ignored。 |
+| core config/database | `cargo test --manifest-path desktop/Cargo.toml -p work-review-core config`；同命令 `database` | 47 passed 与 33 passed，均 0 failed。 |
+| M2 build 检查 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'custom-protocol,wechat-m2'` | 通过；现有 dead-code/unused 警告保留，不宣称零警告。 |
+| 步骤 25/26 兼容门禁 | `verify_task25_m2_rag.py`；正式 `verify_m2_observability_gate.py` | task25 exit 0；步骤 26 formal gate 诚实 exit 2/blocked。 |
+| 前端全量与构建 | `cd desktop && node --test`；`npm run build` | build 通过（247 modules）；全量 Node 为 489/490，唯一失败是本 run 修改前已存在且本 run 未触碰的 zh-TW `knowledgeScope.*` 18 key 缺失，不在 task 27 必要范围内。 |
+| 语法、格式、JSON 与空白 | Python `py_compile`、4 个新增 JSON `json.tool`、`cargo fmt --check`、本 run allowlist `git diff --check` | 全部通过。 |
+
+未运行且不得从上述结果推断：真实 Windows/微信 profile、真实数据集与问题正文、性能采样、真实模型/embedding、NSIS/updater、Authenticode、安装升级卸载、素材商业授权、发行渠道发布和真实 LKG rollback。PowerShell collector 因当前为 macOS 未执行；当前正式结论持续 blocked。
+
 ## 大型 messages[] 流式导入、规范化和媒体引用（2026-08-07）
 
 检测脚本：`kaifa/kaifa_test/verify_streaming_message_import.py`。它只读取本 run 的 Rust 源码和 migration，不打开导出目录、媒体、微信或网络。

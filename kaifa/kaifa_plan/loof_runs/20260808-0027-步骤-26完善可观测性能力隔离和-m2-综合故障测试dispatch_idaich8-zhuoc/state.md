@@ -5,8 +5,8 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fdd40-561f-7333-95f8-b9c5b82136ba
-- next_poll_at: 2026-08-07T17:26:34+00:00
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月08日00点29分-完善可观测性能力隔离和M2综合故障测试.md

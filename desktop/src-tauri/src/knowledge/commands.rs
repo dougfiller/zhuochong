@@ -6,7 +6,8 @@ use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_dialog::DialogExt;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,7 +36,7 @@ pub(crate) struct SelectedRoot {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct SelectedRoots {
-    selected_roots: Vec<String>,
+    selection_receipt_id: String,
 }
 
 #[derive(Deserialize)]
@@ -68,8 +69,24 @@ pub(crate) struct KnowledgeOperationReceipt {
     operation_id: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct KnowledgeRebuildSelectionReceipt {
+    selection_receipt_id: String,
+}
+
 fn command_error() -> AppError {
     AppError::Unknown("KB_NOT_READY".into())
+}
+
+fn rebuild_error(error: crate::wechat::types::ContractError) -> AppError {
+    let code = match error {
+        crate::wechat::types::ContractError::KbRebuildSelectionRequired => {
+            "KB_REBUILD_SELECTION_REQUIRED"
+        }
+        _ => "KB_NOT_READY",
+    };
+    AppError::Unknown(code.into())
 }
 
 #[tauri::command]
@@ -181,19 +198,37 @@ pub(crate) async fn deny_knowledge_source(
 }
 
 #[tauri::command]
+pub(crate) async fn pick_knowledge_rebuild_roots(
+    app: AppHandle,
+    store: State<'_, KnowledgeStore>,
+) -> Result<KnowledgeRebuildSelectionReceipt, AppError> {
+    let roots = app
+        .dialog()
+        .file()
+        .blocking_pick_folders()
+        .ok_or_else(command_error)?
+        .into_iter()
+        .map(|path| path.into_path().map_err(|_| command_error()))
+        .collect::<Result<Vec<PathBuf>, AppError>>()?;
+    let selection_receipt_id = store
+        .issue_rebuild_selection(roots)
+        .map_err(rebuild_error)?;
+    Ok(KnowledgeRebuildSelectionReceipt {
+        selection_receipt_id,
+    })
+}
+
+#[tauri::command]
 pub(crate) async fn start_knowledge_rebuild(
     input: SelectedRoots,
     store: State<'_, KnowledgeStore>,
 ) -> Result<KnowledgeOperationReceipt, AppError> {
-    let roots = input
-        .selected_roots
-        .into_iter()
-        .map(PathBuf::from)
-        .collect::<Vec<_>>();
-    if roots.is_empty() {
+    if input.selection_receipt_id.is_empty() {
         return Err(command_error());
     }
-    let operation_id = store.start_rebuild(roots).map_err(|_| command_error())?;
+    let operation_id = store
+        .prepare_and_start_rebuild(&input.selection_receipt_id)
+        .map_err(rebuild_error)?;
     Ok(KnowledgeOperationReceipt { operation_id })
 }
 

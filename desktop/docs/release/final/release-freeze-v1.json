@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "approvedAt": null,
+  "approvedBy": null,
+  "targetWindows": null,
+  "wechatProfile": null,
+  "dataset": null,
+  "performanceLimits": null,
+  "productIdentity": null,
+  "assetLedgerSha256": null,
+  "replyModel": null,
+  "embedding": null,
+  "contentRetentionDays": null,
+  "authenticode": null,
+  "updater": null,
+  "releaseChannel": null
+}

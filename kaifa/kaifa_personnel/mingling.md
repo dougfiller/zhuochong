@@ -1,3 +1,62 @@
+# 2026-08-08：步骤 27 全量性能、业务 UAT、签名发布与阶段感知回滚
+
+```bash
+# 正式门禁：当前外部 freeze 与 Windows 同批证据缺失，预期 exit 2/blocked。
+python3 -B kaifa/kaifa_test/verify_final_m2_release_gate.py \
+  --project-root . \
+  --freeze desktop/docs/release/final/release-freeze-v1.json \
+  --manifest desktop/docs/release/final/final-release-after-gate.json
+
+# verifier 正反行为测试：raw sample 重算、晚批准阈值、M1/无 feature/双 feature、
+# hash/path/symlink、题集缺项、签名、素材、runtime 与 rollback 目标。
+python3 -B -m unittest kaifa/kaifa_test/test_verify_final_m2_release_gate.py
+
+# M2 编排与知识回归。knowledge 测试会在系统分配的 127.0.0.1 临时端口启动
+# 手写 fake embedding server；若沙箱报 Operation not permitted，须在获准的本机
+# loopback 环境按原命令重跑，不能把沙箱失败写成产品失败。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::' \
+  --no-default-features --features 'wechat-contract-check,wechat-m2' -- --test-threads=1
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'knowledge::' \
+  --no-default-features --features 'wechat-contract-check,wechat-m2' -- --test-threads=1
+
+# recovery bundle 所复用的 core config/database 与正式 M2 build feature 检查。
+cargo test --manifest-path desktop/Cargo.toml -p work-review-core config
+cargo test --manifest-path desktop/Cargo.toml -p work-review-core database
+cargo check --manifest-path desktop/src-tauri/Cargo.toml \
+  --no-default-features --features 'custom-protocol,wechat-m2'
+
+# 步骤 25/26 兼容门禁、前端回归、生产构建、语法、格式和范围空白。
+python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py \
+  --project-root . --evidence desktop/docs/baselines/work-review-m2-after-gate.json
+python3 -B kaifa/kaifa_test/verify_task25_m2_rag.py --project-root .
+(cd desktop && node --test)
+(cd desktop && npm run build)
+PYTHONPYCACHEPREFIX=/tmp/aich8-task27-pycache python3 -m py_compile \
+  kaifa/kaifa_test/verify_final_m2_release_gate.py \
+  kaifa/kaifa_test/test_verify_final_m2_release_gate.py
+cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check
+git diff --check -- desktop/src-tauri/src/commands/config.rs \
+  desktop/src-tauri/src/knowledge/commands.rs desktop/src-tauri/src/knowledge/store.rs \
+  desktop/src-tauri/src/wechat/types.rs desktop/docs/release/final desktop/docs/uat \
+  desktop/docs/runbooks desktop/scripts/release kaifa/kaifa_test/verify_final_m2_release_gate.py \
+  kaifa/kaifa_test/test_verify_final_m2_release_gate.py \
+  kaifa/kaifa_test/fixtures/final_release kaifa/kaifa_personnel/mingling.md \
+  kaifa/kaifa_test/test.md kaifa/kaifa_log
+```
+
+Windows 采集脚本仅在冻结环境由发行负责人手工运行：
+
+```powershell
+desktop\scripts\release\collect-final-evidence.ps1 `
+  -ReleaseBatchId '<已冻结批次>' `
+  -CandidatePath '<同批签名候选绝对路径>' `
+  -MetadataInput '<无正文 metadata JSON>'
+```
+
+- PowerShell collector 会自行打开 Windows 原生目录选择器，并只接受隔离的非 junction 证据目录；它只读取明确文件、计算 candidate hash、读取 Authenticode 公有状态并封装递归校验后的 metadata，不做微信 UIA 输入、键鼠模拟、粘贴/发送、数据库/协议读取、网络上传或自动发布。
+- 正式 gate 退出码固定为 `0=pass`、`1=fail`、`2=blocked`。当前必须是 2；只有用户/发行负责人冻结全部输入并完成同批 Windows 证据后才可能变为 0。
+- `createUpdaterArtifacts=false`、空 production 微信 profile 和 fixed-fail release workflow 本步骤保持不变；上述命令不启用 updater 或发布。
+
 ## 大型 messages[] 流式导入、规范化和媒体引用（2026-08-07）
 
 ```bash

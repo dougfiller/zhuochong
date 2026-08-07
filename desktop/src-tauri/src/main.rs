@@ -4590,6 +4590,7 @@ async fn main() {
             knowledge::commands::start_knowledge_source_import,
             knowledge::commands::retire_knowledge_source,
             knowledge::commands::deny_knowledge_source,
+            knowledge::commands::pick_knowledge_rebuild_roots,
             knowledge::commands::start_knowledge_rebuild,
             commands::get_update_settings,
             commands::save_update_settings,

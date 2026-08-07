@@ -51,7 +51,9 @@ test('微信和知识库设置使用与save_config相同的camelCase payload', a
   assert.match(knowledge, /get_knowledge_maintenance_status', \{ input: \{ operationId \} \}/);
   assert.match(knowledge, /if \(!selectedRoot \|\| Array\.isArray\(selectedRoot\)\) return/);
   assert.match(knowledge, /\$: busy = Boolean\(operationId\)/);
-  assert.match(knowledge, /selectedRoots/);
+  assert.match(knowledge, /invoke\('pick_knowledge_rebuild_roots'\)/);
+  assert.match(knowledge, /selectionReceiptId: selection\.selectionReceiptId/);
+  assert.doesNotMatch(knowledge, /selectedRoots/);
   assert.doesNotMatch(knowledge, /showToast\([^\n]*selectedRoot/);
   assert.match(knowledge, /async function loadReplyHistory\(\)/);
   assert.match(knowledge, /async function showReplySources\(requestId\)/);

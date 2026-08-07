@@ -14,13 +14,13 @@ use crate::config::LocalEmbeddingConfig;
 use crate::wechat::types::ContractError;
 use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
-#[cfg(test)]
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 use work_review_core::semantic::{
     decode_embedding_exact, normalize_embedding_strict, StreamingCosineTopK,
@@ -28,7 +28,12 @@ use work_review_core::semantic::{
 
 const MAX_READERS: usize = 4;
 const READER_DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const REBUILD_SELECTION_TTL: Duration = Duration::from_secs(5 * 60);
 const UNIT_NORM_TOLERANCE: f64 = 1e-4;
+
+thread_local! {
+    static MAINTENANCE_READER_OWNER: Cell<bool> = const { Cell::new(false) };
+}
 
 #[cfg(test)]
 thread_local! {
@@ -36,6 +41,7 @@ thread_local! {
     static FAIL_CHUNK_WRITE_STEP: Cell<Option<u8>> = const { Cell::new(None) };
     static ACTIVATION_TEST_HOOK: Cell<Option<(&'static str, bool)>> = const { Cell::new(None) };
     static FAIL_READER_AT: Cell<Option<usize>> = const { Cell::new(None) };
+    static FAIL_PUBLISH_RENAME_AT: Cell<Option<usize>> = const { Cell::new(None) };
 }
 
 #[cfg(test)]
@@ -67,6 +73,15 @@ fn run_active_fts_after_scan_hook() {
     if let Some(hook) = ACTIVE_FTS_AFTER_SCAN_HOOK.lock().unwrap().take() {
         hook();
     }
+}
+
+fn with_maintenance_reader_owner<T>(operation: impl FnOnce() -> T) -> T {
+    MAINTENANCE_READER_OWNER.with(|owner| {
+        let previous = owner.replace(true);
+        let result = operation();
+        owner.set(previous);
+        result
+    })
 }
 
 #[cfg(test)]
@@ -566,6 +581,40 @@ struct SourceFact {
     export_id: String,
 }
 
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PrivateRebuildManifest {
+    schema_version: u8,
+    created_at: String,
+    source_selections: Vec<PrivateSourceSelection>,
+    index_spec: PrivateIndexSpec,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PrivateSourceSelection {
+    root_path: PathBuf,
+    root_identity: String,
+    manifest_sha256: String,
+    coverage_sha256: String,
+    source_manifest_hash: String,
+    source_coverage_hash: String,
+    priority: u32,
+    state: String,
+    policy_receipt_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PrivateIndexSpec {
+    schema_head: i32,
+    chunk_schema: String,
+    token_counter: String,
+    fts_pretoken: String,
+    embedding_fingerprint: Option<String>,
+    embedding_dimension: Option<u32>,
+}
+
 /// The only owner of knowledge.sqlite connections and SQL. An unavailable
 /// store is intentional: callers receive KB_NOT_READY and must not fall back.
 #[derive(Default)]
@@ -574,12 +623,18 @@ struct MaintenanceRegistry {
     statuses: HashMap<String, MaintenanceStatus>,
 }
 
+struct RebuildSelectionReceipt {
+    roots: Vec<PathBuf>,
+    expires_at: Instant,
+}
+
 struct KnowledgeStoreInner {
     availability: StoreAvailability,
     path: Option<PathBuf>,
     writer: Mutex<Option<Connection>>,
     active_readers: Mutex<usize>,
     maintenance: Mutex<MaintenanceRegistry>,
+    rebuild_selections: Mutex<HashMap<String, RebuildSelectionReceipt>>,
     pending_display_metadata: Mutex<HashMap<String, String>>,
 }
 
@@ -615,6 +670,7 @@ impl KnowledgeStore {
                 writer: Mutex::new(Some(writer)),
                 active_readers: Mutex::new(0),
                 maintenance: Mutex::new(MaintenanceRegistry::default()),
+                rebuild_selections: Mutex::new(HashMap::new()),
                 pending_display_metadata: Mutex::new(HashMap::new()),
             }),
         })
@@ -628,6 +684,7 @@ impl KnowledgeStore {
                 writer: Mutex::new(None),
                 active_readers: Mutex::new(0),
                 maintenance: Mutex::new(MaintenanceRegistry::default()),
+                rebuild_selections: Mutex::new(HashMap::new()),
                 pending_display_metadata: Mutex::new(HashMap::new()),
             }),
         }
@@ -648,7 +705,8 @@ impl KnowledgeStore {
         if self.inner.availability != StoreAvailability::Ready {
             return Ok(Vec::new());
         }
-        self.with_reader(|connection| {
+        with_maintenance_reader_owner(|| {
+            self.with_reader(|connection| {
             let mut statement = connection.prepare(
                 "SELECT s.id,s.coverage_kind,CASE WHEN EXISTS(SELECT 1 FROM knowledge_denials d WHERE d.source_id=s.id) THEN 'denied' ELSE s.source_state END,s.import_status,(SELECT COUNT(*) FROM knowledge_source_lineage l WHERE l.predecessor_source_id=s.id OR l.successor_source_id=s.id),(SELECT COUNT(DISTINCT v.message_id) FROM knowledge_message_sources p JOIN knowledge_message_versions v ON v.id=p.message_version_id WHERE p.source_id=s.id),(SELECT COUNT(DISTINCT m.conversation_id) FROM knowledge_message_sources p JOIN knowledge_message_versions v ON v.id=p.message_version_id JOIN knowledge_messages m ON m.id=v.message_id WHERE p.source_id=s.id),s.checked_at_ms FROM knowledge_sources s ORDER BY s.checked_at_ms DESC"
             ).map_err(|_| ContractError::KbNotReady)?;
@@ -656,6 +714,7 @@ impl KnowledgeStore {
                 source_id: row.get(0)?, coverage_kind: row.get(1)?, source_state: row.get(2)?, import_status: row.get(3)?, lineage_count: row.get(4)?, message_count: row.get(5)?, conversation_count: row.get(6)?, checked_at_ms: row.get(7)?,
             })).map_err(|_| ContractError::KbNotReady)?;
             rows.collect::<Result<Vec<_>, _>>().map_err(|_| ContractError::KbNotReady)
+        })
         })
     }
 
@@ -777,7 +836,8 @@ impl KnowledgeStore {
         let store = self.clone();
         let worker_operation_id = operation_id.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            let result = store.import_wechat_json_archive(&source_root);
+            let result =
+                with_maintenance_reader_owner(|| store.import_wechat_json_archive(&source_root));
             store.finish_maintenance(&worker_operation_id, result.is_ok());
         });
         Ok(operation_id)
@@ -803,42 +863,276 @@ impl KnowledgeStore {
 
     pub(crate) fn deny_source(&self, source_id: &str) -> Result<(), ContractError> {
         let operation_id = self.begin_maintenance("denying", 1)?;
-        let exists = self.with_reader(|connection| {
-            connection
-                .query_row(
-                    "SELECT 1 FROM knowledge_sources WHERE id=?1",
-                    [source_id],
-                    |_| Ok(()),
-                )
-                .map_err(|_| ContractError::KbNotReady)
-        });
-        let result = exists.and_then(|_| {
-            self.deny_or_delete(DeletionRequest {
-                source_id: Some(source_id.to_owned()),
-                conversation_id: None,
-                message_id: None,
-                reason: "user_denied_source".into(),
+        let result = with_maintenance_reader_owner(|| {
+            let exists = self.with_reader(|connection| {
+                connection
+                    .query_row(
+                        "SELECT 1 FROM knowledge_sources WHERE id=?1",
+                        [source_id],
+                        |_| Ok(()),
+                    )
+                    .map_err(|_| ContractError::KbNotReady)
+            });
+            exists.and_then(|_| {
+                self.deny_or_delete(DeletionRequest {
+                    source_id: Some(source_id.to_owned()),
+                    conversation_id: None,
+                    message_id: None,
+                    reason: "user_denied_source".into(),
+                })
             })
         });
         self.finish_maintenance(&operation_id, result.is_ok());
         result
     }
 
-    pub(crate) fn start_rebuild(&self, roots: Vec<PathBuf>) -> Result<String, ContractError> {
-        if roots.is_empty() || roots.iter().any(|root| root.as_os_str().is_empty()) {
-            return Err(ContractError::KbNotReady);
+    pub(crate) fn issue_rebuild_selection(
+        &self,
+        roots: Vec<PathBuf>,
+    ) -> Result<String, ContractError> {
+        if roots.is_empty()
+            || roots.iter().any(|root| root.as_os_str().is_empty())
+            || roots.iter().collect::<BTreeSet<_>>().len() != roots.len()
+            || self.maintenance_status()?.maintenance == "closed"
+        {
+            return Err(ContractError::KbRebuildSelectionRequired);
         }
-        let operation_id = self.begin_maintenance("rebuilding", roots.len() as u64)?;
+        let receipt_id = opaque_id("rebuild-selection");
+        let mut receipts = self
+            .inner
+            .rebuild_selections
+            .lock()
+            .map_err(|_| ContractError::KbNotReady)?;
+        receipts.retain(|_, receipt| receipt.expires_at > Instant::now());
+        receipts.insert(
+            receipt_id.clone(),
+            RebuildSelectionReceipt {
+                roots,
+                expires_at: Instant::now() + REBUILD_SELECTION_TTL,
+            },
+        );
+        Ok(receipt_id)
+    }
+
+    fn consume_rebuild_selection(&self, receipt_id: &str) -> Result<Vec<PathBuf>, ContractError> {
+        let receipt = self
+            .inner
+            .rebuild_selections
+            .lock()
+            .map_err(|_| ContractError::KbNotReady)?
+            .remove(receipt_id)
+            .ok_or(ContractError::KbRebuildSelectionRequired)?;
+        if receipt.expires_at <= Instant::now() {
+            return Err(ContractError::KbRebuildSelectionRequired);
+        }
+        Ok(receipt.roots)
+    }
+
+    pub(crate) fn prepare_and_start_rebuild(
+        &self,
+        selection_receipt_id: &str,
+    ) -> Result<String, ContractError> {
+        let operation_id = self.begin_maintenance("rebuilding", 1)?;
+        let prepared = with_maintenance_reader_owner(|| {
+            let roots = self.consume_rebuild_selection(selection_receipt_id)?;
+            self.wait_for_reader_drain(READER_DRAIN_TIMEOUT)?;
+            let expected_hash = self.prepare_rebuild_manifest(&roots)?;
+            self.load_rebuild_manifest(&expected_hash)
+        });
+        let manifest = match prepared {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                self.finish_maintenance(&operation_id, false);
+                return Err(error);
+            }
+        };
         let store = self.clone();
         let worker_operation_id = operation_id.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            let result = store.rebuild_from_selected_roots(&roots);
+            let result = with_maintenance_reader_owner(|| store.rebuild_from_manifest(&manifest));
             store.finish_maintenance(&worker_operation_id, result.is_ok());
         });
         Ok(operation_id)
     }
 
-    fn rebuild_from_selected_roots(&self, roots: &[PathBuf]) -> Result<(), ContractError> {
+    fn private_rebuild_manifest_path(&self) -> Result<PathBuf, ContractError> {
+        let database = self.inner.path.as_ref().ok_or(ContractError::KbNotReady)?;
+        Ok(database
+            .parent()
+            .ok_or(ContractError::KbNotReady)?
+            .join("rebuild-manifest.v1.json"))
+    }
+
+    fn current_index_spec(&self) -> Result<PrivateIndexSpec, ContractError> {
+        let embedding = self
+            .with_reader(|connection| {
+                connection
+                    .query_row(
+                        "SELECT json_extract(g.embedding_metadata_json,'$.fingerprint'),json_extract(g.embedding_metadata_json,'$.dimension') FROM knowledge_catalog_state c JOIN knowledge_index_generations g ON g.id=c.active_index_generation_id AND g.status='ready' WHERE c.singleton_id=1",
+                        [],
+                        |row| Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?)),
+                    )
+                    .optional()
+                    .map_err(|_| ContractError::KbNotReady)
+            })?;
+        Ok(PrivateIndexSpec {
+            schema_head: migrations::SCHEMA_HEAD,
+            chunk_schema: CHUNK_SCHEMA_VERSION.into(),
+            token_counter: TOKEN_COUNTER_VERSION.into(),
+            fts_pretoken: FTS_PRETOKEN_VERSION.into(),
+            embedding_fingerprint: embedding.as_ref().map(|value| value.0.clone()),
+            embedding_dimension: embedding.map(|value| value.1),
+        })
+    }
+
+    fn freeze_source_selection(
+        &self,
+        selected_root: &Path,
+    ) -> Result<PrivateSourceSelection, ContractError> {
+        let metadata = fs::symlink_metadata(selected_root)
+            .map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(ContractError::KbRebuildSelectionRequired);
+        }
+        let root = selected_root
+            .canonicalize()
+            .map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        let manifest_path = root.join("manifest.json");
+        let manifest_metadata = fs::symlink_metadata(&manifest_path)
+            .map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        if manifest_metadata.file_type().is_symlink() || !manifest_metadata.is_file() {
+            return Err(ContractError::KbRebuildSelectionRequired);
+        }
+        let bytes =
+            fs::read(&manifest_path).map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        let value: serde_json::Value = serde_json::from_slice(&bytes)
+            .map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        let schema_version = value
+            .get("schemaVersion")
+            .and_then(|value| value.as_str())
+            .ok_or(ContractError::KbRebuildSelectionRequired)?;
+        let export_id = value
+            .get("exportId")
+            .and_then(|value| value.as_str())
+            .ok_or(ContractError::KbRebuildSelectionRequired)?;
+        let account_stable_id = value
+            .pointer("/account/stableId")
+            .and_then(|value| value.as_str())
+            .ok_or(ContractError::KbRebuildSelectionRequired)?;
+        let declared_manifest_hash = value
+            .pointer("/format/manifestContentHash")
+            .and_then(|value| value.as_str());
+        let (source_manifest_hash, source_coverage_hash, raw_priority, state):
+            (String, String, i64, String) = self.with_reader(|connection| {
+                connection
+                    .query_row(
+                        "SELECT s.manifest_hash,s.coverage_hash,s.priority,CASE WHEN EXISTS(SELECT 1 FROM knowledge_denials d WHERE d.source_id=s.id) THEN 'denied' ELSE s.source_state END FROM knowledge_sources s WHERE s.account_stable_id=?1 AND s.export_id=?2 AND s.schema_version=?3 AND (?4 IS NULL OR s.manifest_hash=?4) ORDER BY s.checked_at_ms DESC,s.id LIMIT 1",
+                        params![account_stable_id, export_id, schema_version, declared_manifest_hash],
+                        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                    )
+                    .map_err(|_| ContractError::KbRebuildSelectionRequired)
+            })?;
+        let priority =
+            u32::try_from(raw_priority).map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        if !matches!(state.as_str(), "active" | "retired" | "denied") {
+            return Err(ContractError::KbRebuildSelectionRequired);
+        }
+        let identity = serde_json::json!({
+            "schemaVersion": value.get("schemaVersion"),
+            "exportId": value.get("exportId"),
+            "account": value.get("account"),
+            "source": value.get("source"),
+        });
+        let coverage = serde_json::json!({
+            "scope": value.get("scope"),
+            "filters": value.get("filters"),
+            "stats": value.get("stats"),
+        });
+        let root_identity = hex_hash(
+            &serde_json::to_string(&identity)
+                .map_err(|_| ContractError::KbRebuildSelectionRequired)?,
+        );
+        let coverage_sha256 = hex_hash(
+            &serde_json::to_string(&coverage)
+                .map_err(|_| ContractError::KbRebuildSelectionRequired)?,
+        );
+        let policy_receipt_sha256 = hex_hash(&format!(
+            "{priority}|{state}|{source_manifest_hash}|{source_coverage_hash}|{root_identity}|{coverage_sha256}"
+        ));
+        Ok(PrivateSourceSelection {
+            root_path: root,
+            root_identity,
+            manifest_sha256: format!("{:x}", Sha256::digest(&bytes)),
+            coverage_sha256,
+            source_manifest_hash,
+            source_coverage_hash,
+            priority,
+            state,
+            policy_receipt_sha256,
+        })
+    }
+
+    fn prepare_rebuild_manifest(&self, roots: &[PathBuf]) -> Result<String, ContractError> {
+        if roots.is_empty() {
+            return Err(ContractError::KbRebuildSelectionRequired);
+        }
+        let mut source_selections = Vec::with_capacity(roots.len());
+        for selected_root in roots {
+            source_selections.push(self.freeze_source_selection(selected_root)?);
+        }
+        source_selections.sort_by(|left, right| {
+            (left.priority, &left.root_identity).cmp(&(right.priority, &right.root_identity))
+        });
+        let manifest = PrivateRebuildManifest {
+            schema_version: 1,
+            created_at: chrono::Utc::now().to_rfc3339(),
+            source_selections,
+            index_spec: self.current_index_spec()?,
+        };
+        let bytes =
+            serde_json::to_vec(&manifest).map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        let path = self.private_rebuild_manifest_path()?;
+        write_private_atomic(&path, &bytes)?;
+        Ok(format!("{:x}", Sha256::digest(&bytes)))
+    }
+
+    fn load_rebuild_manifest(
+        &self,
+        expected_manifest_hash: &str,
+    ) -> Result<PrivateRebuildManifest, ContractError> {
+        let path = self.private_rebuild_manifest_path()?;
+        let metadata =
+            fs::symlink_metadata(&path).map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(ContractError::KbRebuildSelectionRequired);
+        }
+        let bytes = fs::read(&path).map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        if format!("{:x}", Sha256::digest(&bytes)) != expected_manifest_hash {
+            return Err(ContractError::KbRebuildSelectionRequired);
+        }
+        let manifest: PrivateRebuildManifest = serde_json::from_slice(&bytes)
+            .map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        if manifest.schema_version != 1 || manifest.source_selections.is_empty() {
+            return Err(ContractError::KbRebuildSelectionRequired);
+        }
+        if manifest.index_spec != self.current_index_spec()? {
+            return Err(ContractError::KbRebuildSelectionRequired);
+        }
+        for selection in &manifest.source_selections {
+            if !matches!(selection.state.as_str(), "active" | "retired" | "denied") {
+                return Err(ContractError::KbRebuildSelectionRequired);
+            }
+            if self.freeze_source_selection(&selection.root_path)? != *selection {
+                return Err(ContractError::KbRebuildSelectionRequired);
+            }
+        }
+        Ok(manifest)
+    }
+
+    fn rebuild_from_manifest(
+        &self,
+        manifest: &PrivateRebuildManifest,
+    ) -> Result<(), ContractError> {
         let primary = self.inner.path.clone().ok_or(ContractError::KbNotReady)?;
         let root = primary.parent().ok_or(ContractError::KbNotReady)?;
         let candidate_dir = root.join(format!(".candidate-{}", Uuid::new_v4().simple()));
@@ -848,12 +1142,39 @@ impl KnowledgeStore {
         let candidate_result = (|| {
             let sources = {
                 let candidate = Self::open_database(candidate_path.clone())?;
-                for selected_root in roots {
-                    candidate.import_wechat_json_archive(selected_root)?;
+                for selection in &manifest.source_selections {
+                    candidate.import_wechat_json_archive(&selection.root_path)?;
                 }
+                candidate.with_writer(|connection| {
+                    let transaction = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|_| ContractError::KbNotReady)?;
+                    for selection in &manifest.source_selections {
+                        let source_id: String = transaction.query_row(
+                            "SELECT id FROM knowledge_sources WHERE manifest_hash=?1 AND coverage_hash=?2",
+                            params![selection.source_manifest_hash, selection.source_coverage_hash],
+                            |row| row.get(0),
+                        ).map_err(|_| ContractError::KbNotReady)?;
+                        transaction.execute(
+                            "UPDATE knowledge_sources SET priority=?1,source_state=?2 WHERE id=?3",
+                            params![selection.priority, if selection.state == "retired" { "retired" } else { "active" }, source_id],
+                        ).map_err(|_| ContractError::KbNotReady)?;
+                        if selection.state == "denied" {
+                            transaction.execute(
+                                "INSERT INTO knowledge_denials(id,source_id,reason,created_at_ms) VALUES(?1,?2,'rebuild_policy_replay',?3)",
+                                params![opaque_id("denial"), source_id, now_ms()],
+                            ).map_err(|_| ContractError::KbNotReady)?;
+                        }
+                    }
+                    transaction.commit().map_err(|_| ContractError::KbNotReady)
+                })?;
                 let sources = candidate.list_sources()?;
                 if sources.is_empty()
-                    || sources.iter().any(|source| source.source_state != "active")
+                    || !sources.iter().any(|source| source.source_state == "active")
+                    || sources.iter().any(|source| {
+                        !matches!(
+                            source.source_state.as_str(),
+                            "active" | "retired" | "denied"
+                        )
+                    })
                 {
                     return Err(ContractError::KbNotReady);
                 }
@@ -2758,6 +3079,23 @@ impl KnowledgeStore {
             }
             *readers += 1;
         }
+        let maintenance_closed = match self.inner.maintenance.lock() {
+            Ok(registry) => {
+                registry.active_operation_id.is_some() && !MAINTENANCE_READER_OWNER.with(Cell::get)
+            }
+            Err(_) => {
+                if let Ok(mut readers) = self.inner.active_readers.lock() {
+                    *readers = readers.saturating_sub(1);
+                }
+                return Err(ContractError::KbNotReady);
+            }
+        };
+        if maintenance_closed {
+            if let Ok(mut readers) = self.inner.active_readers.lock() {
+                *readers = readers.saturating_sub(1);
+            }
+            return Err(ContractError::KbNotReady);
+        }
         let result = self
             .inner
             .path
@@ -4016,6 +4354,54 @@ fn write_redacted_manifest(
         .map_err(|_| ContractError::KbNotReady)
 }
 
+fn write_private_atomic(path: &Path, bytes: &[u8]) -> Result<(), ContractError> {
+    let parent = path
+        .parent()
+        .ok_or(ContractError::KbRebuildSelectionRequired)?;
+    let pending = parent.join(format!(
+        ".rebuild-manifest-{}.pending",
+        Uuid::new_v4().simple()
+    ));
+    let result = (|| {
+        use std::io::Write;
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options
+            .open(&pending)
+            .map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        file.write_all(bytes)
+            .map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        file.sync_all()
+            .map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        if path.exists() {
+            let previous = parent.join(format!(
+                ".rebuild-manifest-{}.previous",
+                Uuid::new_v4().simple()
+            ));
+            fs::rename(path, &previous).map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+            if fs::rename(&pending, path).is_err() {
+                let _ = fs::rename(&previous, path);
+                return Err(ContractError::KbRebuildSelectionRequired);
+            }
+            let _ = fs::remove_file(previous);
+        } else {
+            fs::rename(&pending, path).map_err(|_| ContractError::KbRebuildSelectionRequired)?;
+        }
+        fs::File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|_| ContractError::KbRebuildSelectionRequired)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&pending);
+    }
+    result
+}
+
 fn redacted_manifest_bytes(
     database: &Path,
     sources: &[KnowledgeSourceStatus],
@@ -4088,6 +4474,66 @@ fn validate_database_pair(database: &Path, manifest: &Path) -> Result<(), Contra
         .ok_or(ContractError::KbNotReady)
 }
 
+fn file_sha256(path: &Path) -> Result<String, ContractError> {
+    let mut file = fs::File::open(path).map_err(|_| ContractError::KbNotReady)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = file
+            .read(&mut buffer)
+            .map_err(|_| ContractError::KbNotReady)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+#[cfg(test)]
+fn fail_publish_rename_at(call: usize) {
+    FAIL_PUBLISH_RENAME_AT.with(|remaining| remaining.set(Some(call)));
+}
+
+#[cfg(test)]
+fn publish_rename(from: &Path, to: &Path) -> std::io::Result<()> {
+    let fail = FAIL_PUBLISH_RENAME_AT.with(|remaining| match remaining.get() {
+        Some(1) => {
+            remaining.set(None);
+            true
+        }
+        Some(call) => {
+            remaining.set(Some(call - 1));
+            false
+        }
+        None => false,
+    });
+    if fail {
+        Err(std::io::Error::other("publish rename fault injection"))
+    } else {
+        fs::rename(from, to)
+    }
+}
+
+#[cfg(not(test))]
+fn publish_rename(from: &Path, to: &Path) -> std::io::Result<()> {
+    fs::rename(from, to)
+}
+
+fn restore_quarantined(quarantined: &[(PathBuf, PathBuf)]) -> Result<(), ContractError> {
+    let mut complete = true;
+    for (original, moved) in quarantined.iter().rev() {
+        if moved.exists() {
+            if original.exists() || publish_rename(moved, original).is_err() {
+                complete = false;
+            }
+        } else if !original.exists() {
+            complete = false;
+        }
+    }
+    complete.then_some(()).ok_or(ContractError::KbNotReady)
+}
+
 fn publish_candidate_pair(
     primary: &Path,
     primary_manifest: &Path,
@@ -4096,27 +4542,79 @@ fn publish_candidate_pair(
     root: &Path,
 ) -> Result<(), ContractError> {
     let generation = Uuid::new_v4().simple().to_string();
-    let backup = root.join(format!("knowledge.sqlite.backup-{generation}"));
-    let backup_manifest = root.join(format!(
-        "knowledge.sqlite.manifest.json.backup-{generation}"
-    ));
-    fs::rename(primary, &backup).map_err(|_| ContractError::KbNotReady)?;
-    if fs::rename(primary_manifest, &backup_manifest).is_err() {
-        let _ = fs::rename(&backup, primary);
+    let quarantine = root.join(format!(".quarantine-{generation}"));
+    fs::create_dir(&quarantine).map_err(|_| ContractError::KbNotReady)?;
+    let primary_wal = PathBuf::from(format!("{}-wal", primary.display()));
+    let primary_shm = PathBuf::from(format!("{}-shm", primary.display()));
+    let audit = root.join("knowledge-audit.jsonl");
+    let old_set = [
+        primary,
+        primary_manifest,
+        &primary_wal,
+        &primary_shm,
+        &audit,
+    ];
+    let mut quarantined = Vec::new();
+    for path in old_set {
+        if !path.exists() {
+            continue;
+        }
+        let destination = quarantine.join(path.file_name().ok_or(ContractError::KbNotReady)?);
+        if publish_rename(path, &destination).is_err() {
+            let _ = restore_quarantined(&quarantined);
+            return Err(ContractError::KbNotReady);
+        }
+        quarantined.push((path.to_path_buf(), destination));
+    }
+    let inventory = quarantined
+        .iter()
+        .map(|(_, path)| -> Result<serde_json::Value, ContractError> {
+            let metadata = fs::metadata(path).map_err(|_| ContractError::KbNotReady)?;
+            Ok(serde_json::json!({
+                "relativeName": path.file_name().and_then(|name| name.to_str()).unwrap_or("invalid"),
+                "bytes": metadata.len(),
+                "kind": "file",
+                "sha256": file_sha256(path)?,
+            }))
+        })
+        .collect::<Result<Vec<_>, _>>();
+    let inventory = match inventory {
+        Ok(inventory) => inventory,
+        Err(_) => {
+            let _ = restore_quarantined(&quarantined);
+            return Err(ContractError::KbNotReady);
+        }
+    };
+    let inventory_bytes = serde_json::to_vec(&serde_json::json!({
+        "schemaVersion": 1,
+        "generation": generation,
+        "entries": inventory,
+        "sourceExportsExcluded": true,
+    }))
+    .map_err(|_| ContractError::KbNotReady)?;
+    if write_private_atomic(
+        &quarantine.join("quarantine-inventory.json"),
+        &inventory_bytes,
+    )
+    .is_err()
+    {
+        let _ = restore_quarantined(&quarantined);
         return Err(ContractError::KbNotReady);
     }
-    if fs::rename(candidate, primary).is_err() {
-        let _ = fs::rename(&backup_manifest, primary_manifest);
-        let _ = fs::rename(&backup, primary);
+    if publish_rename(candidate, primary).is_err() {
+        let _ = restore_quarantined(&quarantined);
         return Err(ContractError::KbNotReady);
     }
-    if fs::rename(candidate_manifest, primary_manifest).is_err()
+    if publish_rename(candidate_manifest, primary_manifest).is_err()
         || validate_database_pair(primary, primary_manifest).is_err()
     {
-        let _ = fs::rename(primary, candidate);
-        let _ = fs::rename(primary_manifest, candidate_manifest);
-        let _ = fs::rename(&backup, primary);
-        let _ = fs::rename(&backup_manifest, primary_manifest);
+        if primary.exists() {
+            let _ = publish_rename(primary, candidate);
+        }
+        if primary_manifest.exists() {
+            let _ = publish_rename(primary_manifest, candidate_manifest);
+        }
+        let _ = restore_quarantined(&quarantined);
         return Err(ContractError::KbNotReady);
     }
     Ok(())
@@ -4130,6 +4628,180 @@ mod tests {
         let path = std::env::temp_dir().join(format!("knowledge_store_{}", Uuid::new_v4()));
         fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    fn rebuild_source_fixture(root: &Path) {
+        fs::create_dir_all(root).unwrap();
+        fs::write(
+            root.join("manifest.json"),
+            br#"{"schemaVersion":"wechat_archive_v1","exportId":"fixture-export","account":{"stableId":"fixture-account"},"source":{"kind":"user_selected"},"scope":{"kind":"full","conversations":[]},"filters":{},"stats":{"conversationCount":0,"messageCount":0,"missingCount":0},"format":{"manifestContentHash":"manifest"}}"#,
+        )
+        .unwrap();
+    }
+
+    fn seed_rebuild_source_policy(store: &KnowledgeStore) {
+        store
+            .begin_staging_source(NewSource {
+                account_stable_id: "fixture-account".into(),
+                conversation_stable_id: String::new(),
+                export_id: "fixture-export".into(),
+                schema_version: "wechat_archive_v1".into(),
+                manifest_hash: "manifest".into(),
+                coverage_hash: "coverage".into(),
+                exported_at_ms: 1,
+                coverage_kind: CoverageKind::Full,
+                display_metadata_json: None,
+            })
+            .unwrap();
+    }
+
+    #[test]
+    fn private_rebuild_manifest_is_atomic_strict_and_contains_no_body_fields() {
+        let data_dir = temp_dir();
+        let selected_root = temp_dir().join("selected-export");
+        rebuild_source_fixture(&selected_root);
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        seed_rebuild_source_policy(&store);
+
+        let digest = store
+            .prepare_rebuild_manifest(std::slice::from_ref(&selected_root))
+            .unwrap();
+        assert_eq!(digest.len(), 64);
+        let path = data_dir.join("wechat_knowledge/rebuild-manifest.v1.json");
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("fixture-export"));
+        for forbidden in ["messageText", "body", "excerpt", "vector", "apiKey"] {
+            assert!(!text.contains(forbidden));
+        }
+        let mut value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        value["unexpected"] = serde_json::json!(true);
+        let tampered = serde_json::to_vec(&value).unwrap();
+        fs::write(&path, &tampered).unwrap();
+        let tampered_digest = format!("{:x}", Sha256::digest(&tampered));
+        assert!(matches!(
+            store.load_rebuild_manifest(&tampered_digest),
+            Err(ContractError::KbRebuildSelectionRequired)
+        ));
+    }
+
+    #[test]
+    fn rebuild_manifest_hash_drift_requires_explicit_reselection() {
+        let data_dir = temp_dir();
+        let selected_root = temp_dir().join("selected-export");
+        rebuild_source_fixture(&selected_root);
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        seed_rebuild_source_policy(&store);
+        let digest = store
+            .prepare_rebuild_manifest(std::slice::from_ref(&selected_root))
+            .unwrap();
+        fs::write(selected_root.join("manifest.json"), b"{}").unwrap();
+
+        assert!(matches!(
+            store.load_rebuild_manifest(&digest),
+            Err(ContractError::KbRebuildSelectionRequired)
+        ));
+        let status = store.maintenance_status().unwrap();
+        assert_eq!(status.state, "idle");
+        assert_eq!(status.maintenance, "open");
+    }
+
+    #[test]
+    fn rebuild_selection_receipts_are_one_time_expiring_and_maintenance_scoped() {
+        let data_dir = temp_dir();
+        let selected_root = temp_dir().join("selected-export");
+        rebuild_source_fixture(&selected_root);
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        seed_rebuild_source_policy(&store);
+
+        let receipt = store
+            .issue_rebuild_selection(vec![selected_root.clone()])
+            .unwrap();
+        assert_eq!(
+            store.consume_rebuild_selection(&receipt).unwrap(),
+            vec![selected_root.clone()]
+        );
+        assert!(matches!(
+            store.consume_rebuild_selection(&receipt),
+            Err(ContractError::KbRebuildSelectionRequired)
+        ));
+        assert!(matches!(
+            store.consume_rebuild_selection("forged"),
+            Err(ContractError::KbRebuildSelectionRequired)
+        ));
+
+        let expired = store
+            .issue_rebuild_selection(vec![selected_root.clone()])
+            .unwrap();
+        store
+            .inner
+            .rebuild_selections
+            .lock()
+            .unwrap()
+            .get_mut(&expired)
+            .unwrap()
+            .expires_at = Instant::now();
+        assert!(matches!(
+            store.consume_rebuild_selection(&expired),
+            Err(ContractError::KbRebuildSelectionRequired)
+        ));
+
+        let operation = store.begin_maintenance("fixture", 1).unwrap();
+        assert!(matches!(
+            store.with_reader(|_| Ok(())),
+            Err(ContractError::KbNotReady)
+        ));
+        assert!(with_maintenance_reader_owner(|| store.with_reader(|_| Ok(()))).is_ok());
+        assert!(matches!(
+            store.issue_rebuild_selection(vec![selected_root]),
+            Err(ContractError::KbRebuildSelectionRequired)
+        ));
+        store.finish_maintenance(&operation, true);
+    }
+
+    #[test]
+    fn rebuild_manifest_freezes_real_priority_policy_and_detects_policy_drift() {
+        let data_dir = temp_dir();
+        let selected_root = temp_dir().join("selected-export");
+        rebuild_source_fixture(&selected_root);
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        seed_rebuild_source_policy(&store);
+        store
+            .with_writer(|connection| {
+                connection
+                    .execute(
+                        "UPDATE knowledge_sources SET priority=7,source_state='retired'",
+                        [],
+                    )
+                    .map_err(|_| ContractError::KbNotReady)?;
+                Ok(())
+            })
+            .unwrap();
+
+        let first_digest = store
+            .prepare_rebuild_manifest(std::slice::from_ref(&selected_root))
+            .unwrap();
+        let first = store.load_rebuild_manifest(&first_digest).unwrap();
+        assert_eq!(first.source_selections[0].priority, 7);
+        assert_eq!(first.source_selections[0].state, "retired");
+        let second_digest = store
+            .prepare_rebuild_manifest(std::slice::from_ref(&selected_root))
+            .unwrap();
+        let second = store.load_rebuild_manifest(&second_digest).unwrap();
+        assert_eq!(first.source_selections, second.source_selections);
+        assert_eq!(first.index_spec, second.index_spec);
+
+        store
+            .with_writer(|connection| {
+                connection
+                    .execute("UPDATE knowledge_sources SET priority=8", [])
+                    .map_err(|_| ContractError::KbNotReady)?;
+                Ok(())
+            })
+            .unwrap();
+        assert!(matches!(
+            store.load_rebuild_manifest(&second_digest),
+            Err(ContractError::KbRebuildSelectionRequired)
+        ));
     }
 
     #[test]
@@ -5578,6 +6250,10 @@ mod tests {
 
         let old_database = fs::read(&primary).unwrap();
         let old_manifest = fs::read(&primary_manifest).unwrap();
+        let primary_wal = PathBuf::from(format!("{}-wal", primary.display()));
+        let audit = primary.parent().unwrap().join("knowledge-audit.jsonl");
+        fs::write(&primary_wal, b"").unwrap();
+        fs::write(&audit, b"old-audit-fixture").unwrap();
         fs::write(&candidate_manifest, b"not a knowledge manifest").unwrap();
         assert_eq!(
             publish_candidate_pair(
@@ -5591,7 +6267,135 @@ mod tests {
         );
         assert_eq!(fs::read(&primary).unwrap(), old_database);
         assert_eq!(fs::read(&primary_manifest).unwrap(), old_manifest);
+        assert!(fs::read(&primary_wal).unwrap().is_empty());
+        assert_eq!(fs::read(&audit).unwrap(), b"old-audit-fixture");
         validate_database_pair(&primary, &primary_manifest).unwrap();
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn every_publish_rename_failure_preserves_each_old_derived_file() {
+        for fail_at in 1..=14 {
+            let data_dir = temp_dir();
+            let root = data_dir.join("wechat_knowledge");
+            let primary = root.join("knowledge.sqlite");
+            let primary_manifest = root.join("knowledge.sqlite.manifest.json");
+            let store = KnowledgeStore::open(&data_dir).unwrap();
+            let primary_sources = store.list_sources().unwrap();
+            drop(store);
+            write_redacted_manifest(&primary_manifest, &primary, &primary_sources).unwrap();
+
+            let candidate_dir = root.join(".candidate-test");
+            fs::create_dir(&candidate_dir).unwrap();
+            let candidate = candidate_dir.join("knowledge.sqlite");
+            let candidate_manifest = candidate_dir.join("knowledge.sqlite.manifest.json");
+            let candidate_store = KnowledgeStore::open_database(candidate.clone()).unwrap();
+            let candidate_sources = candidate_store.list_sources().unwrap();
+            drop(candidate_store);
+            write_redacted_manifest(&candidate_manifest, &candidate, &candidate_sources).unwrap();
+
+            let wal = PathBuf::from(format!("{}-wal", primary.display()));
+            let shm = PathBuf::from(format!("{}-shm", primary.display()));
+            let audit = root.join("knowledge-audit.jsonl");
+            fs::write(&wal, b"old-wal").unwrap();
+            fs::write(&shm, b"old-shm").unwrap();
+            fs::write(&audit, b"old-audit").unwrap();
+            let expected = [
+                (primary.clone(), fs::read(&primary).unwrap()),
+                (
+                    primary_manifest.clone(),
+                    fs::read(&primary_manifest).unwrap(),
+                ),
+                (wal.clone(), b"old-wal".to_vec()),
+                (shm.clone(), b"old-shm".to_vec()),
+                (audit.clone(), b"old-audit".to_vec()),
+            ];
+            fs::write(&candidate_manifest, b"invalid candidate manifest").unwrap();
+
+            fail_publish_rename_at(fail_at);
+            assert_eq!(
+                publish_candidate_pair(
+                    &primary,
+                    &primary_manifest,
+                    &candidate,
+                    &candidate_manifest,
+                    &root,
+                ),
+                Err(ContractError::KbNotReady),
+                "fault {fail_at} must fail closed"
+            );
+            let quarantines = fs::read_dir(&root)
+                .unwrap()
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.starts_with(".quarantine-"))
+                })
+                .collect::<Vec<_>>();
+            for (original, bytes) in &expected {
+                let original_matches = fs::read(original).ok().as_ref() == Some(bytes);
+                let quarantined_matches = quarantines.iter().any(|quarantine| {
+                    original
+                        .file_name()
+                        .and_then(|name| fs::read(quarantine.join(name)).ok())
+                        .as_ref()
+                        == Some(bytes)
+                });
+                assert!(
+                    original_matches || quarantined_matches,
+                    "fault {fail_at} lost {}",
+                    original.display()
+                );
+            }
+            let _ = fs::remove_dir_all(data_dir);
+        }
+    }
+
+    #[test]
+    fn successful_publish_retains_hashed_quarantine_inventory() {
+        let data_dir = temp_dir();
+        let root = data_dir.join("wechat_knowledge");
+        let primary = root.join("knowledge.sqlite");
+        let primary_manifest = root.join("knowledge.sqlite.manifest.json");
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let primary_sources = store.list_sources().unwrap();
+        drop(store);
+        write_redacted_manifest(&primary_manifest, &primary, &primary_sources).unwrap();
+        let candidate_dir = root.join(".candidate-test");
+        fs::create_dir(&candidate_dir).unwrap();
+        let candidate = candidate_dir.join("knowledge.sqlite");
+        let candidate_manifest = candidate_dir.join("knowledge.sqlite.manifest.json");
+        let candidate_store = KnowledgeStore::open_database(candidate.clone()).unwrap();
+        let candidate_sources = candidate_store.list_sources().unwrap();
+        drop(candidate_store);
+        write_redacted_manifest(&candidate_manifest, &candidate, &candidate_sources).unwrap();
+
+        publish_candidate_pair(
+            &primary,
+            &primary_manifest,
+            &candidate,
+            &candidate_manifest,
+            &root,
+        )
+        .unwrap();
+        let inventory = fs::read_dir(&root)
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path().join("quarantine-inventory.json"))
+            .find(|path| path.is_file())
+            .unwrap();
+        let value: serde_json::Value =
+            serde_json::from_slice(&fs::read(inventory).unwrap()).unwrap();
+        let entries = value["entries"].as_array().unwrap();
+        assert!(!entries.is_empty());
+        assert!(entries.iter().all(|entry| {
+            entry["kind"] == "file"
+                && entry["sha256"]
+                    .as_str()
+                    .is_some_and(|hash| hash.len() == 64)
+        }));
         let _ = fs::remove_dir_all(data_dir);
     }
 

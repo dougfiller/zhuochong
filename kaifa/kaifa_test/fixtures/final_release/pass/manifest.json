@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "releaseBatchId": "fixture-batch-27",
+  "verdict": "pass",
+  "blockers": [],
+  "sections": {
+    "candidate": "pass", "environment": "pass", "performance": "pass", "businessUat": "pass", "m2Audit": "pass", "rebuild": "pass", "recovery": "pass",
+    "installer": "pass", "signatures": "pass", "runtimeAudit": "pass", "assetAudit": "pass", "rollback": "pass", "releaseNotes": "pass", "approvals": "pass"
+  },
+  "evidenceRefs": [
+    {"kind":"finalEvidence","path":"evidence.json","sha256":"4ec53eb3c6f950920f9fcb10e628b58bece20951d5364e5b4ff845d5e66e107f"},
+    {"kind":"m2ContractFreeze","path":"m2-contract.json","sha256":"f2b46868c0883506f22eecd7cd4603d18b3e0596e106813dc33e0187d9795f02"},
+    {"kind":"candidateMetadata","path":"candidate.json","sha256":"745b41d5b848417a06a72dafc1a1f412eccd3d691fa62b978e0db17b02c9c79d"},
+    {"kind":"candidateArtifact","path":"candidate.bin","sha256":"2bc41ecaa1f6dab2bae0decfb639037f4b828b087baad7b1fd04073b3e0a9c79"},
+    {"kind":"environmentAttestation","path":"environment.json","sha256":"0a44730844368ecfd9dd716b69ae010ea7de437f9e5f7813ada08216bb77344d"},
+    {"kind":"businessUat","path":"uat.json","sha256":"d1aa08d58d7be612aa3b341faa448074b9846aa8612f89f1510e87e76c2562ad"},
+    {"kind":"m2Audit","path":"audit.json","sha256":"1dd12b6b73e9fb30eac7940166409cc52cdc2c90c13d4874c7a19ecb43068bfa"},
+    {"kind":"rebuildSnapshots","path":"rebuild.json","sha256":"321743432cd14240345d05ab44d561d72ff0aa3a9094a612b507a4df76ccbde8"},
+    {"kind":"recoveryReceipt","path":"recovery.json","sha256":"f36b1086cbcf3e45dd18a3b9cf49e33632af7ebaa160cc5e713e7ce4897bb532"},
+    {"kind":"signatureOutput","path":"signatures.json","sha256":"317758f535098e3898d7e5420994cdad57e2e609df22ad37aa1e978c0e2541df"},
+    {"kind":"installerLifecycle","path":"installer.json","sha256":"13be4609b6310fd97e4da2f9536a85a759144884d03655287d90416e1eb00bdd"},
+    {"kind":"runtimeAudit","path":"runtime.json","sha256":"a6b22ac357a0eb46f56ff95509bb8e8ac98019c9ad19c449551245851430abc8"},
+    {"kind":"assetAudit","path":"assets.json","sha256":"f2dc904701bec1a800da9af4f4b3f85a53a704a89bc1afeda413ce70e7e1ee46"},
+    {"kind":"rollbackReceipt","path":"rollback.json","sha256":"8729e086d8f5a8f929b013dfac7599279c1fc0257edf6192d76df929ec3530e9"},
+    {"kind":"approvals","path":"approvals.json","sha256":"c3f110ff47218d65aebdd8e8247bbbc2804223e902e2b33f20bab145fa24044c"},
+    {"kind":"releaseNotesReview","path":"release-notes.json","sha256":"5927c8bdb6bd922d1615f8947a0ca6581b4a3608460cb6f3461b0ea146b0a630"}
+  ]
+}

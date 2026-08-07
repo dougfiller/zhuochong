@@ -7,9 +7,14 @@ use crate::privacy::PrivacyFilter;
 use crate::screenshot::ScreenshotService;
 use crate::storage::StorageManager;
 use crate::AppState;
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, State};
+use uuid::Uuid;
 
 use super::shared::persist_app_config;
 
@@ -23,6 +28,207 @@ const MANAGED_DATA_ENTRIES: &[&str] = &[
 ];
 
 const LIVE_DATABASE_FILES: &[&str] = &["workreview.db", "workreview.db-shm", "workreview.db-wal"];
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum RecoveryReason {
+    PreUpgrade,
+    PreRollback,
+}
+
+impl RecoveryReason {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::PreUpgrade => "pre_upgrade",
+            Self::PreRollback => "pre_rollback",
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RecoveryBundleReceipt {
+    bundle_id: String,
+    created_at: String,
+    installed_version: String,
+    release_batch_id: String,
+    reason: &'static str,
+    verified: bool,
+    files: Vec<RecoveryFileReceipt>,
+    core_database: CoreDatabaseReceipt,
+    knowledge_inventory_policy: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RecoveryFileReceipt {
+    relative_name: String,
+    sha256: String,
+    bytes: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CoreDatabaseReceipt {
+    integrity: &'static str,
+    table_count: u64,
+    activity_count: u64,
+}
+
+fn hash_file(path: &Path) -> Result<(String, u64), AppError> {
+    let mut file = File::open(path)?;
+    let mut digest = Sha256::new();
+    let mut bytes = 0u64;
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+        bytes += read as u64;
+    }
+    Ok((format!("{:x}", digest.finalize()), bytes))
+}
+
+fn verify_core_backup(path: &Path) -> Result<CoreDatabaseReceipt, AppError> {
+    // FTS5's integrity_check may need a temporary write even when the database
+    // is valid, so validate the private backup copy read-write, never the live DB.
+    let connection = rusqlite::Connection::open(path)?;
+    let integrity: String = connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+    if !integrity.trim().eq_ignore_ascii_case("ok") {
+        return Err(AppError::Config("RECOVERY_BACKUP_FAILED".into()));
+    }
+    let table_count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+        [],
+        |row| row.get(0),
+    )?;
+    let activity_count: i64 =
+        connection.query_row("SELECT COUNT(*) FROM activities", [], |row| row.get(0))?;
+    Ok(CoreDatabaseReceipt {
+        integrity: "ok",
+        table_count: u64::try_from(table_count)
+            .map_err(|_| AppError::Config("RECOVERY_BACKUP_FAILED".into()))?,
+        activity_count: u64::try_from(activity_count)
+            .map_err(|_| AppError::Config("RECOVERY_BACKUP_FAILED".into()))?,
+    })
+}
+
+fn canonical_or_absolute(path: &Path) -> Result<PathBuf, AppError> {
+    if path.exists() {
+        Ok(path.canonicalize()?)
+    } else {
+        let absolute = to_absolute_path(path)?;
+        let mut cursor = absolute.as_path();
+        let mut missing = Vec::new();
+        while !cursor.exists() {
+            missing.push(
+                cursor
+                    .file_name()
+                    .ok_or_else(|| AppError::Config("RECOVERY_BACKUP_FAILED".into()))?
+                    .to_owned(),
+            );
+            cursor = cursor
+                .parent()
+                .ok_or_else(|| AppError::Config("RECOVERY_BACKUP_FAILED".into()))?;
+        }
+        let mut normalized = cursor.canonicalize()?;
+        for component in missing.into_iter().rev() {
+            normalized.push(component);
+        }
+        Ok(normalized)
+    }
+}
+
+/// Creates a verified, private recovery bundle in a directory already chosen
+/// by the native picker. This narrow seam intentionally is not a Tauri command:
+/// frontend strings cannot select backup paths without a picker receipt.
+#[allow(dead_code)]
+pub(crate) fn create_recovery_bundle(
+    source_data_dir: &Path,
+    selected_directory: &Path,
+    database: &Database,
+    installed_version: &str,
+    release_batch_id: &str,
+    reason: RecoveryReason,
+) -> Result<RecoveryBundleReceipt, AppError> {
+    if installed_version.trim().is_empty() || release_batch_id.trim().is_empty() {
+        return Err(AppError::Config("RECOVERY_BACKUP_FAILED".into()));
+    }
+    let source = source_data_dir.canonicalize()?;
+    let selected = canonical_or_absolute(selected_directory)?;
+    if source == selected
+        || source.starts_with(&selected)
+        || selected.starts_with(&source)
+        || fs::symlink_metadata(selected_directory)
+            .map(|metadata| metadata.file_type().is_symlink())
+            .unwrap_or(false)
+    {
+        return Err(AppError::Config("RECOVERY_BACKUP_FAILED".into()));
+    }
+    fs::create_dir_all(&selected)?;
+    let selected = selected.canonicalize()?;
+    let bundle_id = format!("recovery-{}", Uuid::new_v4().simple());
+    let temporary = selected.join(format!(".{bundle_id}.pending"));
+    let committed = selected.join(&bundle_id);
+    fs::create_dir(&temporary)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o700))?;
+    }
+    let result = (|| {
+        let mut files = Vec::new();
+        for name in ["config.json", "config.json.bak"] {
+            let source_file = source.join(name);
+            if !source_file.exists() {
+                continue;
+            }
+            if source_file.is_symlink() || !source_file.is_file() {
+                return Err(AppError::Config("RECOVERY_BACKUP_FAILED".into()));
+            }
+            let target = temporary.join(name);
+            fs::copy(&source_file, &target)?;
+            let (sha256, bytes) = hash_file(&target)?;
+            files.push(RecoveryFileReceipt {
+                relative_name: name.into(),
+                sha256,
+                bytes,
+            });
+        }
+        let backup = temporary.join("workreview.db");
+        database.backup_to(&backup)?;
+        let core_database = verify_core_backup(&backup)?;
+        let (sha256, bytes) = hash_file(&backup)?;
+        files.push(RecoveryFileReceipt {
+            relative_name: "workreview.db".into(),
+            sha256,
+            bytes,
+        });
+        files.sort_by(|left, right| left.relative_name.cmp(&right.relative_name));
+        let receipt = RecoveryBundleReceipt {
+            bundle_id: bundle_id.clone(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            installed_version: installed_version.into(),
+            release_batch_id: release_batch_id.into(),
+            reason: reason.as_str(),
+            verified: true,
+            files,
+            core_database,
+            knowledge_inventory_policy: "derived-layer-inventory-only; source exports excluded",
+        };
+        let manifest = temporary.join("recovery-manifest.v1.json");
+        fs::write(&manifest, serde_json::to_vec_pretty(&receipt)?)?;
+        File::open(&manifest)?.sync_all()?;
+        fs::rename(&temporary, &committed)?;
+        File::open(&selected)?.sync_all()?;
+        Ok(receipt)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_dir_all(&temporary);
+    }
+    result
+}
 
 /// 获取配置
 #[tauri::command]
@@ -409,4 +615,68 @@ pub async fn open_data_dir(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(),
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!("task27-{label}-{}", Uuid::new_v4()));
+        fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn recovery_bundle_is_verified_committed_and_contains_no_absolute_paths() {
+        let source = temp_dir("recovery-source");
+        let destination = temp_dir("recovery-destination");
+        fs::write(source.join("config.json"), br#"{"secret":"local-only"}"#).unwrap();
+        fs::write(source.join("config.json.bak"), br#"{"safe":true}"#).unwrap();
+        let database = Database::new(&source.join("workreview.db")).unwrap();
+        let source_canonical = source.canonicalize().unwrap();
+        let destination_canonical = destination.canonicalize().unwrap();
+        assert!(!source_canonical.starts_with(&destination_canonical));
+        assert!(!destination_canonical.starts_with(&source_canonical));
+        let receipt = create_recovery_bundle(
+            &source,
+            &destination,
+            &database,
+            "1.0.0",
+            "fixture-batch",
+            RecoveryReason::PreRollback,
+        )
+        .unwrap();
+
+        assert!(receipt.verified);
+        assert_eq!(receipt.core_database.integrity, "ok");
+        let bundle = destination.join(&receipt.bundle_id);
+        let manifest = fs::read_to_string(bundle.join("recovery-manifest.v1.json")).unwrap();
+        assert!(!manifest.contains(&source.to_string_lossy().to_string()));
+        assert!(!manifest.contains(&destination.to_string_lossy().to_string()));
+        assert_eq!(
+            fs::read(bundle.join("config.json")).unwrap(),
+            br#"{"secret":"local-only"}"#
+        );
+        assert!(Database::new(&bundle.join("workreview.db")).is_ok());
+    }
+
+    #[test]
+    fn recovery_bundle_rejects_data_root_relatives_without_changing_source() {
+        let source = temp_dir("recovery-reject");
+        fs::write(source.join("config.json"), b"original").unwrap();
+        let database = Database::new(&source.join("workreview.db")).unwrap();
+        let before = fs::read(source.join("config.json")).unwrap();
+
+        assert!(create_recovery_bundle(
+            &source,
+            &source.join("recovery"),
+            &database,
+            "1.0.0",
+            "fixture-batch",
+            RecoveryReason::PreUpgrade,
+        )
+        .is_err());
+        assert_eq!(fs::read(source.join("config.json")).unwrap(), before);
+    }
 }

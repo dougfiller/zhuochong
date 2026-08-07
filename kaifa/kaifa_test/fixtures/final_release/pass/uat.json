@@ -1,0 +1,10 @@
+{"schemaVersion":1,"releaseBatchId":"fixture-batch-27","questions":[
+  {"questionId":"q1","category":"singleConversation","requestId":"r1","result":"pass"},
+  {"questionId":"q2","category":"selectedConversations","requestId":"r2","result":"pass"},
+  {"questionId":"q3","category":"globalConfirmed","requestId":"r3","result":"pass"},
+  {"questionId":"q4","category":"noHit","requestId":"r4","result":"pass"},
+  {"questionId":"q5","category":"chineseKeyword","requestId":"r5","result":"pass"},
+  {"questionId":"q6","category":"chineseSemantic","requestId":"r6","result":"pass"},
+  {"questionId":"q7","category":"synonym","requestId":"r7","result":"pass"},
+  {"questionId":"q8","category":"sourceReview","requestId":"r8","result":"pass"}
+]}

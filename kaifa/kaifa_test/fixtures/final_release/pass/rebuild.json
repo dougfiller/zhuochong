@@ -1,0 +1,5 @@
+{"schemaVersion":1,"releaseBatchId":"fixture-batch-27","runs":[
+  {"mode":"selected","run":1,"logicalDigest":"s","sourcePolicyDigest":"p","indexSpecDigest":"i"},{"mode":"selected","run":2,"logicalDigest":"s","sourcePolicyDigest":"p","indexSpecDigest":"i"},
+  {"mode":"full","run":1,"logicalDigest":"f","sourcePolicyDigest":"p","indexSpecDigest":"i"},{"mode":"full","run":2,"logicalDigest":"f","sourcePolicyDigest":"p","indexSpecDigest":"i"},
+  {"mode":"incremental","run":1,"logicalDigest":"n","sourcePolicyDigest":"p","indexSpecDigest":"i"},{"mode":"incremental","run":2,"logicalDigest":"n","sourcePolicyDigest":"p","indexSpecDigest":"i"}
+]}

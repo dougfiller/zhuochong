@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "approvedAt": "2026-08-08T01:00:00Z",
+  "approvedBy": "fixture-release-owner",
+  "targetWindows": {"build": "fixture-windows-11", "architecture": "x64"},
+  "wechatProfile": {"profileId": "fixture-profile", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  "dataset": {"datasetId": "fixture-dataset", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+  "performanceLimits": {
+    "firstIndexMs": 1000,
+    "stableKnowledgeBytes": 1000,
+    "derivedTotalBytes": 2000,
+    "peakWorkingSetBytes": 3000,
+    "queryP50Ms": 50,
+    "queryP95Ms": 100,
+    "schedulerDriftP95Ms": 20,
+    "uiInputLatencyP95Ms": 30
+  },
+  "productIdentity": {"productName": "Fixture Product", "identifier": "example.fixture", "version": "1.0.0"},
+  "assetLedgerSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "replyModel": {"provider": "fixture", "model": "fixture-model", "baseUrlHostSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"},
+  "embedding": {"fingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "dimension": 8},
+  "contentRetentionDays": 30,
+  "authenticode": {"subject": "Fixture Subject", "thumbprint": "fixture-thumbprint", "timestampHost": "timestamp.example.invalid"},
+  "updater": {"pubkeySha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "endpointHost": "updates.example.invalid", "privateKeySecretName": "FIXTURE_SECRET"},
+  "releaseChannel": "fixture-stable"
+}

@@ -260,6 +260,8 @@ pub(crate) enum ContractError {
     WxRequestStale,
     #[serde(rename = "KB_NOT_READY")]
     KbNotReady,
+    #[serde(rename = "KB_REBUILD_SELECTION_REQUIRED")]
+    KbRebuildSelectionRequired,
     #[serde(rename = "KB_SOURCE_UNSUPPORTED")]
     KbSourceUnsupported,
     #[serde(rename = "KB_SCOPE_UNRESOLVED")]

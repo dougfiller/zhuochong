@@ -73,10 +73,9 @@
   }
   async function rebuild() {
     if (!canRebuild || !(await confirm({ title: t('settingsKnowledge.rebuildTitle'), message: t('settingsKnowledge.rebuildConfirm'), tone: 'warning' }))) return;
-    const selectedRoots = await openDialog({ directory: true, multiple: true });
-    if (!Array.isArray(selectedRoots) || !selectedRoots.length) return;
     try {
-      const receipt = await invoke('start_knowledge_rebuild', { input: { selectedRoots } });
+      const selection = await invoke('pick_knowledge_rebuild_roots');
+      const receipt = await invoke('start_knowledge_rebuild', { input: { selectionReceiptId: selection.selectionReceiptId } });
       operationId = receipt.operationId;
       startPolling();
       if (await waitForOperation()) showToast(t('settingsKnowledge.operationSuccess'), 'success');
