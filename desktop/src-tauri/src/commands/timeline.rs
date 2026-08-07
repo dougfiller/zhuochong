@@ -142,5 +142,3 @@ pub async fn get_screenshot_full(
         .screenshot_service
         .generate_full_image_base64(&full_path)
 }
-
-

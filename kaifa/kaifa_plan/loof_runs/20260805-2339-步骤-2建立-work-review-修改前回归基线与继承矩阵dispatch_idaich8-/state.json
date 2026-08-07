@@ -3,8 +3,8 @@
   "feature": "步骤 2：建立 Work Review 修改前回归基线与继承矩阵（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-02）",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-05T15:39:59+00:00",
-  "updated_at": "2026-08-05T16:00:16+00:00",
-  "status": "active",
+  "updated_at": "2026-08-05T16:17:17+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd2a7-3d61-70b0-9f3f-fe83f6167f66",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-05T15:46:12+00:00 phase 2 gate failed: done file is missing",

@@ -5,15 +5,15 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fd4f3-ecbe-7533-99c9-b7367891b026
-- next_poll_at:
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月06日10点02分-复用Work-Review截图primitive实现临时微信裁剪与隐藏恢复.md
 - phase_2: 2026年08月06日10点07分-临时微信截图裁剪与隐藏恢复.md
 - phase_3: 2026年08月06日10点12分-截图恢复验收缺口.md
-- phase_4:
-- phase_5:
+- phase_4: 
+- phase_5: 
 
 ## Threads
 - phase_1: 019fd4cd-f65f-7f30-b256-aed646716547

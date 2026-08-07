@@ -3,8 +3,8 @@
   "feature": "步骤 3：完成品牌、应用标识和发行基础的必要适配（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-03）",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-05T16:30:19+00:00",
-  "updated_at": "2026-08-05T16:46:43+00:00",
-  "status": "active",
+  "updated_at": "2026-08-05T16:50:02+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd2d1-c1ac-7013-b433-d5e8b6cbd2c2",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": []
 }

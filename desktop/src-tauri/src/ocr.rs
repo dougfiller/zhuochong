@@ -108,7 +108,11 @@ impl OcrService {
         };
         let expected_len = match usize::try_from(image.width())
             .ok()
-            .and_then(|width| usize::try_from(image.height()).ok().and_then(|height| width.checked_mul(height)))
+            .and_then(|width| {
+                usize::try_from(image.height())
+                    .ok()
+                    .and_then(|height| width.checked_mul(height))
+            })
             .and_then(|pixels| pixels.checked_mul(4))
         {
             Some(expected_len) if expected_len == image.as_raw().len() => expected_len,
@@ -118,11 +122,10 @@ impl OcrService {
             return WindowsMemoryOcrResult::Failed;
         }
 
-        let buffer = match DataWriter::new()
-            .and_then(|writer| {
-                writer.WriteBytes(image.as_raw())?;
-                writer.DetachBuffer()
-            }) {
+        let buffer = match DataWriter::new().and_then(|writer| {
+            writer.WriteBytes(image.as_raw())?;
+            writer.DetachBuffer()
+        }) {
             Ok(buffer) => buffer,
             Err(_) => return WindowsMemoryOcrResult::Failed,
         };
@@ -140,7 +143,10 @@ impl OcrService {
             Ok(engine) => engine,
             Err(_) => return WindowsMemoryOcrResult::Unavailable,
         };
-        let result = match engine.RecognizeAsync(&bitmap).and_then(|operation| operation.get()) {
+        let result = match engine
+            .RecognizeAsync(&bitmap)
+            .and_then(|operation| operation.get())
+        {
             Ok(result) => result,
             Err(_) => return WindowsMemoryOcrResult::Failed,
         };

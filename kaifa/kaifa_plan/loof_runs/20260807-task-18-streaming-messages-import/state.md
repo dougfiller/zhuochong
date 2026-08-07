@@ -5,15 +5,15 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fda61-c1f7-7e00-81eb-dab86b58e553
-- next_poll_at:
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月07日09点25分-实现大型messages流式导入规范化和媒体引用.md
 - phase_2: 2026年08月07日09点35分-实现大型messages流式导入规范化和媒体引用.md
 - phase_3: 2026年08月07日11点19分-流式导入审查阻断问题.md
-- phase_4:
-- phase_5:
+- phase_4: 
+- phase_5: 
 
 ## Threads
 - phase_1: 019fd9d1-e27f-7661-852e-e044c1e9475e

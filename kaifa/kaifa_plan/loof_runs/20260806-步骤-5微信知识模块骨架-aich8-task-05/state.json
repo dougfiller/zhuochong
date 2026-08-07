@@ -3,11 +3,11 @@
   "feature": "步骤 5：建立最小微信/知识库模块骨架并接入现有配置（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-05）。在不改变 Work Review 主体结构下创建原创 wechat/ 与 knowledge/ 模块最小 trait、类型和空实现；main.rs 注册模块、Tauri 命令与独立 managed state（WechatReplyRuntime、KnowledgeStore、CaptureCoordinator），不得序列化 AppState/数据库给前端、长任务不得占用 Arc Mutex AppState。扩展 AppConfig wechat/knowledge 配置并沿用 normalize、原子保存、备份恢复、旧值默认机制；wechat 保存 compatibility profile ID、明确的 TextModelProfile ID（或产品决定固定 text_model）、内容保留开关/期限；allowlist/ROI 在签名版本化 profile 中，不能任意 appName；默认不自动触发/不保存正文、模型缺失阻断无 fallback。knowledge 保存 picker 最近目录、scopeMode null、topK、tokenBudget、tokenCounterVersion、sameConversationBoost 安全默认和独立 localEmbedding；knowledge_sources 是多源、lineage、状态、priority 的权威清单，禁止单 sourcePath；macOS 种子不能成默认。不复用 memory_semantic_enabled、embedding_provider 或云 fallback。设置页接入 SettingsWechat.svelte/SettingsKnowledge.svelte 和四语 i18n。增加旧配置、篡改 profile、模型缺失、scope null、空最近目录、非 loopback embedding 测试。禁止 Work Review 核心数据库 knowledge_* 表或顶层 retrieval 包；保持微信边界：仅用户明确选择的前台微信，禁止注入/协议或数据库读取/UI 自动化输入/键鼠模拟/自动粘贴或发送/未选聊天/MCP Bot search upload Agent。",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-05T19:00:32+00:00",
-  "updated_at": "2026-08-06T00:53:44+00:00",
-  "status": "active",
+  "updated_at": "2026-08-06T00:58:35+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd48f-c61b-7523-9749-70fdece0e842",
-  "next_poll_at": "2026-08-06T00:56:44+00:00",
+  "next_poll_at": "",
   "threads": {
     "1": "019fd34c-bd71-7953-8f04-614cf537968f",
     "2": "019fd352-4fbf-79c2-88bd-6498fa6d8f64",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": []
 }

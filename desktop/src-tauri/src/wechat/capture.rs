@@ -55,9 +55,13 @@ pub(crate) fn cropped_images_for_identity(
     frame: EphemeralCapturedFrame,
     identity: &WechatWindowIdentity,
 ) -> Result<(RgbaImage, RgbaImage), ContractError> {
-    let chat_rgba = frame.crop_window_roi(identity.bounds_px(), identity.dpi(), identity.chat_roi())?;
-    let header_identity_rgba =
-        frame.crop_window_roi(identity.bounds_px(), identity.dpi(), identity.header_identity_roi())?;
+    let chat_rgba =
+        frame.crop_window_roi(identity.bounds_px(), identity.dpi(), identity.chat_roi())?;
+    let header_identity_rgba = frame.crop_window_roi(
+        identity.bounds_px(),
+        identity.dpi(),
+        identity.header_identity_roi(),
+    )?;
     Ok((chat_rgba, header_identity_rgba))
 }
 
@@ -148,7 +152,11 @@ impl WechatWindowPort for TauriWechatWindowPort {
     fn is_visible(&self, label: &'static str) -> Result<Option<bool>, ContractError> {
         self.app
             .get_webview_window(label)
-            .map(|window| window.is_visible().map_err(|_| ContractError::WxCaptureFailed))
+            .map(|window| {
+                window
+                    .is_visible()
+                    .map_err(|_| ContractError::WxCaptureFailed)
+            })
             .transpose()
     }
 
@@ -187,7 +195,9 @@ impl<P: WechatWindowPort> WechatCaptureGuard<P> {
             let Some(was_visible) = guard.port.is_visible(label)? else {
                 continue;
             };
-            guard.windows.push(ProductWindowSnapshot { label, was_visible });
+            guard
+                .windows
+                .push(ProductWindowSnapshot { label, was_visible });
             if was_visible {
                 guard.port.hide(label)?;
                 if guard.port.is_visible(label)? != Some(false) {
@@ -297,7 +307,12 @@ mod tests {
     fn physical_negative_monitor_origin_is_translated_before_crop() {
         let image = crop_physical_roi(
             frame((-1920, 0)),
-            WindowBounds { x: -1900, y: 10, width: 80, height: 60 },
+            WindowBounds {
+                x: -1900,
+                y: 10,
+                width: 80,
+                height: 60,
+            },
             96,
             roi(),
         )
@@ -310,7 +325,12 @@ mod tests {
         assert_eq!(
             crop_physical_roi(
                 frame((0, 0)),
-                WindowBounds { x: -1, y: 0, width: 80, height: 60 },
+                WindowBounds {
+                    x: -1,
+                    y: 0,
+                    width: 80,
+                    height: 60
+                },
                 96,
                 roi(),
             ),
@@ -319,7 +339,12 @@ mod tests {
         assert_eq!(
             crop_physical_roi(
                 frame((0, 0)),
-                WindowBounds { x: 0, y: 0, width: 101, height: 60 },
+                WindowBounds {
+                    x: 0,
+                    y: 0,
+                    width: 101,
+                    height: 60
+                },
                 96,
                 roi(),
             ),
@@ -328,9 +353,19 @@ mod tests {
         assert_eq!(
             crop_physical_roi(
                 frame((0, 0)),
-                WindowBounds { x: 0, y: 0, width: 80, height: 60 },
+                WindowBounds {
+                    x: 0,
+                    y: 0,
+                    width: 80,
+                    height: 60
+                },
                 96,
-                NormalizedRoi { left: 0.8, top: 0.0, right: 0.2, bottom: 1.0 },
+                NormalizedRoi {
+                    left: 0.8,
+                    top: 0.0,
+                    right: 0.2,
+                    bottom: 1.0
+                },
             ),
             Err(ContractError::WxCaptureFailed)
         );
@@ -345,7 +380,10 @@ mod tests {
         drop(guard);
 
         assert_eq!(port.calls(), vec!["hide-avatar", "show-avatar"]);
-        assert_eq!(port.is_visible(crate::avatar_engine::AVATAR_WINDOW_LABEL), Ok(Some(true)));
+        assert_eq!(
+            port.is_visible(crate::avatar_engine::AVATAR_WINDOW_LABEL),
+            Ok(Some(true))
+        );
         assert_eq!(port.is_visible(MAIN_WINDOW_LABEL), Ok(Some(false)));
     }
 
@@ -354,8 +392,14 @@ mod tests {
         let mut port = FakeWindowPort::new(true, false);
         port.fail_hide = Some(crate::avatar_engine::AVATAR_WINDOW_LABEL);
 
-        assert_eq!(WechatCaptureGuard::begin(port.clone()).err(), Some(ContractError::WxCaptureFailed));
+        assert_eq!(
+            WechatCaptureGuard::begin(port.clone()).err(),
+            Some(ContractError::WxCaptureFailed)
+        );
         assert_eq!(port.calls(), vec!["hide-avatar", "show-avatar"]);
-        assert_eq!(port.is_visible(crate::avatar_engine::AVATAR_WINDOW_LABEL), Ok(Some(true)));
+        assert_eq!(
+            port.is_visible(crate::avatar_engine::AVATAR_WINDOW_LABEL),
+            Ok(Some(true))
+        );
     }
 }

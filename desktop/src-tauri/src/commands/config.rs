@@ -410,4 +410,3 @@ pub async fn open_data_dir(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(),
 
     Ok(())
 }
-

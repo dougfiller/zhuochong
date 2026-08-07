@@ -3,11 +3,11 @@
   "feature": "步骤 12：扩展现有桌宠持续气泡、复制/关闭和代际校验（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-12）",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-06T07:48:41+00:00",
-  "updated_at": "2026-08-06T08:27:41+00:00",
-  "status": "active",
+  "updated_at": "2026-08-06T08:44:44+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd62f-5d18-7a52-a96e-d9ca0c459278",
-  "next_poll_at": "2026-08-06T08:30:41+00:00",
+  "next_poll_at": "",
   "threads": {
     "1": "019fd60c-5b07-7001-b694-948f706a3468",
     "2": "019fd612-22fd-7352-83d6-272391318545",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-06T08:01:37+00:00 phase 2 gate failed: done file is missing"

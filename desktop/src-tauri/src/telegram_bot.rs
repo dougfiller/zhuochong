@@ -277,9 +277,7 @@ async fn run(
                             );
                             if should_abort_polling(status, body.error_code) {
                                 set_error(shared, msg.clone());
-                                log::error!(
-                                    "Telegram Bot 轮询遇到不可恢复错误，停止轮询: {msg}"
-                                );
+                                log::error!("Telegram Bot 轮询遇到不可恢复错误，停止轮询: {msg}");
                                 return;
                             }
                             let wait = poll_backoff_seconds(consecutive_errors);
@@ -745,7 +743,10 @@ mod tests {
             StatusCode::INTERNAL_SERVER_ERROR,
             Some(500)
         ));
-        assert!(!should_abort_polling(StatusCode::TOO_MANY_REQUESTS, Some(429)));
+        assert!(!should_abort_polling(
+            StatusCode::TOO_MANY_REQUESTS,
+            Some(429)
+        ));
         assert!(should_abort_polling(StatusCode::UNAUTHORIZED, Some(401)));
 
         assert_eq!(poll_backoff_seconds(1), 3);

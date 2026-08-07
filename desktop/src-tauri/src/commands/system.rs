@@ -1,18 +1,20 @@
 //! Auto-extracted from the historical `commands.rs`. Behavior unchanged.
 
-use crate::error::AppError;
-#[cfg(target_os = "linux")]
-use crate::linux_session::{current_linux_desktop_environment, current_linux_desktop_session, LinuxDesktopSession};
 #[cfg(target_os = "linux")]
 use super::avatar::{
     gnome_avatar_extension_needs_relogin, is_gnome_avatar_extension_enabled,
     is_gnome_avatar_extension_installed,
 };
+use crate::error::AppError;
+#[cfg(target_os = "linux")]
+use crate::linux_session::{
+    current_linux_desktop_environment, current_linux_desktop_session, LinuxDesktopSession,
+};
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use tauri::{State};
+use tauri::State;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -1241,12 +1243,9 @@ pub async fn clear_background_image(
     Ok(())
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[cfg(target_os = "macos")]
     #[test]
@@ -1372,5 +1371,4 @@ mod tests {
             Some("/Applications/Microsoft Edge.app")
         );
     }
-
 }

@@ -3,13 +3,19 @@ use super::archive_schema::CoverageKind;
 use super::archive_store::{
     CompletenessVerdict, ImportFingerprint, MemberAudit, SourceAuditDigest,
 };
+use super::chunk::{
+    draft_from_messages, fts_match_query, BuildMessage, ChunkDraft, Direction,
+    CHUNK_SCHEMA_VERSION, FTS_PRETOKEN_VERSION, TOKEN_COUNTER_VERSION,
+};
+use super::config::validate_local_embedding;
 use super::migrations;
+use crate::config::LocalEmbeddingConfig;
 use crate::wechat::types::ContractError;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
 #[cfg(test)]
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -22,6 +28,7 @@ const READER_DRAIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs
 #[cfg(test)]
 thread_local! {
     static FAIL_ON_APPEND_BATCH: Cell<Option<usize>> = const { Cell::new(None) };
+    static FAIL_CHUNK_WRITE_STEP: Cell<Option<u8>> = const { Cell::new(None) };
 }
 
 #[cfg(test)]
@@ -47,6 +54,26 @@ fn should_fail_append_batch() -> bool {
         }
         None => false,
     })
+}
+
+#[cfg(test)]
+fn fail_chunk_write_at(step: u8) {
+    FAIL_CHUNK_WRITE_STEP.with(|value| value.set(Some(step)));
+}
+
+#[cfg(test)]
+fn clear_chunk_write_failure() {
+    FAIL_CHUNK_WRITE_STEP.with(|value| value.set(None));
+}
+
+#[cfg(test)]
+fn should_fail_chunk_write(step: u8) -> bool {
+    FAIL_CHUNK_WRITE_STEP.with(|value| value.get() == Some(step))
+}
+
+#[cfg(not(test))]
+fn should_fail_chunk_write(_step: u8) -> bool {
+    false
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -155,6 +182,7 @@ pub(crate) struct CandidateChecks {
     pub(crate) expected_message_count: u64,
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug)]
 pub(crate) struct ReadyIndex {
     pub(crate) id: String,
@@ -169,6 +197,72 @@ pub(crate) struct ActiveSnapshot {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ActiveReadRequest;
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub(crate) struct FrozenEmbeddingIdentity {
+    pub(crate) provider: String,
+    pub(crate) endpoint: String,
+    pub(crate) model: String,
+    pub(crate) fingerprint: String,
+    pub(crate) dimension: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FrozenIndexBuildSpec {
+    pub(crate) chunk_schema_version: String,
+    pub(crate) token_counter_version: String,
+    pub(crate) fts_pretoken_version: String,
+    pub(crate) retrieval_token_budget: u32,
+    pub(crate) embedding: FrozenEmbeddingIdentity,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FrozenIndexBuild {
+    pub(crate) index_generation_id: String,
+    pub(crate) import_snapshot_hash: String,
+    pub(crate) message_count: u64,
+    pub(crate) spec: FrozenIndexBuildSpec,
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) struct StableConversationKey {
+    pub(crate) account_stable_id: String,
+    pub(crate) conversation_stable_id: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BuildMessageCursor {
+    pub(crate) created_at_ms: i64,
+    pub(crate) source_ordinal: u64,
+    pub(crate) sort_key: String,
+    pub(crate) stable_message_key: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BuildMessagePage {
+    pub(crate) messages: Vec<BuildMessage>,
+    pub(crate) next_cursor: Option<BuildMessageCursor>,
+    pub(crate) has_more: bool,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ActiveFtsRequest {
+    pub(crate) scope: Vec<StableConversationKey>,
+    pub(crate) query: String,
+    pub(crate) from_ms: Option<i64>,
+    pub(crate) to_ms: Option<i64>,
+    pub(crate) top_k: u8,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FtsHit {
+    pub(crate) chunk_key: String,
+    pub(crate) content: String,
+    pub(crate) token_count: u32,
+    pub(crate) started_at_ms: i64,
+    pub(crate) ended_at_ms: i64,
+    pub(crate) rank: f64,
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct DeletionRequest {
@@ -326,7 +420,7 @@ impl KnowledgeStore {
     pub(crate) fn retire_source(&self, source_id: &str) -> Result<(), ContractError> {
         let operation_id = self.begin_maintenance("retiring", 1)?;
         let result = self.with_writer(|connection| {
-            let changed = connection.execute("UPDATE knowledge_sources SET source_state='retired',checked_at_ms=?1 WHERE id=?2 AND source_state='active' AND NOT EXISTS(SELECT 1 FROM knowledge_denials WHERE source_id=?2)", params![now_ms(), source_id]).map_err(|_| ContractError::KbNotReady)?;
+            let changed = connection.execute("UPDATE knowledge_sources SET source_state='retired',checked_at_ms=?1 WHERE id=?2 AND source_state='active' AND NOT EXISTS(SELECT 1 FROM knowledge_denials WHERE source_id=?2) AND NOT EXISTS(SELECT 1 FROM knowledge_index_generations WHERE status='building')", params![now_ms(), source_id]).map_err(|_| ContractError::KbNotReady)?;
             if changed == 1 { Ok(()) } else { Err(ContractError::KbNotReady) }
         });
         self.finish_maintenance(&operation_id, result.is_ok());
@@ -498,6 +592,17 @@ impl KnowledgeStore {
             let transaction = connection
                 .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
                 .map_err(|_| ContractError::KbNotReady)?;
+            let building: Option<i64> = transaction
+                .query_row(
+                    "SELECT 1 FROM knowledge_index_generations WHERE status='building'",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|_| ContractError::KbNotReady)?;
+            if building.is_some() {
+                return Err(ContractError::KbNotReady);
+            }
             let source_id: Option<String> = transaction
                 .query_row(
                     "SELECT id FROM knowledge_sources WHERE account_stable_id=?1 AND export_id=?2 AND schema_version=?3 AND manifest_hash=?4 AND coverage_hash=?5",
@@ -676,8 +781,8 @@ impl KnowledgeStore {
                     params![version_id, staging.source_id, incoming.source_member_token],
                 ).map_err(|_| ContractError::KbNotReady)?;
                 transaction.execute(
-                    "INSERT OR IGNORE INTO knowledge_message_normalizations(message_version_id,created_at_ms,source_ordinal,sort_key,message_kind,render_kind,sender_key,text_hash,reference_json,extra_json,canonical_hash) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
-                    params![version_id, incoming.created_at_ms, incoming.source_ordinal as i64, incoming.sort_key, incoming.message_kind, incoming.render_kind, incoming.sender_key, incoming.text_hash, incoming.reference_json, incoming.extra_json, incoming.content_hash],
+                    "INSERT OR IGNORE INTO knowledge_message_normalizations(message_version_id,created_at_ms,source_ordinal,sort_key,message_kind,render_kind,sender_key,text_hash,reference_json,extra_json,canonical_hash,direction) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,CASE WHEN ?7=(SELECT account_stable_id FROM knowledge_conversations WHERE id=?12) THEN 'self' ELSE 'other' END)",
+                    params![version_id, incoming.created_at_ms, incoming.source_ordinal as i64, incoming.sort_key, incoming.message_kind, incoming.render_kind, incoming.sender_key, incoming.text_hash, incoming.reference_json, incoming.extra_json, incoming.content_hash, staging.conversation_id],
                 ).map_err(|_| ContractError::KbNotReady)?;
                 for media in &incoming.media_refs {
                     transaction.execute(
@@ -833,6 +938,309 @@ impl KnowledgeStore {
         })
     }
 
+    pub(crate) fn begin_or_resume_index_build(
+        &self,
+        spec: FrozenIndexBuildSpec,
+    ) -> Result<FrozenIndexBuild, ContractError> {
+        validate_build_spec(&spec)?;
+        self.with_writer(|connection| {
+            let transaction = connection
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(|_| ContractError::KbNotReady)?;
+            let existing: Option<String> = transaction
+                .query_row(
+                    "SELECT id FROM knowledge_index_generations WHERE status='building'",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|_| ContractError::KbNotReady)?;
+            if let Some(index_generation_id) = existing {
+                let frozen = load_frozen_build(&transaction, &index_generation_id)?;
+                if frozen.spec != spec || !mapping_is_publishable(&transaction, &index_generation_id)? {
+                    return Err(ContractError::KbNotReady);
+                }
+                transaction.commit().map_err(|_| ContractError::KbNotReady)?;
+                return Ok(frozen);
+            }
+
+            let selections = select_index_imports(&transaction)?;
+            if selections.is_empty() {
+                return Err(ContractError::KbNotReady);
+            }
+            let import_snapshot_hash = snapshot_hash(&selections);
+            let message_count = selections.iter().map(|selection| selection.message_count).sum();
+            let index_generation_id = opaque_id("index");
+            let embedding_metadata_json = serde_json::to_string(&spec.embedding)
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction.execute(
+                "INSERT INTO knowledge_index_generations(id,schema_version,embedding_metadata_json,snapshot_hash,status,chunk_count,created_at_ms,token_counter_version,fts_pretoken_version,retrieval_token_budget,message_count) VALUES(?1,?2,?3,?4,'building',0,?5,?6,?7,?8,?9)",
+                params![index_generation_id, spec.chunk_schema_version, embedding_metadata_json, import_snapshot_hash, now_ms(), spec.token_counter_version, spec.fts_pretoken_version, spec.retrieval_token_budget as i64, message_count as i64],
+            ).map_err(|_| ContractError::KbNotReady)?;
+            for selection in &selections {
+                transaction.execute(
+                    "INSERT INTO knowledge_index_generation_imports(index_generation_id,conversation_id,import_generation_id) VALUES(?1,?2,?3)",
+                    params![index_generation_id, selection.conversation_id, selection.import_generation_id],
+                ).map_err(|_| ContractError::KbNotReady)?;
+            }
+            let mapping_count: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM knowledge_index_generation_imports WHERE index_generation_id=?1",
+                [&index_generation_id],
+                |row| row.get(0),
+            ).map_err(|_| ContractError::KbNotReady)?;
+            if mapping_count != selections.len() as i64 {
+                return Err(ContractError::KbNotReady);
+            }
+            transaction.commit().map_err(|_| ContractError::KbNotReady)?;
+            Ok(FrozenIndexBuild {
+                index_generation_id,
+                import_snapshot_hash,
+                message_count,
+                spec,
+            })
+        })
+    }
+
+    pub(crate) fn list_build_conversations(
+        &self,
+        index_generation_id: &str,
+    ) -> Result<Vec<StableConversationKey>, ContractError> {
+        self.with_reader(|connection| {
+            let mut statement = connection.prepare(
+                "SELECT c.account_stable_id,c.conversation_stable_id FROM knowledge_index_generations i JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=i.id JOIN knowledge_conversations c ON c.id=mapping.conversation_id WHERE i.id=?1 AND i.status='building' ORDER BY c.account_stable_id,c.conversation_stable_id",
+            ).map_err(|_| ContractError::KbNotReady)?;
+            let rows = statement.query_map([index_generation_id], |row| Ok(StableConversationKey {
+                account_stable_id: row.get(0)?,
+                conversation_stable_id: row.get(1)?,
+            })).map_err(|_| ContractError::KbNotReady)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| ContractError::KbNotReady)?;
+            Ok(rows)
+        })
+    }
+
+    pub(crate) fn read_build_message_page(
+        &self,
+        index_generation_id: &str,
+        conversation: &StableConversationKey,
+        after: Option<&BuildMessageCursor>,
+        limit: u16,
+    ) -> Result<BuildMessagePage, ContractError> {
+        if limit == 0 || limit > 256 {
+            return Err(ContractError::KbNotReady);
+        }
+        self.with_reader(|connection| {
+            let mut statement = connection.prepare(
+                "SELECT c.account_stable_id,c.conversation_stable_id,m.id,v.id,COALESCE(m.message_stable_id,m.fallback_key),n.created_at_ms,n.source_ordinal,n.sort_key,n.sender_key,n.direction,n.message_kind,v.normalized_content,v.content_hash FROM knowledge_index_generations i JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=i.id JOIN knowledge_conversations c ON c.id=mapping.conversation_id JOIN knowledge_import_generation_members member ON member.import_generation_id=mapping.import_generation_id JOIN knowledge_messages m ON m.id=member.message_id JOIN knowledge_message_versions v ON v.id=member.message_version_id AND v.message_id=m.id LEFT JOIN knowledge_message_normalizations n ON n.message_version_id=v.id WHERE i.id=?1 AND i.status='building' AND c.account_stable_id=?2 AND c.conversation_stable_id=?3 AND (?4 IS NULL OR n.created_at_ms>?4 OR (n.created_at_ms=?4 AND n.source_ordinal>?5) OR (n.created_at_ms=?4 AND n.source_ordinal=?5 AND n.sort_key>?6) OR (n.created_at_ms=?4 AND n.source_ordinal=?5 AND n.sort_key=?6 AND COALESCE(m.message_stable_id,m.fallback_key)>?7)) ORDER BY n.created_at_ms,n.source_ordinal,n.sort_key,COALESCE(m.message_stable_id,m.fallback_key) LIMIT ?8",
+            ).map_err(|_| ContractError::KbNotReady)?;
+            let rows = statement.query_map(
+                params![
+                    index_generation_id,
+                    conversation.account_stable_id,
+                    conversation.conversation_stable_id,
+                    after.map(|cursor| cursor.created_at_ms),
+                    after.map(|cursor| cursor.source_ordinal as i64),
+                    after.map(|cursor| cursor.sort_key.as_str()),
+                    after.map(|cursor| cursor.stable_message_key.as_str()),
+                    limit as i64,
+                ],
+                |row| Ok((
+                    row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?, row.get::<_, String>(4)?, row.get::<_, Option<i64>>(5)?,
+                    row.get::<_, Option<i64>>(6)?, row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<String>>(8)?, row.get::<_, Option<String>>(9)?,
+                    row.get::<_, Option<String>>(10)?, row.get::<_, String>(11)?, row.get::<_, String>(12)?,
+                )),
+            ).map_err(|_| ContractError::KbNotReady)?;
+            let raw = rows.collect::<Result<Vec<_>, _>>().map_err(|_| ContractError::KbNotReady)?;
+            let mut messages = Vec::new();
+            let mut next_cursor = None;
+            for (account, stable_conversation, message_id, version_id, stable_key, created_at, source_ordinal, sort_key, sender_key, direction, message_kind, content, content_hash) in &raw {
+                let created_at_ms = created_at.ok_or(ContractError::KbNotReady)?;
+                let source_ordinal = source_ordinal.and_then(|value| u64::try_from(value).ok()).ok_or(ContractError::KbNotReady)?;
+                let sort_key = sort_key.as_ref().ok_or(ContractError::KbNotReady)?;
+                next_cursor = Some(BuildMessageCursor { created_at_ms, source_ordinal, sort_key: sort_key.clone(), stable_message_key: stable_key.clone() });
+                let kind = message_kind.as_ref().ok_or(ContractError::KbNotReady)?;
+                if matches!(kind.as_str(), "image" | "video" | "voice" | "file" | "recall") {
+                    continue;
+                }
+                if !matches!(kind.as_str(), "text" | "quote" | "reply" | "link" | "location" | "emoji" | "system") {
+                    return Err(ContractError::KbNotReady);
+                }
+                messages.push(BuildMessage {
+                    account_stable_id: account.clone(), conversation_stable_id: stable_conversation.clone(),
+                    message_id: message_id.clone(), message_version_id: version_id.clone(), stable_message_key: stable_key.clone(),
+                    created_at_ms, source_ordinal, sort_key: sort_key.clone(),
+                    sender_key: sender_key.as_ref().ok_or(ContractError::KbNotReady)?.clone(),
+                    direction: Direction::parse(direction.as_deref().ok_or(ContractError::KbNotReady)?)?,
+                    message_kind: kind.clone(), content: content.clone(), content_hash: content_hash.clone(),
+                });
+            }
+            Ok(BuildMessagePage { messages, next_cursor, has_more: raw.len() == limit as usize })
+        })
+    }
+
+    pub(crate) fn reset_build_chunks(
+        &self,
+        index_generation_id: &str,
+    ) -> Result<(), ContractError> {
+        self.with_writer(|connection| {
+            let transaction = connection
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(|_| ContractError::KbNotReady)?;
+            let building: Option<i64> = transaction
+                .query_row(
+                    "SELECT 1 FROM knowledge_index_generations WHERE id=?1 AND status='building'",
+                    [index_generation_id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|_| ContractError::KbNotReady)?;
+            if building.is_none() {
+                return Err(ContractError::KbNotReady);
+            }
+            transaction
+                .execute(
+                    "DELETE FROM knowledge_chunks_fts WHERE index_generation_id=?1",
+                    [index_generation_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "DELETE FROM knowledge_chunks WHERE index_generation_id=?1",
+                    [index_generation_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction
+                .execute(
+                    "UPDATE knowledge_index_generations SET chunk_count=0 WHERE id=?1",
+                    [index_generation_id],
+                )
+                .map_err(|_| ContractError::KbNotReady)?;
+            transaction.commit().map_err(|_| ContractError::KbNotReady)
+        })
+    }
+
+    pub(crate) fn write_chunk_batch(
+        &self,
+        index_generation_id: &str,
+        drafts: &[ChunkDraft],
+    ) -> Result<(), ContractError> {
+        if drafts.is_empty() {
+            return Err(ContractError::KbNotReady);
+        }
+        self.with_writer(|connection| {
+            let transaction = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|_| ContractError::KbNotReady)?;
+            let frozen = load_frozen_build(&transaction, index_generation_id)?;
+            for draft in drafts {
+                let conversation_id: String = transaction.query_row(
+                    "SELECT c.id FROM knowledge_index_generations i JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=i.id JOIN knowledge_conversations c ON c.id=mapping.conversation_id WHERE i.id=?1 AND i.status='building' AND c.account_stable_id=?2 AND c.conversation_stable_id=?3",
+                    params![index_generation_id, draft.account_stable_id, draft.conversation_stable_id], |row| row.get(0),
+                ).map_err(|_| ContractError::KbNotReady)?;
+                validate_chunk_draft(&transaction, &frozen, &conversation_id, draft)?;
+                let chunk_id = opaque_id("chunk");
+                transaction.execute(
+                    "INSERT INTO knowledge_chunks(id,index_generation_id,chunk_key,conversation_id,first_message_version_id,last_message_version_id,content,content_hash,chunk_index,chunk_schema_version,started_at_ms,ended_at_ms,token_count,message_count) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
+                    params![chunk_id,index_generation_id,draft.chunk_key,conversation_id,draft.first_message_version_id,draft.last_message_version_id,draft.content,draft.content_hash,draft.chunk_index as i64,CHUNK_SCHEMA_VERSION,draft.started_at_ms,draft.ended_at_ms,draft.token_count as i64,draft.members.len() as i64],
+                ).map_err(|_| ContractError::KbNotReady)?;
+                if should_fail_chunk_write(1) { return Err(ContractError::KbNotReady); }
+                for member in &draft.members {
+                    transaction.execute(
+                        "INSERT INTO knowledge_chunk_messages(chunk_id,message_id,message_version_id,message_index) VALUES(?1,?2,?3,?4)",
+                        params![chunk_id,member.message_id,member.message_version_id,member.message_index as i64],
+                    ).map_err(|_| ContractError::KbNotReady)?;
+                }
+                if should_fail_chunk_write(2) { return Err(ContractError::KbNotReady); }
+                transaction.execute(
+                    "INSERT INTO knowledge_chunks_fts(content,chunk_id,index_generation_id) VALUES(?1,?2,?3)",
+                    params![draft.fts_terms,chunk_id,index_generation_id],
+                ).map_err(|_| ContractError::KbNotReady)?;
+                if should_fail_chunk_write(3) { return Err(ContractError::KbNotReady); }
+            }
+            let (chunks, fts): (i64, i64) = transaction.query_row(
+                "SELECT (SELECT COUNT(*) FROM knowledge_chunks WHERE index_generation_id=?1),(SELECT COUNT(*) FROM knowledge_chunks_fts WHERE index_generation_id=?1)",
+                [index_generation_id], |row| Ok((row.get(0)?,row.get(1)?)),
+            ).map_err(|_| ContractError::KbNotReady)?;
+            if chunks != fts { return Err(ContractError::KbNotReady); }
+            let changed = transaction.execute("UPDATE knowledge_index_generations SET chunk_count=?1 WHERE id=?2 AND status='building'", params![chunks,index_generation_id]).map_err(|_| ContractError::KbNotReady)?;
+            if changed != 1 { return Err(ContractError::KbNotReady); }
+            transaction.commit().map_err(|_| ContractError::KbNotReady)
+        })
+    }
+
+    pub(crate) fn search_active_fts(
+        &self,
+        request: ActiveFtsRequest,
+    ) -> Result<Vec<FtsHit>, ContractError> {
+        if request.scope.is_empty()
+            || request.scope.len() > 32
+            || !(1..=12).contains(&request.top_k)
+        {
+            return Err(ContractError::KbScopeUnresolved);
+        }
+        if request
+            .from_ms
+            .zip(request.to_ms)
+            .is_some_and(|(from, to)| from >= to)
+        {
+            return Err(ContractError::KbRetrievalFailed);
+        }
+        let unique = request.scope.iter().cloned().collect::<BTreeSet<_>>();
+        if unique.len() != request.scope.len() {
+            return Err(ContractError::KbScopeUnresolved);
+        }
+        self.with_reader(|connection| {
+            let active_pretoken_version: Option<String> = connection.query_row(
+                "SELECT generation.fts_pretoken_version FROM knowledge_catalog_state catalog JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' WHERE catalog.singleton_id=1",
+                [], |row| row.get(0),
+            ).optional().map_err(|_| ContractError::KbRetrievalFailed)?;
+            let active_pretoken_version = active_pretoken_version.ok_or(ContractError::KbNotReady)?;
+            let values = std::iter::repeat("(?,?)").take(request.scope.len()).collect::<Vec<_>>().join(",");
+            let scope_sql = format!(
+                "WITH requested(account_stable_id,conversation_stable_id) AS (VALUES {values}) SELECT COUNT(*) FROM requested JOIN knowledge_conversations conversation ON conversation.account_stable_id=requested.account_stable_id AND conversation.conversation_stable_id=requested.conversation_stable_id JOIN knowledge_catalog_state catalog ON catalog.singleton_id=1 JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' JOIN knowledge_index_generation_imports mapping ON mapping.index_generation_id=generation.id AND mapping.conversation_id=conversation.id"
+            );
+            let mut scope_parameters = Vec::with_capacity(request.scope.len() * 2);
+            for scope in &request.scope {
+                scope_parameters.push(Value::Text(scope.account_stable_id.clone()));
+                scope_parameters.push(Value::Text(scope.conversation_stable_id.clone()));
+            }
+            let resolved: i64 = connection.query_row(
+                &scope_sql,
+                params_from_iter(scope_parameters),
+                |row| row.get(0),
+            ).map_err(|_| ContractError::KbRetrievalFailed)?;
+            if resolved != request.scope.len() as i64 {
+                return Err(ContractError::KbScopeUnresolved);
+            }
+            let denial: Option<i64> = connection.query_row("SELECT 1 FROM knowledge_denials LIMIT 1", [], |row| row.get(0)).optional().map_err(|_| ContractError::KbRetrievalFailed)?;
+            if denial.is_some() { return Err(ContractError::KbNotReady); }
+            let match_query = fts_match_query(&active_pretoken_version, &request.query)?;
+            let Some(match_query) = match_query else { return Ok(Vec::new()); };
+            let sql = format!(
+                "WITH requested(account_stable_id,conversation_stable_id) AS (VALUES {values}) SELECT chunk.chunk_key,chunk.content,chunk.token_count,chunk.started_at_ms,chunk.ended_at_ms,knowledge_chunks_fts.rank FROM knowledge_catalog_state catalog JOIN knowledge_index_generations generation ON generation.id=catalog.active_index_generation_id AND generation.status='ready' JOIN knowledge_chunks_fts ON knowledge_chunks_fts.index_generation_id=generation.id JOIN knowledge_chunks chunk ON chunk.id=knowledge_chunks_fts.chunk_id AND chunk.index_generation_id=knowledge_chunks_fts.index_generation_id JOIN knowledge_conversations conversation ON conversation.id=chunk.conversation_id JOIN requested scope ON scope.account_stable_id=conversation.account_stable_id AND scope.conversation_stable_id=conversation.conversation_stable_id WHERE knowledge_chunks_fts MATCH ? AND (? IS NULL OR chunk.ended_at_ms>=?) AND (? IS NULL OR chunk.started_at_ms<?) AND NOT EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.conversation_id=chunk.conversation_id OR denial.message_id IN (SELECT message_id FROM knowledge_chunk_messages WHERE chunk_id=chunk.id)) ORDER BY knowledge_chunks_fts.rank,chunk.chunk_key LIMIT ?"
+            );
+            let mut parameters = Vec::new();
+            for scope in &request.scope {
+                parameters.push(Value::Text(scope.account_stable_id.clone()));
+                parameters.push(Value::Text(scope.conversation_stable_id.clone()));
+            }
+            parameters.push(Value::Text(match_query));
+            parameters.push(request.from_ms.map(Value::Integer).unwrap_or(Value::Null));
+            parameters.push(request.from_ms.map(Value::Integer).unwrap_or(Value::Null));
+            parameters.push(request.to_ms.map(Value::Integer).unwrap_or(Value::Null));
+            parameters.push(request.to_ms.map(Value::Integer).unwrap_or(Value::Null));
+            parameters.push(Value::Integer(request.top_k as i64));
+            let mut statement = connection.prepare(&sql).map_err(|_| ContractError::KbRetrievalFailed)?;
+            let hits = statement.query_map(params_from_iter(parameters), |row| Ok(FtsHit {
+                chunk_key: row.get(0)?, content: row.get(1)?, token_count: row.get::<_,i64>(2)? as u32,
+                started_at_ms: row.get(3)?, ended_at_ms: row.get(4)?, rank: row.get(5)?,
+            })).map_err(|_| ContractError::KbRetrievalFailed)?
+                .collect::<Result<Vec<_>, _>>().map_err(|_| ContractError::KbRetrievalFailed)?;
+            Ok(hits)
+        })
+    }
+
+    #[cfg(test)]
     pub(crate) fn register_ready_index(
         &self,
         candidate: &CandidateImport,
@@ -852,6 +1260,7 @@ impl KnowledgeStore {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn register_ready_index_set(
         &self,
         candidates: &[CandidateImport],
@@ -889,6 +1298,7 @@ impl KnowledgeStore {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn activate_candidate(
         &self,
         candidate: CandidateImport,
@@ -914,6 +1324,7 @@ impl KnowledgeStore {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn activate_candidates(
         &self,
         candidates: Vec<CandidateImport>,
@@ -986,6 +1397,8 @@ impl KnowledgeStore {
         }
         self.with_writer(|connection| {
             let transaction = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).map_err(|_| ContractError::KbNotReady)?;
+            let building: Option<i64> = transaction.query_row("SELECT 1 FROM knowledge_index_generations WHERE status='building'", [], |row| row.get(0)).optional().map_err(|_| ContractError::KbNotReady)?;
+            if building.is_some() { return Err(ContractError::KbNotReady); }
             transaction.execute("INSERT INTO knowledge_denials(id,source_id,conversation_id,message_id,reason,created_at_ms) VALUES(?1,?2,?3,?4,?5,?6)", params![opaque_id("denial"), request.source_id, request.conversation_id, request.message_id, request.reason, now_ms()]).map_err(|_| ContractError::KbNotReady)?;
             transaction.execute("UPDATE knowledge_catalog_state SET active_index_generation_id=NULL,active_snapshot_hash=NULL,activated_at_ms=NULL WHERE singleton_id=1", []).map_err(|_| ContractError::KbNotReady)?;
             transaction.commit().map_err(|_| ContractError::KbNotReady)
@@ -1112,6 +1525,313 @@ impl KnowledgeStore {
         }
         result
     }
+}
+
+#[derive(Clone, Debug)]
+struct IndexImportSelection {
+    account_stable_id: String,
+    conversation_stable_id: String,
+    conversation_id: String,
+    import_generation_id: String,
+    source_set_hash: String,
+    membership_digest: String,
+    message_count: u64,
+}
+
+fn validate_build_spec(spec: &FrozenIndexBuildSpec) -> Result<(), ContractError> {
+    if spec.chunk_schema_version != CHUNK_SCHEMA_VERSION
+        || spec.token_counter_version != TOKEN_COUNTER_VERSION
+        || spec.fts_pretoken_version != FTS_PRETOKEN_VERSION
+        || !(256..=4096).contains(&spec.retrieval_token_budget)
+        || spec.embedding.fingerprint.trim().is_empty()
+        || !(1..=65536).contains(&spec.embedding.dimension)
+    {
+        return Err(ContractError::KbNotReady);
+    }
+    validate_local_embedding(&LocalEmbeddingConfig {
+        provider: spec.embedding.provider.clone(),
+        endpoint: spec.embedding.endpoint.clone(),
+        model: spec.embedding.model.clone(),
+    })
+    .map_err(|_| ContractError::KbNotReady)
+}
+
+fn load_frozen_build(
+    connection: &Connection,
+    index_generation_id: &str,
+) -> Result<FrozenIndexBuild, ContractError> {
+    connection
+        .query_row(
+            "SELECT schema_version,token_counter_version,fts_pretoken_version,retrieval_token_budget,embedding_metadata_json,snapshot_hash,message_count FROM knowledge_index_generations WHERE id=?1 AND status='building'",
+            [index_generation_id],
+            |row| Ok((
+                row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?, row.get::<_, String>(4)?, row.get::<_, String>(5)?,
+                row.get::<_, i64>(6)?,
+            )),
+        )
+        .map_err(|_| ContractError::KbNotReady)
+        .and_then(|(chunk_schema_version, token_counter_version, fts_pretoken_version, budget, embedding_json, snapshot_hash, message_count)| {
+            let retrieval_token_budget = u32::try_from(budget).map_err(|_| ContractError::KbNotReady)?;
+            let message_count = u64::try_from(message_count).map_err(|_| ContractError::KbNotReady)?;
+            let embedding = serde_json::from_str(&embedding_json).map_err(|_| ContractError::KbNotReady)?;
+            let spec = FrozenIndexBuildSpec { chunk_schema_version, token_counter_version, fts_pretoken_version, retrieval_token_budget, embedding };
+            validate_build_spec(&spec)?;
+            Ok(FrozenIndexBuild { index_generation_id: index_generation_id.into(), import_snapshot_hash: snapshot_hash, message_count, spec })
+        })
+}
+
+fn validate_chunk_draft(
+    connection: &Connection,
+    frozen: &FrozenIndexBuild,
+    conversation_id: &str,
+    draft: &ChunkDraft,
+) -> Result<(), ContractError> {
+    if draft.members.is_empty()
+        || draft.members.len() > 40
+        || draft
+            .members
+            .iter()
+            .enumerate()
+            .any(|(index, member)| member.message_index != index as u32)
+    {
+        return Err(ContractError::KbNotReady);
+    }
+    let next_chunk_index: i64 = connection
+        .query_row(
+            "SELECT COALESCE(MAX(chunk_index)+1,0) FROM knowledge_chunks WHERE index_generation_id=?1 AND conversation_id=?2",
+            params![frozen.index_generation_id, conversation_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| ContractError::KbNotReady)?;
+    if i64::from(draft.chunk_index) != next_chunk_index {
+        return Err(ContractError::KbNotReady);
+    }
+    let mut messages = Vec::with_capacity(draft.members.len());
+    for member in &draft.members {
+        let message = connection.query_row(
+            "SELECT conversation.account_stable_id,conversation.conversation_stable_id,message.id,version.id,COALESCE(message.message_stable_id,message.fallback_key),normalization.created_at_ms,normalization.source_ordinal,normalization.sort_key,normalization.sender_key,normalization.direction,normalization.message_kind,version.normalized_content,version.content_hash FROM knowledge_index_generation_imports mapping JOIN knowledge_import_generation_members source_member ON source_member.import_generation_id=mapping.import_generation_id JOIN knowledge_messages message ON message.id=source_member.message_id JOIN knowledge_message_versions version ON version.id=source_member.message_version_id AND version.message_id=message.id JOIN knowledge_message_normalizations normalization ON normalization.message_version_id=version.id JOIN knowledge_conversations conversation ON conversation.id=mapping.conversation_id WHERE mapping.index_generation_id=?1 AND mapping.conversation_id=?2 AND source_member.message_id=?3 AND source_member.message_version_id=?4",
+            params![frozen.index_generation_id, conversation_id, member.message_id, member.message_version_id],
+            |row| Ok((
+                row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?, row.get::<_, String>(4)?, row.get::<_, i64>(5)?,
+                row.get::<_, i64>(6)?, row.get::<_, String>(7)?, row.get::<_, String>(8)?,
+                row.get::<_, String>(9)?, row.get::<_, String>(10)?, row.get::<_, String>(11)?,
+                row.get::<_, String>(12)?,
+            )),
+        ).map_err(|_| ContractError::KbNotReady)?;
+        messages.push(BuildMessage {
+            account_stable_id: message.0,
+            conversation_stable_id: message.1,
+            message_id: message.2,
+            message_version_id: message.3,
+            stable_message_key: message.4,
+            created_at_ms: message.5,
+            source_ordinal: u64::try_from(message.6).map_err(|_| ContractError::KbNotReady)?,
+            sort_key: message.7,
+            sender_key: message.8,
+            direction: Direction::parse(&message.9)?,
+            message_kind: message.10,
+            content: message.11,
+            content_hash: message.12,
+        });
+    }
+    if messages.windows(2).any(|pair| {
+        (
+            pair[0].created_at_ms,
+            pair[0].source_ordinal,
+            pair[0].sort_key.as_str(),
+            pair[0].stable_message_key.as_str(),
+        ) >= (
+            pair[1].created_at_ms,
+            pair[1].source_ordinal,
+            pair[1].sort_key.as_str(),
+            pair[1].stable_message_key.as_str(),
+        )
+    }) {
+        return Err(ContractError::KbNotReady);
+    }
+    let expected = draft_from_messages(
+        &frozen.import_snapshot_hash,
+        draft.chunk_index,
+        &frozen.spec.fts_pretoken_version,
+        &messages,
+    )?;
+    let cap = 512_usize.min(frozen.spec.retrieval_token_budget as usize);
+    if &expected != draft || expected.token_count as usize > cap {
+        return Err(ContractError::KbNotReady);
+    }
+    Ok(())
+}
+
+fn mapping_is_publishable(
+    connection: &Connection,
+    index_generation_id: &str,
+) -> Result<bool, ContractError> {
+    let invalid: Option<i64> = connection.query_row(
+        "SELECT 1 FROM knowledge_index_generation_imports mapping JOIN knowledge_import_generations generation ON generation.id=mapping.import_generation_id JOIN knowledge_conversations conversation ON conversation.id=mapping.conversation_id WHERE mapping.index_generation_id=?1 AND (generation.conversation_id<>mapping.conversation_id OR generation.status NOT IN ('ready_candidate','active') OR (generation.status='ready_candidate' AND NOT (generation.parent_generation_id IS conversation.active_import_generation_id OR (generation.parent_generation_id IS NULL AND conversation.active_import_generation_id IS NULL))) OR (conversation.active_import_generation_id IS NULL AND (SELECT COUNT(*) FROM knowledge_import_generations active WHERE active.conversation_id=conversation.id AND active.status='active')<>0) OR (conversation.active_import_generation_id IS NOT NULL AND (SELECT COUNT(*) FROM knowledge_import_generations active WHERE active.conversation_id=conversation.id AND active.status='active')<>1) OR NOT EXISTS(SELECT 1 FROM knowledge_import_generation_sources source_mapping WHERE source_mapping.import_generation_id=generation.id) OR EXISTS(SELECT 1 FROM knowledge_import_generation_sources source_mapping JOIN knowledge_sources source ON source.id=source_mapping.source_id WHERE source_mapping.import_generation_id=generation.id AND (source.source_state<>'active' OR EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.source_id=source.id))) OR EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.conversation_id=mapping.conversation_id OR denial.message_id IN (SELECT member.message_id FROM knowledge_import_generation_members member WHERE member.import_generation_id=generation.id))) LIMIT 1",
+        [index_generation_id], |row| row.get(0),
+    ).optional().map_err(|_| ContractError::KbNotReady)?;
+    let count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM knowledge_index_generation_imports WHERE index_generation_id=?1",
+            [index_generation_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| ContractError::KbNotReady)?;
+    Ok(invalid.is_none() && count > 0)
+}
+
+fn select_index_imports(
+    connection: &Connection,
+) -> Result<Vec<IndexImportSelection>, ContractError> {
+    let staging: Option<i64> = connection
+        .query_row(
+            "SELECT 1 FROM knowledge_import_generations WHERE status='staging' LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| ContractError::KbNotReady)?;
+    if staging.is_some() {
+        return Err(ContractError::KbNotReady);
+    }
+    let mut statement = connection.prepare(
+        "SELECT id,account_stable_id,conversation_stable_id,active_import_generation_id FROM knowledge_conversations ORDER BY account_stable_id,conversation_stable_id",
+    ).map_err(|_| ContractError::KbNotReady)?;
+    let conversations = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<String>>(3)?,
+            ))
+        })
+        .map_err(|_| ContractError::KbNotReady)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| ContractError::KbNotReady)?;
+    let mut selections = Vec::with_capacity(conversations.len());
+    for (conversation_id, account_stable_id, conversation_stable_id, active_pointer) in
+        conversations
+    {
+        let active_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_import_generations WHERE conversation_id=?1 AND status='active'",
+                [&conversation_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| ContractError::KbNotReady)?;
+        if (active_pointer.is_none() && active_count != 0)
+            || (active_pointer.is_some() && active_count != 1)
+        {
+            return Err(ContractError::KbNotReady);
+        }
+        let candidates = {
+            let mut candidate_statement = connection.prepare(
+                "SELECT id,parent_generation_id FROM knowledge_import_generations WHERE conversation_id=?1 AND status='ready_candidate' ORDER BY id",
+            ).map_err(|_| ContractError::KbNotReady)?;
+            let rows = candidate_statement
+                .query_map([&conversation_id], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+                })
+                .map_err(|_| ContractError::KbNotReady)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| ContractError::KbNotReady)?;
+            rows
+        };
+        let import_generation_id = match candidates.as_slice() {
+            [(candidate_id, parent)] if parent == &active_pointer => candidate_id.clone(),
+            [] => {
+                let pointer = active_pointer.as_deref().ok_or(ContractError::KbNotReady)?;
+                connection.query_row(
+                    "SELECT id FROM knowledge_import_generations WHERE id=?1 AND conversation_id=?2 AND status='active'",
+                    params![pointer,conversation_id], |row| row.get(0),
+                ).map_err(|_| ContractError::KbNotReady)?
+            }
+            _ => return Err(ContractError::KbNotReady),
+        };
+        let invalid_source: Option<i64> = connection.query_row(
+            "SELECT 1 FROM knowledge_import_generation_sources mapping JOIN knowledge_sources source ON source.id=mapping.source_id WHERE mapping.import_generation_id=?1 AND (source.source_state<>'active' OR EXISTS(SELECT 1 FROM knowledge_denials denial WHERE denial.source_id=source.id)) LIMIT 1",
+            [&import_generation_id], |row| row.get(0),
+        ).optional().map_err(|_| ContractError::KbNotReady)?;
+        let source_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_import_generation_sources WHERE import_generation_id=?1",
+                [&import_generation_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| ContractError::KbNotReady)?;
+        let denied_conversation: Option<i64> = connection
+            .query_row(
+                "SELECT 1 FROM knowledge_denials denial WHERE denial.conversation_id=?1 OR denial.message_id IN (SELECT member.message_id FROM knowledge_import_generation_members member WHERE member.import_generation_id=?2) LIMIT 1",
+                params![conversation_id, import_generation_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|_| ContractError::KbNotReady)?;
+        if source_count == 0 || invalid_source.is_some() || denied_conversation.is_some() {
+            return Err(ContractError::KbNotReady);
+        }
+        let source_set_hash: String = connection
+            .query_row(
+                "SELECT source_set_hash FROM knowledge_import_generations WHERE id=?1",
+                [&import_generation_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| ContractError::KbNotReady)?;
+        let members = {
+            let mut member_statement = connection.prepare(
+                "SELECT COALESCE(message.message_stable_id,message.fallback_key),version.content_hash FROM knowledge_import_generation_members member JOIN knowledge_messages message ON message.id=member.message_id JOIN knowledge_message_versions version ON version.id=member.message_version_id AND version.message_id=message.id WHERE member.import_generation_id=?1 ORDER BY COALESCE(message.message_stable_id,message.fallback_key),version.content_hash",
+            ).map_err(|_| ContractError::KbNotReady)?;
+            let rows = member_statement
+                .query_map([&import_generation_id], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
+                .map_err(|_| ContractError::KbNotReady)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| ContractError::KbNotReady)?;
+            rows
+        };
+        if members.is_empty() {
+            return Err(ContractError::KbNotReady);
+        }
+        let mut digest = Sha256::new();
+        digest.update(b"membership-v1");
+        for (stable_key, content_hash) in &members {
+            digest.update((stable_key.len() as u64).to_be_bytes());
+            digest.update(stable_key.as_bytes());
+            digest.update((content_hash.len() as u64).to_be_bytes());
+            digest.update(content_hash.as_bytes());
+        }
+        selections.push(IndexImportSelection {
+            account_stable_id,
+            conversation_stable_id,
+            conversation_id,
+            import_generation_id,
+            source_set_hash,
+            membership_digest: hex::encode(digest.finalize()),
+            message_count: members.len() as u64,
+        });
+    }
+    Ok(selections)
+}
+
+fn snapshot_hash(selections: &[IndexImportSelection]) -> String {
+    let mut hash = Sha256::new();
+    hash.update(b"import-snapshot-v1");
+    for selection in selections {
+        for part in [
+            selection.account_stable_id.as_str(),
+            selection.conversation_stable_id.as_str(),
+            selection.source_set_hash.as_str(),
+            selection.membership_digest.as_str(),
+        ] {
+            hash.update((part.len() as u64).to_be_bytes());
+            hash.update(part.as_bytes());
+        }
+    }
+    hex::encode(hash.finalize())
 }
 
 fn opaque_id(prefix: &str) -> String {
@@ -1514,6 +2234,470 @@ mod tests {
             extra_json: None,
             media_refs: Vec::new(),
         }
+    }
+
+    fn build_spec() -> FrozenIndexBuildSpec {
+        FrozenIndexBuildSpec {
+            chunk_schema_version: CHUNK_SCHEMA_VERSION.into(),
+            token_counter_version: TOKEN_COUNTER_VERSION.into(),
+            fts_pretoken_version: FTS_PRETOKEN_VERSION.into(),
+            retrieval_token_budget: 512,
+            embedding: FrozenEmbeddingIdentity {
+                provider: "ollama_loopback".into(),
+                endpoint: "http://127.0.0.1:11434".into(),
+                model: "fixture-model".into(),
+                fingerprint: "fixture-fingerprint".into(),
+                dimension: 8,
+            },
+        }
+    }
+
+    #[test]
+    fn frozen_build_chunks_and_active_fts_are_generation_and_scope_isolated() {
+        let data_dir = temp_dir();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let staging = store.begin_staging_source(source("fts-build")).unwrap();
+        store
+            .append_staging_messages(
+                &staging,
+                &[
+                    message("one", "周五下午同步知识库迁移进度"),
+                    message("two", "ProjectA 发布窗口调整到 v2"),
+                ],
+            )
+            .unwrap();
+        store
+            .mark_ready_candidate(
+                staging,
+                CandidateChecks {
+                    expected_message_count: 2,
+                },
+            )
+            .unwrap();
+
+        let frozen = store.begin_or_resume_index_build(build_spec()).unwrap();
+        assert_eq!(frozen.message_count, 2);
+        assert_eq!(
+            store.begin_or_resume_index_build(build_spec()).unwrap(),
+            frozen
+        );
+        let mut changed = build_spec();
+        changed.embedding.fingerprint = "different".into();
+        assert_eq!(
+            store.begin_or_resume_index_build(changed),
+            Err(ContractError::KbNotReady)
+        );
+        let mut changed_pretoken = build_spec();
+        changed_pretoken.fts_pretoken_version = "fts-pretoken-v2".into();
+        assert_eq!(
+            store.begin_or_resume_index_build(changed_pretoken),
+            Err(ContractError::KbNotReady)
+        );
+
+        let conversations = store
+            .list_build_conversations(&frozen.index_generation_id)
+            .unwrap();
+        assert_eq!(conversations.len(), 1);
+        let page = store
+            .read_build_message_page(&frozen.index_generation_id, &conversations[0], None, 256)
+            .unwrap();
+        assert_eq!(page.messages.len(), 2);
+        assert_eq!(page.messages[0].direction, Direction::Other);
+        let drafts = super::super::chunk::chunk_messages(
+            &frozen.import_snapshot_hash,
+            frozen.spec.retrieval_token_budget,
+            &page.messages,
+        )
+        .unwrap();
+        store
+            .write_chunk_batch(&frozen.index_generation_id, &drafts)
+            .unwrap();
+        store
+            .reset_build_chunks(&frozen.index_generation_id)
+            .unwrap();
+        store
+            .write_chunk_batch(&frozen.index_generation_id, &drafts)
+            .unwrap();
+        assert!(matches!(
+            store.begin_staging_source(source("blocked-during-build")),
+            Err(ContractError::KbNotReady)
+        ));
+
+        let request = ActiveFtsRequest {
+            scope: conversations.clone(),
+            query: "迁移".into(),
+            from_ms: None,
+            to_ms: None,
+            top_k: 12,
+        };
+        assert_eq!(
+            store.search_active_fts(request.clone()),
+            Err(ContractError::KbNotReady)
+        );
+        store
+            .with_writer(|connection| {
+                connection
+                    .execute(
+                        "UPDATE knowledge_index_generations SET status='ready' WHERE id=?1",
+                        [&frozen.index_generation_id],
+                    )
+                    .unwrap();
+                connection
+                    .execute(
+                        "UPDATE knowledge_catalog_state SET active_index_generation_id=?1,active_snapshot_hash=?2 WHERE singleton_id=1",
+                        params![frozen.index_generation_id, frozen.import_snapshot_hash],
+                    )
+                    .unwrap();
+                Ok(())
+            })
+            .unwrap();
+        let hits = store.search_active_fts(request).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert!(hits[0].content.contains("知识库迁移"));
+        for scope in [
+            vec![StableConversationKey {
+                account_stable_id: "unknown".into(),
+                conversation_stable_id: "conv".into(),
+            }],
+            vec![
+                conversations[0].clone(),
+                StableConversationKey {
+                    account_stable_id: "acct".into(),
+                    conversation_stable_id: "unknown".into(),
+                },
+            ],
+            vec![conversations[0].clone(), conversations[0].clone()],
+        ] {
+            assert_eq!(
+                store.search_active_fts(ActiveFtsRequest {
+                    scope,
+                    query: "迁移".into(),
+                    from_ms: None,
+                    to_ms: None,
+                    top_k: 12,
+                }),
+                Err(ContractError::KbScopeUnresolved)
+            );
+        }
+        assert_eq!(
+            store.search_active_fts(ActiveFtsRequest {
+                scope: (0..33)
+                    .map(|index| StableConversationKey {
+                        account_stable_id: "acct".into(),
+                        conversation_stable_id: format!("scope-{index}"),
+                    })
+                    .collect(),
+                query: "迁移".into(),
+                from_ms: None,
+                to_ms: None,
+                top_k: 12,
+            }),
+            Err(ContractError::KbScopeUnresolved)
+        );
+        let mut scope_32 = vec![conversations[0].clone()];
+        store
+            .with_writer(|connection| {
+                let source_id: String = connection
+                    .query_row("SELECT id FROM knowledge_sources LIMIT 1", [], |row| row.get(0))
+                    .unwrap();
+                for index in 1..32 {
+                    let conversation_id = format!("scope-conversation-{index}");
+                    let import_id = format!("scope-import-{index}");
+                    let stable_id = format!("scope-{index}");
+                    connection.execute(
+                        "INSERT INTO knowledge_conversations(id,account_stable_id,conversation_stable_id) VALUES(?1,'acct',?2)",
+                        params![conversation_id, stable_id],
+                    ).unwrap();
+                    connection.execute(
+                        "INSERT INTO knowledge_import_generations(id,trigger_source_id,conversation_id,source_set_hash,merge_mode,status,message_count,created_at_ms) VALUES(?1,?2,?3,?4,'replace','active',0,1)",
+                        params![import_id,source_id,conversation_id,format!("scope-hash-{index}")],
+                    ).unwrap();
+                    connection.execute(
+                        "INSERT INTO knowledge_index_generation_imports(index_generation_id,conversation_id,import_generation_id) VALUES(?1,?2,?3)",
+                        params![frozen.index_generation_id,conversation_id,import_id],
+                    ).unwrap();
+                    scope_32.push(StableConversationKey {
+                        account_stable_id: "acct".into(),
+                        conversation_stable_id: stable_id,
+                    });
+                }
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(scope_32.len(), 32);
+        assert!(store
+            .search_active_fts(ActiveFtsRequest {
+                scope: scope_32,
+                query: String::new(),
+                from_ms: None,
+                to_ms: None,
+                top_k: 12,
+            })
+            .unwrap()
+            .is_empty());
+        assert!(store
+            .search_active_fts(ActiveFtsRequest {
+                scope: conversations.clone(),
+                query: "迁移 OR 不存在".into(),
+                from_ms: None,
+                to_ms: None,
+                top_k: 12,
+            })
+            .unwrap()
+            .is_empty());
+        store
+            .with_writer(|connection| {
+                connection
+                    .execute(
+                        "UPDATE knowledge_index_generations SET fts_pretoken_version='unknown' WHERE id=?1",
+                        [&frozen.index_generation_id],
+                    )
+                    .unwrap();
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            store.search_active_fts(ActiveFtsRequest {
+                scope: conversations,
+                query: "迁移".into(),
+                from_ms: None,
+                to_ms: None,
+                top_k: 12,
+            }),
+            Err(ContractError::KbNotReady)
+        );
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn store_pagination_streams_more_than_256_messages_without_index_collisions() {
+        let data_dir = temp_dir();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let staging = store.begin_staging_source(source("many-pages")).unwrap();
+        let messages = (0..260)
+            .map(|index| {
+                let mut incoming =
+                    message(&format!("message-{index:03}"), &format!("body-{index:03}"));
+                incoming.created_at_ms = if index < 180 {
+                    index as i64
+                } else {
+                    30 * 60 * 1000 + index as i64 + 1
+                };
+                incoming.source_ordinal = index as u64;
+                incoming.sort_key = format!("sort-{index:03}");
+                incoming.source_member_token = format!("member-{index:03}");
+                incoming
+            })
+            .collect::<Vec<_>>();
+        store.append_staging_messages(&staging, &messages).unwrap();
+        store
+            .mark_ready_candidate(
+                staging,
+                CandidateChecks {
+                    expected_message_count: messages.len() as u64,
+                },
+            )
+            .unwrap();
+        let frozen = store.begin_or_resume_index_build(build_spec()).unwrap();
+        let conversation = store
+            .list_build_conversations(&frozen.index_generation_id)
+            .unwrap()
+            .remove(0);
+        let mut cursor = None;
+        let mut chunker = super::super::chunk::ChunkerState::new(
+            &frozen.import_snapshot_hash,
+            frozen.spec.retrieval_token_budget,
+            &frozen.spec.fts_pretoken_version,
+        )
+        .unwrap();
+        let mut page_count = 0;
+        loop {
+            let page = store
+                .read_build_message_page(
+                    &frozen.index_generation_id,
+                    &conversation,
+                    cursor.as_ref(),
+                    128,
+                )
+                .unwrap();
+            page_count += 1;
+            let drafts = chunker.push_page(&page.messages).unwrap();
+            if !drafts.is_empty() {
+                store
+                    .write_chunk_batch(&frozen.index_generation_id, &drafts)
+                    .unwrap();
+            }
+            if !page.has_more {
+                break;
+            }
+            cursor = page.next_cursor;
+        }
+        let final_drafts = chunker.finish().unwrap();
+        store
+            .write_chunk_batch(&frozen.index_generation_id, &final_drafts)
+            .unwrap();
+        assert_eq!(page_count, 3);
+        store
+            .with_reader(|connection| {
+                let (count, distinct_indexes, min_index, max_index): (i64, i64, i64, i64) =
+                    connection
+                        .query_row(
+                            "SELECT COUNT(*),COUNT(DISTINCT chunk_index),MIN(chunk_index),MAX(chunk_index) FROM knowledge_chunks WHERE index_generation_id=?1",
+                            [&frozen.index_generation_id],
+                            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                        )
+                        .unwrap();
+                assert_eq!(count, distinct_indexes);
+                assert_eq!(min_index, 0);
+                assert_eq!(max_index, count - 1);
+                Ok(())
+            })
+            .unwrap();
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn chunk_batch_rejects_tampering_and_rolls_back_each_write_step() {
+        let data_dir = temp_dir();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        let staging = store
+            .begin_staging_source(source("chunk-validation"))
+            .unwrap();
+        store
+            .append_staging_messages(
+                &staging,
+                &[message("one", "first"), message("two", "second")],
+            )
+            .unwrap();
+        store
+            .mark_ready_candidate(
+                staging,
+                CandidateChecks {
+                    expected_message_count: 2,
+                },
+            )
+            .unwrap();
+        let frozen = store.begin_or_resume_index_build(build_spec()).unwrap();
+        let conversation = store
+            .list_build_conversations(&frozen.index_generation_id)
+            .unwrap()
+            .remove(0);
+        let page = store
+            .read_build_message_page(&frozen.index_generation_id, &conversation, None, 256)
+            .unwrap();
+        let draft = super::super::chunk::chunk_messages(
+            &frozen.import_snapshot_hash,
+            frozen.spec.retrieval_token_budget,
+            &page.messages,
+        )
+        .unwrap()
+        .remove(0);
+        assert_eq!(
+            store.write_chunk_batch(&frozen.index_generation_id, &[]),
+            Err(ContractError::KbNotReady)
+        );
+        assert_eq!(
+            store.write_chunk_batch("missing-generation", std::slice::from_ref(&draft)),
+            Err(ContractError::KbNotReady)
+        );
+        for step in 1..=3 {
+            fail_chunk_write_at(step);
+            assert_eq!(
+                store.write_chunk_batch(&frozen.index_generation_id, std::slice::from_ref(&draft)),
+                Err(ContractError::KbNotReady)
+            );
+            clear_chunk_write_failure();
+            store
+                .with_reader(|connection| {
+                    let counts: (i64, i64, i64) = connection
+                        .query_row(
+                            "SELECT (SELECT COUNT(*) FROM knowledge_chunks WHERE index_generation_id=?1),(SELECT COUNT(*) FROM knowledge_chunk_messages),(SELECT COUNT(*) FROM knowledge_chunks_fts WHERE index_generation_id=?1)",
+                            [&frozen.index_generation_id],
+                            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                        )
+                        .unwrap();
+                    assert_eq!(counts, (0, 0, 0));
+                    Ok(())
+                })
+                .unwrap();
+        }
+        let mut tampered = Vec::new();
+        let mut changed = draft.clone();
+        changed.content_hash = "tampered".into();
+        tampered.push(changed);
+        let mut changed = draft.clone();
+        changed.fts_terms = "tampered".into();
+        tampered.push(changed);
+        let mut changed = draft.clone();
+        changed.first_message_version_id = "tampered".into();
+        tampered.push(changed);
+        let mut changed = draft.clone();
+        changed.last_message_version_id = "tampered".into();
+        tampered.push(changed);
+        let mut changed = draft.clone();
+        changed.chunk_key = "tampered".into();
+        tampered.push(changed);
+        let mut changed = draft.clone();
+        changed.content.push_str("tampered");
+        tampered.push(changed);
+        let mut changed = draft.clone();
+        changed.started_at_ms += 1;
+        tampered.push(changed);
+        let mut changed = draft.clone();
+        changed.ended_at_ms += 1;
+        tampered.push(changed);
+        let mut changed = draft.clone();
+        changed.chunk_index = 1;
+        tampered.push(changed);
+        let mut changed = draft.clone();
+        changed.members[0].message_index = 1;
+        tampered.push(changed);
+        for changed in tampered {
+            assert_eq!(
+                store.write_chunk_batch(&frozen.index_generation_id, &[changed]),
+                Err(ContractError::KbNotReady)
+            );
+        }
+        store
+            .write_chunk_batch(&frozen.index_generation_id, &[draft])
+            .unwrap();
+        store
+            .with_writer(|connection| {
+                connection
+                    .execute("UPDATE knowledge_chunks_fts SET content='tampered'", [])
+                    .unwrap();
+                Ok(())
+            })
+            .unwrap();
+        drop(store);
+        assert_eq!(
+            KnowledgeStore::open_or_unavailable(&data_dir).availability(),
+            StoreAvailability::Unavailable
+        );
+        let _ = fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn multiple_ready_candidates_fail_closed_before_snapshot_creation() {
+        let data_dir = temp_dir();
+        let store = KnowledgeStore::open(&data_dir).unwrap();
+        ready_candidate(&store, source("candidate-a"));
+        ready_candidate(&store, source("candidate-b"));
+        assert_eq!(
+            store.begin_or_resume_index_build(build_spec()),
+            Err(ContractError::KbNotReady)
+        );
+        let database =
+            Connection::open(data_dir.join("wechat_knowledge/knowledge.sqlite")).unwrap();
+        let count: i64 = database
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_index_generations WHERE status='building'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+        let _ = fs::remove_dir_all(data_dir);
     }
 
     #[test]

@@ -1,17 +1,17 @@
-mod fixtures;
-mod model_contract;
-mod model_client;
-mod ocr;
-#[cfg(feature = "wechat-m1")]
-mod reply_flow;
-pub(crate) mod content;
-pub(crate) mod trace;
 pub(crate) mod capture;
 pub(crate) mod commands;
 pub(crate) mod config;
+pub(crate) mod content;
+mod fixtures;
+mod model_client;
+mod model_contract;
+mod ocr;
 pub(crate) mod profiles;
+#[cfg(feature = "wechat-m1")]
+mod reply_flow;
 pub(crate) mod runtime;
 pub(crate) mod state_machine;
+pub(crate) mod trace;
 pub(crate) mod types;
 pub(crate) mod window_identity;
 

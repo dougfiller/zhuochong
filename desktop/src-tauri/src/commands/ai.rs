@@ -62,7 +62,6 @@ pub(crate) fn validate_model_endpoint(endpoint: &str) -> Result<(), AppError> {
     ))
 }
 
-
 /// 测试模型连接（新版，使用 ModelConfig）
 #[tauri::command]
 pub async fn test_model(model_config: ModelConfig) -> Result<ModelTestResult, AppError> {
@@ -526,7 +525,6 @@ async fn resolve_ollama_text_model_names(
     Ok(filtered_names)
 }
 
-
 /// 从 OpenAI 兼容提供商获取模型列表
 async fn fetch_openai_compatible_models(
     client: &reqwest::Client,
@@ -763,7 +761,11 @@ pub async fn test_assistant_search(
             let html = crate::agent::tools::bing_search_html(&client, "connection test", 3)
                 .await
                 .map_err(AppError::Analysis)?;
-            if html.contains("<h2") { 1 } else { 0 }
+            if html.contains("<h2") {
+                1
+            } else {
+                0
+            }
         }
         "bocha" => {
             if api_key.trim().is_empty() {
@@ -978,8 +980,6 @@ pub async fn get_ai_providers() -> Result<Vec<serde_json::Value>, AppError> {
     ])
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1029,9 +1029,7 @@ mod tests {
         // /api/v3/v1/chat/completions 这种不存在的端点——issue 用户报错根因）。
         assert_eq!(
             openai_compatible_chat_completion_urls("https://ark.cn-beijing.volces.com/api/v3"),
-            vec![
-                "https://ark.cn-beijing.volces.com/api/v3/chat/completions".to_string()
-            ]
+            vec!["https://ark.cn-beijing.volces.com/api/v3/chat/completions".to_string()]
         );
     }
 
@@ -1040,9 +1038,7 @@ mod tests {
         // 智谱 /api/paas/v4 同理，已含版本段
         assert_eq!(
             openai_compatible_chat_completion_urls("https://open.bigmodel.cn/api/paas/v4"),
-            vec![
-                "https://open.bigmodel.cn/api/paas/v4/chat/completions".to_string()
-            ]
+            vec!["https://open.bigmodel.cn/api/paas/v4/chat/completions".to_string()]
         );
     }
 
@@ -1156,5 +1152,4 @@ mod tests {
         ));
         assert!(!ollama_model_should_be_listed(&heuristic_only, None));
     }
-
 }

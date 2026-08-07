@@ -516,9 +516,9 @@ fn ensure_export_dir_components_safe(canonical: &Path) -> Result<(), AppError> {
 /// 导出目录可由本地 API 请求方或前端传入，写入前必须校验，防止向 .ssh、
 /// LaunchAgents 等位置写文件。返回规范化（已解析符号链接）后的路径。
 pub(crate) fn validate_export_dir(dir: &Path) -> Result<PathBuf, AppError> {
-    let canonical = dir.canonicalize().map_err(|_| {
-        AppError::Config("导出目录不存在或无法访问，请先创建该目录".to_string())
-    })?;
+    let canonical = dir
+        .canonicalize()
+        .map_err(|_| AppError::Config("导出目录不存在或无法访问，请先创建该目录".to_string()))?;
     if !canonical.is_dir() {
         return Err(AppError::Config("导出路径必须是已存在的目录".to_string()));
     }
@@ -597,8 +597,22 @@ fn ensure_iso_date(value: &str, field: &str) -> Result<(), AppError> {
 /// [标题, 日期范围, 导出时间, 日报数量, 语言, 冒号]
 fn range_export_scaffold_labels(locale: AppLocale) -> [&'static str; 6] {
     match locale {
-        AppLocale::ZhCn => ["工作日报合并导出", "日期范围", "导出时间", "日报数量", "语言", "："],
-        AppLocale::ZhTw => ["工作日報合併導出", "日期範圍", "導出時間", "日報數量", "語言", "："],
+        AppLocale::ZhCn => [
+            "工作日报合并导出",
+            "日期范围",
+            "导出时间",
+            "日报数量",
+            "语言",
+            "：",
+        ],
+        AppLocale::ZhTw => [
+            "工作日報合併導出",
+            "日期範圍",
+            "導出時間",
+            "日報數量",
+            "語言",
+            "：",
+        ],
         AppLocale::En => [
             "Merged Daily Reports Export",
             "Date range",
@@ -645,12 +659,8 @@ pub(crate) fn export_reports_range_inner(
         return Err(AppError::Config("起始日期不能晚于结束日期".to_string()));
     }
 
-    let report_locale = AppLocale::from_option(
-        locale
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty()),
-    );
+    let report_locale =
+        AppLocale::from_option(locale.as_deref().map(str::trim).filter(|s| !s.is_empty()));
     let locale_code = report_locale.as_code();
 
     let reports = {
@@ -715,8 +725,6 @@ pub struct ExportReportsRangeResult {
     pub path: String,
     pub count: usize,
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -804,16 +812,17 @@ mod tests {
     fn 导出目录组件校验应拦截隐藏目录与自启动目录() {
         use super::ensure_export_dir_components_safe;
 
-        assert!(ensure_export_dir_components_safe(Path::new("/Users/demo/Documents/reports"))
-            .is_ok());
+        assert!(
+            ensure_export_dir_components_safe(Path::new("/Users/demo/Documents/reports")).is_ok()
+        );
         assert!(ensure_export_dir_components_safe(Path::new("/Users/demo/.ssh")).is_err());
         assert!(
             ensure_export_dir_components_safe(Path::new("/home/demo/.config/autostart")).is_err()
         );
-        assert!(ensure_export_dir_components_safe(Path::new(
-            "/Users/demo/Library/LaunchAgents"
-        ))
-        .is_err());
+        assert!(
+            ensure_export_dir_components_safe(Path::new("/Users/demo/Library/LaunchAgents"))
+                .is_err()
+        );
         assert!(ensure_export_dir_components_safe(Path::new(
             "/Users/demo/Library/LaunchDaemons/sub"
         ))
@@ -829,10 +838,8 @@ mod tests {
     fn 导出目录必须已存在() {
         use super::validate_export_dir;
 
-        assert!(validate_export_dir(Path::new(
-            "/nonexistent-work-review-export-dir-a1b2c3"
-        ))
-        .is_err());
+        assert!(
+            validate_export_dir(Path::new("/nonexistent-work-review-export-dir-a1b2c3")).is_err()
+        );
     }
-
 }

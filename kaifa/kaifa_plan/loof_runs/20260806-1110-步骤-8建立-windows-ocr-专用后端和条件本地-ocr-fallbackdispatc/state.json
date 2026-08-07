@@ -3,8 +3,8 @@
   "feature": "步骤 8：建立 Windows OCR 专用后端和条件本地 OCR fallback（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-08）。仅处理用户当前明确选择的前台微信聊天区内存图；以 Work Review OcrService WindowsOCR 路径为唯一首选，Text 才可构造 OcrReadyReply。规范化/限制输入输出，Empty/Unavailable/Failed 记录脱敏事件并终止模型/检索（spy=0）。只在冻结实机 probe 的 Unavailable/Failed 后审计并启用单一 fallback；不可把 Umi GUI/服务或参考目录冒充无界面引擎。禁止远程 OCR、落盘、任意命令、WeChat 注入/协议/数据库/UIA 输入/键鼠/发送，以及第二应用壳。",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-06T03:10:32+00:00",
-  "updated_at": "2026-08-06T04:20:08+00:00",
-  "status": "active",
+  "updated_at": "2026-08-06T04:22:33+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd54b-ee2e-79b1-a6a1-9a5ef94111b8",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-06T03:11:10+00:00 phase 1 gate failed: done file is missing",

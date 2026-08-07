@@ -3,8 +3,8 @@
   "feature": "步骤 7：复用 Work Review 截图 primitive 实现临时微信裁剪与隐藏恢复（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-07）。复用现有 GDI BitBlt/WGC 像素采集为无落盘 ephemeral 微信帧，新增 CaptureCoordinator 与 WechatCaptureGuard；以 capture origin、DPI 和窗口相对 ROI 正确裁剪 chat/header，所有成功/失败/超时/取消路径恢复覆盖层且不抢焦点。严格保持前台单一微信、无注入/协议/数据库读取/UI 自动化/键鼠模拟/自动发送等产品边界；普通 Work Review 截图行为不变。真实 Windows 成功、失败、超时、取消验证只能如实标注，不能伪造通过。",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-06T02:01:09+00:00",
-  "updated_at": "2026-08-06T02:43:36+00:00",
-  "status": "active",
+  "updated_at": "2026-08-06T02:46:33+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd4f3-ecbe-7533-99c9-b7367891b026",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-06T02:07:31+00:00 phase 2 gate failed: done file is missing",

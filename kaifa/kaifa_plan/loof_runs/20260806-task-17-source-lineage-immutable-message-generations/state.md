@@ -5,15 +5,15 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fd9b2-715e-7ed0-958e-4a9451751750
-- next_poll_at:
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月06日22点09分-实现源lineage不可变消息版本和导入代际.md
 - phase_2: 2026年08月06日22点20分-实现源lineage不可变消息版本和导入代际.md
 - phase_3: 2026年08月06日22点26分-源lineage代际合并审查.md
-- phase_4:
-- phase_5:
+- phase_4: 
+- phase_5: 
 
 ## Threads
 - phase_1: 019fd767-26c4-7943-8607-9cfcb8b1a18b

@@ -266,3 +266,16 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | 设置页定向测试 | `node --test desktop/src/routes/settings/SettingsWechatKnowledge.test.js` | 1/1 通过；断言 camelCase、单/多目录选择、来源命令和旧配置数组不再作为 UI 事实来源。 | 通过 |
 | Rust 编译与范围空白 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'`；`git diff --check -- <本步骤路径>` | 两项退出 0；编译仍会报告仓库既有未接线模块的 dead-code 警告。 | 通过 |
 | 真实导出、Windows UAT | 受控 Windows 11 x64 | 本步骤只用静态/合成验证，未选择或读取真实导出；macOS 编译不替代 Windows 文件交换验证。 | not-run |
+
+## 冻结候选索引代际、会话内分块与隔离 FTS5（2026-08-07）
+
+检测脚本：`kaifa/kaifa_test/verify_knowledge_candidate_chunks_fts.py`。脚本只读取本步骤 Rust 源码与 migration，不打开用户 `knowledge.sqlite`、微信导出、网络或 Tauri。行为测试仅在系统临时目录使用完全虚构消息。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 步骤 20 静态边界 | `python3 -B kaifa/kaifa_test/verify_knowledge_candidate_chunks_fts.py --project-root .` | 输出 `KNOWLEDGE_CANDIDATE_CHUNKS_FTS_GATE: pass`；版本回执为 `fts5-unicode61 / fts-pretoken-v1 / token-counter-v1`。确认 v4、纯 chunk 模块、building builder、活动 ready + stable scope SQL 和无 LIKE 回退。 | 通过 |
+| bundled SQLite 行为与知识模块回归 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features --features 'wechat-contract-check,wechat-m2'` | 41/41 通过。新增用例覆盖冻结 spec 恢复/漂移拒绝、多候选原子失败、building 阻止来源变更与查询不可见、崩溃式清空重建、显式 scope、两字中文命中、MATCH 语法隔离、超预算拒绝及时间边界无 overlap；既有 archive/lineage/source-management 回归同时通过。 | 通过 |
+| 既有静态知识门禁 | 依次运行 `verify_knowledge_store.py`、`verify_knowledge_lineage_generations.py`、`verify_knowledge_source_management.py` | 分别输出 `KNOWLEDGE_STORE_GATE: pass`、`KNOWLEDGE_LINEAGE_GATE: pass`、`KNOWLEDGE_SOURCE_MANAGEMENT_GATE: pass`。lineage gate 已按 schema head 4 更新，仍验证 v2/v3 资源存在。 | 通过 |
+| M2 feature 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'` | 退出 0；仅有仓库既有/尚未接线代码的 unused/dead-code 警告和 `block v0.1.6` future-incompat 提示。 | 通过 |
+| 范围内格式与空白 | `rustfmt --edition 2021 --check <本步骤 4 个 Rust 文件>`；`git diff --check -- <本步骤路径>` | 两项退出 0；未格式化或修改范围外既有 dirty 文件。 | 通过 |
+| Windows/真实微信/真实导出性能 | 受控 Windows 11 x64 与脱敏的大规模性能样本 | 本步骤在 macOS 仅运行 bundled SQLite 合成测试；未读取真实微信/导出，也未做 Windows 真机和大规模性能验收。 | not-run |

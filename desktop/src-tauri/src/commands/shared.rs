@@ -6,7 +6,7 @@ use crate::error::AppError;
 use crate::work_intelligence::TodoExtractionResult;
 use crate::AppState;
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle};
+use tauri::AppHandle;
 
 /// 从问题中提取时间范围关键词，返回 (date_from, date_to)
 ///
@@ -132,12 +132,16 @@ pub(crate) fn validate_relative_path(path: &str) -> Result<(), AppError> {
 
     let p = Path::new(path);
     if p.is_absolute() {
-        return Err(AppError::Unknown("非法路径：不允许使用绝对路径".to_string()));
+        return Err(AppError::Unknown(
+            "非法路径：不允许使用绝对路径".to_string(),
+        ));
     }
     if p.components()
         .any(|c| matches!(c, Component::ParentDir | Component::Prefix(_)))
     {
-        return Err(AppError::Unknown("非法路径：不允许包含 .. 等越界路径".to_string()));
+        return Err(AppError::Unknown(
+            "非法路径：不允许包含 .. 等越界路径".to_string(),
+        ));
     }
     Ok(())
 }
@@ -427,14 +431,11 @@ fn refresh_avatar_state_for_current_window(app: &AppHandle, state: &Arc<Mutex<Ap
     true
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::database::{BrowserUsage, DailyStats, DomainUsage, UrlDetail, UrlUsage};
     use crate::privacy::apply_excluded_domains_to_stats;
-
 
     #[test]
     fn 概览统计应过滤排除域名并重算浏览器时长() {
@@ -693,5 +694,4 @@ mod tests {
         assert_eq!(from.as_deref(), Some(prev_first.as_str()));
         assert_eq!(to.as_deref(), Some(today_str().as_str()));
     }
-
 }

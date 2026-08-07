@@ -478,7 +478,10 @@ pub fn fast_answer(
     // 查全量（10000 条）反而信息量过大不聚焦。parse_temporal_range 在没匹配到
     // 任何时间词时返回 (None, None)，这里兜底成今天的日期范围。
     if date_from.is_none() && date_to.is_none() {
-        let today = chrono::Local::now().date_naive().format("%Y-%m-%d").to_string();
+        let today = chrono::Local::now()
+            .date_naive()
+            .format("%Y-%m-%d")
+            .to_string();
         date_from = Some(today.clone());
         date_to = Some(today);
     }
@@ -675,7 +678,6 @@ mod tests {
         Database::new(&path).expect("创建测试数据库失败")
     }
 
-
     #[test]
     fn test_route_greeting_without_model() {
         let d = route_query("你好", false);
@@ -821,7 +823,10 @@ mod tests {
         assert_eq!(route_query("你能干什么", false).path, QueryPath::Direct);
         assert_eq!(route_query("你会什么", false).path, QueryPath::Direct);
         assert_eq!(route_query("介绍一下你自己", false).path, QueryPath::Direct);
-        assert_eq!(route_query("what can you do", false).path, QueryPath::Direct);
+        assert_eq!(
+            route_query("what can you do", false).path,
+            QueryPath::Direct
+        );
     }
 
     #[test]

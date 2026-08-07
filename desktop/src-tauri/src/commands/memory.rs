@@ -8,7 +8,6 @@ use tauri::State;
 
 use super::shared::load_filtered_activities_in_range;
 
-
 /// 合成今日工作洞察（规则版，MVP 不依赖 AI）
 pub(crate) fn synthesize_insights_inner(
     date: &str,
@@ -138,6 +137,3 @@ pub(crate) fn generate_weekly_review_inner(
         date_to.as_deref(),
     ))
 }
-
-
-

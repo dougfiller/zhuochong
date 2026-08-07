@@ -503,10 +503,8 @@ static ASSISTANT_CANCEL_SENDERS: once_cell::sync::Lazy<
     Mutex<std::collections::HashMap<String, tokio::sync::watch::Sender<bool>>>,
 > = once_cell::sync::Lazy::new(|| Mutex::new(std::collections::HashMap::new()));
 
-type PendingAssistantConfirmation =
-    (std::time::Instant, tokio::sync::oneshot::Sender<bool>);
-type AssistantConfirmationMap =
-    std::collections::HashMap<String, PendingAssistantConfirmation>;
+type PendingAssistantConfirmation = (std::time::Instant, tokio::sync::oneshot::Sender<bool>);
+type AssistantConfirmationMap = std::collections::HashMap<String, PendingAssistantConfirmation>;
 
 /// 待确认的行动（confirm_id → (创建时间, oneshot sender)）。
 /// 用户在确认卡片上点击后经 `confirm_assistant_action` 回传。
@@ -606,11 +604,8 @@ fn build_realtime_context_text(state_arc: &Arc<Mutex<AppState>>) -> String {
         // 今日概况：从今日时间线聚合（轻量，最多 300 行）
         if let Ok(activities) = s.database.get_timeline(&today, Some(300), None) {
             let (ignored_apps, excluded_domains) = collect_privacy_filters(&s);
-            let activities = super::filter_activities_by_privacy(
-                activities,
-                &ignored_apps,
-                &excluded_domains,
-            );
+            let activities =
+                super::filter_activities_by_privacy(activities, &ignored_apps, &excluded_domains);
             if !activities.is_empty() {
                 let total: i64 = activities.iter().map(|a| a.duration).sum();
                 let mut app_totals: std::collections::HashMap<String, i64> =
@@ -672,16 +667,17 @@ async fn execute_assistant_action(
             let next_config = {
                 let s = state_arc.lock().map_err(|e| e.to_string())?;
                 let mut next = s.config.clone();
-                next.avatar_followups.push(crate::config::AvatarFollowupItem {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    title: text.clone(),
-                    date: today,
-                    source_app: "工作助手".to_string(),
-                    source_title: "助手对话".to_string(),
-                    project_key: String::new(),
-                    created_at: chrono::Utc::now().timestamp(),
-                    status: "open".to_string(),
-                });
+                next.avatar_followups
+                    .push(crate::config::AvatarFollowupItem {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        title: text.clone(),
+                        date: today,
+                        source_app: "工作助手".to_string(),
+                        source_title: "助手对话".to_string(),
+                        project_key: String::new(),
+                        created_at: chrono::Utc::now().timestamp(),
+                        status: "open".to_string(),
+                    });
                 next
             };
             super::persist_app_config(next_config, app, &state_arc)
@@ -865,7 +861,9 @@ pub async fn chat_work_assistant(
     let state_arc: Arc<Mutex<AppState>> = state.inner().clone();
     let context_state = state_arc.clone();
     let semantic_enabled = {
-        let s = state_arc.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+        let s = state_arc
+            .lock()
+            .map_err(|e| AppError::Unknown(e.to_string()))?;
         s.config.memory_semantic_enabled
     };
     let semantic_search = if semantic_enabled {
@@ -873,10 +871,13 @@ pub async fn chat_work_assistant(
         Some(std::sync::Arc::new(move |query: String, limit: usize| {
             let semantic_state = semantic_state.clone();
             Box::pin(async move {
-                let hits =
-                    super::semantic_memory::search_semantic_memory_inner(&semantic_state, &query, limit)
-                        .await
-                        .map_err(|e| e.to_string())?;
+                let hits = super::semantic_memory::search_semantic_memory_inner(
+                    &semantic_state,
+                    &query,
+                    limit,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
                 if hits.is_empty() {
                     return Ok(format!("「{query}」没有检索到相关屏幕记忆。"));
                 }

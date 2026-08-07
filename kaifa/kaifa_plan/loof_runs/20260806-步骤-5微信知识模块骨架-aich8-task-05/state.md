@@ -5,8 +5,8 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fd48f-c61b-7523-9749-70fdece0e842
-- next_poll_at: 2026-08-06T00:56:44+00:00
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月06日03点01分-建立最小微信知识模块骨架并接入现有配置.md

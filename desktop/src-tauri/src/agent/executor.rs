@@ -8,8 +8,8 @@
 use super::events::{default_tool_label, StreamEvent, StreamEventSender};
 use super::model::{self, Message, StopReason};
 use super::tools::{
-    action_confirm_summary, requires_confirmation, AssistantRuntime, ConfirmDecision,
-    ToolRegistry, WebToolsConfig,
+    action_confirm_summary, requires_confirmation, AssistantRuntime, ConfirmDecision, ToolRegistry,
+    WebToolsConfig,
 };
 use crate::config::ModelConfig;
 use crate::database::Database;

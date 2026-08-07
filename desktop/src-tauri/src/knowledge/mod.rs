@@ -1,6 +1,7 @@
 mod archive_importer;
 mod archive_schema;
 mod archive_store;
+mod chunk;
 pub(crate) mod commands;
 pub(crate) mod config;
 mod migrations;

@@ -47,7 +47,6 @@ pub(crate) fn get_app_category_overview_inner(
         .collect())
 }
 
-
 pub(crate) fn upsert_app_category_rule(config: &mut AppConfig, app_name: &str, category: &str) {
     let normalized_app_name = crate::monitor::normalize_display_app_name(app_name);
     let custom_keys: Vec<String> = config
@@ -180,7 +179,6 @@ pub async fn set_app_category_rule(
     let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
     reclassify_app_history_in_state(&state, trimmed_app_name, &category)
 }
-
 
 /// 分类信息（前端展示用）
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -514,4 +512,3 @@ pub async fn set_domain_semantic_rule(
     let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
     reclassify_domain_history_in_state(&state, &normalized_domain, trimmed_semantic_category)
 }
-

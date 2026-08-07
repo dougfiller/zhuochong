@@ -125,7 +125,10 @@ pub(crate) struct OcrReadyReply {
 }
 
 impl OcrReadyReply {
-    pub(crate) fn from_backend(captured: CapturedWechat, result: OcrBackendResult) -> Result<Self, ContractError> {
+    pub(crate) fn from_backend(
+        captured: CapturedWechat,
+        result: OcrBackendResult,
+    ) -> Result<Self, ContractError> {
         if !captured.is_single_chat {
             return Err(ContractError::WxGroupChatUnsupported);
         }
@@ -184,8 +187,17 @@ pub(crate) struct GeneratedReply {
 }
 
 impl GeneratedReply {
-    pub(crate) fn m1(request_id: RequestId, suggestion_generation: SuggestionGeneration, text: String) -> Self {
-        Self { request_id, suggestion_generation, binding_generation: None, text }
+    pub(crate) fn m1(
+        request_id: RequestId,
+        suggestion_generation: SuggestionGeneration,
+        text: String,
+    ) -> Self {
+        Self {
+            request_id,
+            suggestion_generation,
+            binding_generation: None,
+            text,
+        }
     }
 
     pub(crate) fn m2(
@@ -194,7 +206,12 @@ impl GeneratedReply {
         binding_generation: BindingGeneration,
         text: String,
     ) -> Self {
-        Self { request_id, suggestion_generation, binding_generation: Some(binding_generation), text }
+        Self {
+            request_id,
+            suggestion_generation,
+            binding_generation: Some(binding_generation),
+            text,
+        }
     }
 
     pub(crate) fn is_current(
@@ -276,7 +293,11 @@ mod tests {
 
     #[test]
     fn ocr_text_creates_only_the_m1_input_chain() {
-        let ocr = OcrReadyReply::from_backend(capture(), OcrBackendResult::Text(NormalizedOcrText::parse("  请确认  ").unwrap())).unwrap();
+        let ocr = OcrReadyReply::from_backend(
+            capture(),
+            OcrBackendResult::Text(NormalizedOcrText::parse("  请确认  ").unwrap()),
+        )
+        .unwrap();
         assert_eq!(ocr.text(), "请确认");
         let input = M1ReplyInput::from(ocr);
         assert_eq!(input.text(), "请确认");
@@ -286,7 +307,10 @@ mod tests {
     fn non_text_ocr_cannot_create_a_reply_input() {
         for (result, error) in [
             (OcrBackendResult::Empty, ContractError::WxOcrEmpty),
-            (OcrBackendResult::Unavailable, ContractError::WxOcrUnavailable),
+            (
+                OcrBackendResult::Unavailable,
+                ContractError::WxOcrUnavailable,
+            ),
             (OcrBackendResult::Failed, ContractError::WxOcrFailed),
         ] {
             assert_eq!(OcrReadyReply::from_backend(capture(), result), Err(error));
@@ -299,23 +323,42 @@ mod tests {
         group_capture.is_single_chat = false;
 
         assert_eq!(
-            OcrReadyReply::from_backend(group_capture, OcrBackendResult::Text(NormalizedOcrText::parse("请确认").unwrap())),
+            OcrReadyReply::from_backend(
+                group_capture,
+                OcrBackendResult::Text(NormalizedOcrText::parse("请确认").unwrap())
+            ),
             Err(ContractError::WxGroupChatUnsupported),
         );
     }
 
     #[test]
     fn error_codes_are_stable_wire_values() {
-        assert_eq!(serde_json::to_string(&ContractError::KbRetrievalFailed).unwrap(), "\"KB_RETRIEVAL_FAILED\"");
-        assert_eq!(serde_json::to_string(&ContractError::WxGroupChatUnsupported).unwrap(), "\"WX_GROUP_CHAT_UNSUPPORTED\"");
-        assert_eq!(serde_json::from_str::<ContractError>("\"WX_OCR_EMPTY\"").unwrap(), ContractError::WxOcrEmpty);
+        assert_eq!(
+            serde_json::to_string(&ContractError::KbRetrievalFailed).unwrap(),
+            "\"KB_RETRIEVAL_FAILED\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ContractError::WxGroupChatUnsupported).unwrap(),
+            "\"WX_GROUP_CHAT_UNSUPPORTED\""
+        );
+        assert_eq!(
+            serde_json::from_str::<ContractError>("\"WX_OCR_EMPTY\"").unwrap(),
+            ContractError::WxOcrEmpty
+        );
     }
 
     #[test]
     fn normalization_removes_controls_and_rejects_empty_or_over_limit_text() {
-        let text = NormalizedOcrText::parse("  第一行\r\n\0第二\u{0007}行\n\n\n  第三行  ").unwrap();
+        let text =
+            NormalizedOcrText::parse("  第一行\r\n\0第二\u{0007}行\n\n\n  第三行  ").unwrap();
         assert_eq!(text.as_str(), "第一行\n第二行\n\n第三行");
-        assert_eq!(NormalizedOcrText::parse("\0\r\n\t"), Err(ContractError::WxOcrEmpty));
-        assert_eq!(NormalizedOcrText::parse(&"a".repeat(MAX_OCR_TEXT_BYTES + 1)), Err(ContractError::WxOcrFailed));
+        assert_eq!(
+            NormalizedOcrText::parse("\0\r\n\t"),
+            Err(ContractError::WxOcrEmpty)
+        );
+        assert_eq!(
+            NormalizedOcrText::parse(&"a".repeat(MAX_OCR_TEXT_BYTES + 1)),
+            Err(ContractError::WxOcrFailed)
+        );
     }
 }

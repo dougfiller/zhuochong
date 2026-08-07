@@ -14,7 +14,10 @@ use tauri::State;
 
 use super::shared::collect_privacy_filters;
 
-pub(crate) fn load_daily_stats_for_overview(state: &AppState, date: &str) -> Result<DailyStats, AppError> {
+pub(crate) fn load_daily_stats_for_overview(
+    state: &AppState,
+    date: &str,
+) -> Result<DailyStats, AppError> {
     let segments = state.config.effective_work_segments();
     let (ignored_apps, excluded_domains) = collect_privacy_filters(state);
     let mut stats = state.database.get_daily_stats_with_segments_filtered(
@@ -1512,11 +1515,8 @@ pub async fn get_range_daily_totals(
     state: State<'_, Arc<Mutex<AppState>>>,
 ) -> Result<Vec<serde_json::Value>, AppError> {
     let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
-    let (start, end) = resolve_overview_date_span(
-        None,
-        Some(date_from.as_str()),
-        Some(date_to.as_str()),
-    )?;
+    let (start, end) =
+        resolve_overview_date_span(None, Some(date_from.as_str()), Some(date_to.as_str()))?;
 
     let mut totals = Vec::new();
     let mut current = start;

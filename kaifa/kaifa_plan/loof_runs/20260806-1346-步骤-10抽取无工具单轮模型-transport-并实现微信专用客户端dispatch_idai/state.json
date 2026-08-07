@@ -3,8 +3,8 @@
   "feature": "步骤 10：抽取无工具单轮模型 transport 并实现微信专用客户端；dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-10",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-06T05:46:29+00:00",
-  "updated_at": "2026-08-06T06:19:48+00:00",
-  "status": "active",
+  "updated_at": "2026-08-06T06:34:49+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd5b9-d736-79c3-9c51-a2f34eeadfe6",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": []
 }

@@ -3,8 +3,8 @@
   "feature": "步骤 18：实现大型 messages[] 流式导入、规范化和媒体引用（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-18）。使用 serde_json DeserializeSeed 或经基准验证的等价流式 parser，逐项消费 messages[]，禁止将完整 Archive 或 Vec 载入内存；一次一个会话，先验证 meta.json 再读 messages.json。规范化稳定 ID、时间、排序、消息或渲染类型、发送者、文本、引用、来源和哈希；extraJson 白名单且限额；文本白名单和明确回退规则；每个版本支持多行媒体引用，仅登记来源和相对元数据 existsState=unknown，绝不扫描、stat、哈希、复制或读取媒体正文。使用 KnowledgeStore 小批事务，只写 staging generation，整会话成功才 readyCandidate；可从会话开头幂等重放；完全相同源指纹快速 no-op 且消息版本、membership、chunk、索引写入均为 0。损坏会话继续，源 schema 不支持整体停；实现内存探针、全量 manifest/meta/解析计数核对，以及重复、kill、磁盘满、损坏 JSON、空会话、跨包重复与 no-op 冻结耗时测试。保持仅用户明确选择的前台微信及只读导出边界，禁止注入、协议或数据库读取、UI 自动化输入、自动发送、MCP/Bot/search/upload/Agent 工具调用。",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-07T01:23:47+00:00",
-  "updated_at": "2026-08-07T04:01:27+00:00",
-  "status": "active",
+  "updated_at": "2026-08-07T04:21:26+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fda61-c1f7-7e00-81eb-dab86b58e553",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-07T01:40:05+00:00 phase 2 gate failed: done status is not done: blocked",

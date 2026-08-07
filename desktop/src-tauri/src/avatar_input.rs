@@ -1018,8 +1018,7 @@ pub fn spawn_avatar_input_bridge(app: AppHandle) {
         return;
     }
 
-    let smart_click_through_polling_enabled =
-        smart_click_through_polling_enabled_for_platform();
+    let smart_click_through_polling_enabled = smart_click_through_polling_enabled_for_platform();
 
     tauri::async_runtime::spawn(async move {
         let mut last_payload: Option<AvatarInputPayload> = None;

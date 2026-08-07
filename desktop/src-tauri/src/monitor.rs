@@ -1253,7 +1253,8 @@ pub fn get_active_window_fast() -> Result<ActiveWindow> {
 /// Reads private, fail-closed evidence for the future WeChat capture gate.
 /// It deliberately does not change the public ActiveWindow DTO used by Work Review.
 #[cfg(target_os = "windows")]
-pub(crate) fn read_foreground_window_evidence() -> Result<crate::wechat::window_identity::ForegroundWindowEvidence> {
+pub(crate) fn read_foreground_window_evidence(
+) -> Result<crate::wechat::window_identity::ForegroundWindowEvidence> {
     use crate::wechat::window_identity::{
         DisplayEvidence, ExecutableEvidence, ForegroundWindowEvidence, WindowInstanceToken,
     };
@@ -1276,7 +1277,12 @@ pub(crate) fn read_foreground_window_evidence() -> Result<crate::wechat::window_
             return Err(AppError::Unknown("前台窗口不支持".into()));
         }
 
-        let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut rect = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
         if GetWindowRect(hwnd, &mut rect) == 0 {
             return Err(AppError::Unknown("窗口几何不可用".into()));
         }
@@ -1301,15 +1307,17 @@ pub(crate) fn read_foreground_window_evidence() -> Result<crate::wechat::window_
             .ok_or_else(|| AppError::Unknown("进程版本不可用".into()))?;
         let display = foreground_display_evidence(hwnd)
             .ok_or_else(|| AppError::Unknown("显示器拓扑不可用".into()))?;
-        let windows_build = windows_build()
-            .ok_or_else(|| AppError::Unknown("Windows 版本不可用".into()))?;
+        let windows_build =
+            windows_build().ok_or_else(|| AppError::Unknown("Windows 版本不可用".into()))?;
         let theme = foreground_window_theme(hwnd)
             .ok_or_else(|| AppError::Unknown("窗口主题不可用".into()))?;
 
         let mut title: [u16; 512] = [0; 512];
         let title_len = GetWindowTextW(hwnd, title.as_mut_ptr(), title.len() as i32);
         let title_hint = if title_len > 0 {
-            OsString::from_wide(&title[..title_len as usize]).to_string_lossy().to_string()
+            OsString::from_wide(&title[..title_len as usize])
+                .to_string_lossy()
+                .to_string()
         } else {
             String::new()
         };
@@ -1317,8 +1325,18 @@ pub(crate) fn read_foreground_window_evidence() -> Result<crate::wechat::window_
         Ok(ForegroundWindowEvidence {
             instance: WindowInstanceToken::new(hwnd as usize, pid, process_started_at(pid)),
             pid,
-            executable: ExecutableEvidence::new(normalized_path, file_name, sha256, product_version),
-            bounds_px: WindowBounds { x: rect.left, y: rect.top, width, height },
+            executable: ExecutableEvidence::new(
+                normalized_path,
+                file_name,
+                sha256,
+                product_version,
+            ),
+            bounds_px: WindowBounds {
+                x: rect.left,
+                y: rect.top,
+                width,
+                height,
+            },
             dpi,
             is_minimized: false,
             display,
@@ -1331,7 +1349,11 @@ pub(crate) fn read_foreground_window_evidence() -> Result<crate::wechat::window_
 
 #[cfg(any(test, target_os = "windows"))]
 fn theme_from_immersive_dark_mode(value: i32) -> &'static str {
-    if value == 0 { "light" } else { "dark" }
+    if value == 0 {
+        "light"
+    } else {
+        "dark"
+    }
 }
 
 /// Reads the foreground HWND's documented DWM immersive-dark-mode attribute.
@@ -1376,7 +1398,9 @@ fn windows_build() -> Option<String> {
 }
 
 #[cfg(target_os = "windows")]
-fn foreground_display_evidence(hwnd: winapi::shared::windef::HWND) -> Option<crate::wechat::window_identity::DisplayEvidence> {
+fn foreground_display_evidence(
+    hwnd: winapi::shared::windef::HWND,
+) -> Option<crate::wechat::window_identity::DisplayEvidence> {
     use crate::wechat::window_identity::DisplayEvidence;
     use winapi::um::winuser::{
         GetMonitorInfoW, GetSystemMetrics, MonitorFromWindow, MONITORINFO, MONITORINFOF_PRIMARY,
@@ -1467,7 +1491,10 @@ fn windows_product_version(path: &str) -> Option<String> {
         }
         let mut translation: LPVOID = std::ptr::null_mut();
         let mut translation_len: u32 = 0;
-        let query: Vec<u16> = "\\VarFileInfo\\Translation".encode_utf16().chain(Some(0)).collect();
+        let query: Vec<u16> = "\\VarFileInfo\\Translation"
+            .encode_utf16()
+            .chain(Some(0))
+            .collect();
         if VerQueryValueW(
             data.as_mut_ptr() as LPVOID,
             query.as_ptr(),
@@ -1481,7 +1508,8 @@ fn windows_product_version(path: &str) -> Option<String> {
         let words = translation as *const u16;
         let language = *words;
         let code_page = *words.add(1);
-        let version_query = format!("\\StringFileInfo\\{language:04x}{code_page:04x}\\ProductVersion");
+        let version_query =
+            format!("\\StringFileInfo\\{language:04x}{code_page:04x}\\ProductVersion");
         let version_query: Vec<u16> = version_query.encode_utf16().chain(Some(0)).collect();
         let mut version: LPVOID = std::ptr::null_mut();
         let mut version_len: u32 = 0;
@@ -1497,7 +1525,10 @@ fn windows_product_version(path: &str) -> Option<String> {
             return None;
         }
         let value = std::slice::from_raw_parts(version as *const u16, version_len as usize);
-        let value = String::from_utf16_lossy(value).trim_end_matches('\0').trim().to_owned();
+        let value = String::from_utf16_lossy(value)
+            .trim_end_matches('\0')
+            .trim()
+            .to_owned();
         (!value.is_empty()).then_some(value)
     }
 }
@@ -4237,9 +4268,10 @@ fn find_focused_sway_node(value: &Value) -> Option<&Value> {
         .get("focused")
         .and_then(|v| v.as_bool())
         .unwrap_or(false)
-        && (value.get("pid").is_some() || value.get("app_id").is_some()) {
-            return Some(value);
-        }
+        && (value.get("pid").is_some() || value.get("app_id").is_some())
+    {
+        return Some(value);
+    }
 
     for key in ["nodes", "floating_nodes"] {
         if let Some(nodes) = value.get(key).and_then(|v| v.as_array()) {

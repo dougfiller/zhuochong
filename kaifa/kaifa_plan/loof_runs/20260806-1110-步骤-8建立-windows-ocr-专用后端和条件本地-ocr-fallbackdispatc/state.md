@@ -6,7 +6,7 @@
 - current_phase_name: 推送同步
 - current_thread_id: 019fd54b-ee2e-79b1-a6a1-9a5ef94111b8
 - next_poll_at: 
-- status: active
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月06日11点15分-建立Windows OCR专用后端和条件本地OCR fallback.md

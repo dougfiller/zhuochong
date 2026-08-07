@@ -28,7 +28,11 @@ pub async fn create_assistant_conversation(
     state: State<'_, Arc<Mutex<AppState>>>,
 ) -> Result<i64, AppError> {
     let trimmed = title.trim();
-    let title = if trimmed.is_empty() { "新对话" } else { trimmed };
+    let title = if trimmed.is_empty() {
+        "新对话"
+    } else {
+        trimmed
+    };
     let s = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
     s.database.create_assistant_conversation(title)
 }
@@ -65,7 +69,6 @@ pub async fn append_assistant_message(
         model_name.as_deref(),
     )
 }
-
 
 /// 删除会话及全部消息。
 #[tauri::command]

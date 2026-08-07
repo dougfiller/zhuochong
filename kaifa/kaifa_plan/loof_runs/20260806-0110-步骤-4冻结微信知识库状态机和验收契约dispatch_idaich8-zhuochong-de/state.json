@@ -3,8 +3,8 @@
   "feature": "步骤 4：冻结微信、知识库、状态机和验收契约（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-04）",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-05T17:10:24+00:00",
-  "updated_at": "2026-08-05T18:41:16+00:00",
-  "status": "active",
+  "updated_at": "2026-08-05T18:44:15+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd33a-8a84-76e0-8937-34c743b671f7",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-05T17:11:10+00:00 phase 1 gate failed: done file is missing",

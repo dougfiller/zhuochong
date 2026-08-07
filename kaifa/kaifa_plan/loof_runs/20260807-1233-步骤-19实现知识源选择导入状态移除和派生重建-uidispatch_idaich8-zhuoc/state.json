@@ -3,8 +3,8 @@
   "feature": "步骤 19：实现知识源选择、导入状态、移除和派生重建 UI（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-19）。复用 Tauri dialog 和现有 Settings/ConfirmDialog/Toast；实现本地 source 清单与进度、同一 importer/store 门面、retired/missing/denial、多源 provenance、维护屏障及安全 knowledge.sqlite 重建/manifest，严守只读导出和微信手动边界。",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-07T04:33:37+00:00",
-  "updated_at": "2026-08-07T07:20:19+00:00",
-  "status": "active",
+  "updated_at": "2026-08-07T07:23:25+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fdb17-e744-7382-a1f2-0f638ee868ce",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-07T04:36:21+00:00 phase 1 gate failed: done file is missing",

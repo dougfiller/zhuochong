@@ -3,8 +3,8 @@
   "feature": "步骤 17：实现源 lineage、不可变消息版本和导入代际（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-17）。多个完整、筛选或增量导出可确定性合并，候选正文不污染当前活动知识视图。",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-06T14:07:42+00:00",
-  "updated_at": "2026-08-07T00:49:51+00:00",
-  "status": "active",
+  "updated_at": "2026-08-07T01:11:37+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd9b2-715e-7ed0-958e-4a9451751750",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-06T14:10:21+00:00 phase 1 gate failed: done file is missing",

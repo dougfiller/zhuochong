@@ -1,7 +1,6 @@
 use super::types::{BindingGeneration, RequestId};
 use crate::knowledge::types::RetrievedReply;
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ModelKnowledgeContext {
     request_id: RequestId,
@@ -13,7 +12,10 @@ pub(crate) struct ModelKnowledgeContext {
 
 impl ModelKnowledgeContext {
     // This adapter is intentionally the only constructor. RetrievedReply has no public fields.
-    pub(in crate::wechat) fn from_retrieved(reply: RetrievedReply, binding_generation: BindingGeneration) -> Self {
+    pub(in crate::wechat) fn from_retrieved(
+        reply: RetrievedReply,
+        binding_generation: BindingGeneration,
+    ) -> Self {
         Self {
             request_id: reply.request_id().clone(),
             reply_text: reply.query().to_owned(),
@@ -23,18 +25,35 @@ impl ModelKnowledgeContext {
         }
     }
 
-    pub(crate) fn is_no_hit(&self) -> bool { self.no_hit }
+    pub(crate) fn is_no_hit(&self) -> bool {
+        self.no_hit
+    }
 
-    pub(super) fn request_id(&self) -> &RequestId { &self.request_id }
-    pub(super) fn reply_text(&self) -> &str { &self.reply_text }
-    pub(super) fn excerpts(&self) -> &[String] { &self.excerpts }
-    pub(super) fn binding_generation(&self) -> BindingGeneration { self.binding_generation }
+    pub(super) fn request_id(&self) -> &RequestId {
+        &self.request_id
+    }
+    pub(super) fn reply_text(&self) -> &str {
+        &self.reply_text
+    }
+    pub(super) fn excerpts(&self) -> &[String] {
+        &self.excerpts
+    }
+    pub(super) fn binding_generation(&self) -> BindingGeneration {
+        self.binding_generation
+    }
 }
 
-#[cfg(all(feature = "wechat-contract-check", not(any(feature = "wechat-m1", feature = "wechat-m2"))))]
+#[cfg(all(
+    feature = "wechat-contract-check",
+    not(any(feature = "wechat-m1", feature = "wechat-m2"))
+))]
 compile_error!("a WeChat release contract check requires exactly one of wechat-m1 or wechat-m2");
 
-#[cfg(all(feature = "wechat-contract-check", feature = "wechat-m1", feature = "wechat-m2"))]
+#[cfg(all(
+    feature = "wechat-contract-check",
+    feature = "wechat-m1",
+    feature = "wechat-m2"
+))]
 compile_error!("WeChat release contract checks cannot enable both wechat-m1 and wechat-m2");
 
 #[cfg(test)]
@@ -82,7 +101,8 @@ mod tests {
     fn retrieval_failure_ends_m2_before_context_or_model_transport() {
         let fixture: RetrievalFailedFixture = serde_json::from_str(include_str!(
             "../../tests/fixtures/wechat_contract/retrieval_failed.json"
-        )).unwrap();
+        ))
+        .unwrap();
         let request_id = RequestId::new();
         let mut state = retrieving_m2(request_id.clone());
         let retrieval = retrieval_fixture(
@@ -111,7 +131,8 @@ mod tests {
             RetrievalOutcome::Retrieved(RetrievalStatus::NoHit),
             &[],
             0,
-        ).unwrap();
+        )
+        .unwrap();
         let mut state = retrieving_m2(request_id);
         state.complete_retrieval(&reply, 5).unwrap();
         let context = ModelKnowledgeContext::from_retrieved(reply, BindingGeneration::new(2));
@@ -132,7 +153,8 @@ mod tests {
             RetrievalOutcome::Retrieved(RetrievalStatus::Success),
             &[("预算内摘要", 3), ("超预算摘要", 2)],
             4,
-        ).unwrap();
+        )
+        .unwrap();
         let context = ModelKnowledgeContext::from_retrieved(reply, BindingGeneration::new(2));
 
         assert_eq!(context.excerpts(), &["预算内摘要"]);

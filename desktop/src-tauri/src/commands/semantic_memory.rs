@@ -58,7 +58,12 @@ fn load_embedding_config(state: &Arc<Mutex<AppState>>) -> Result<EmbeddingConfig
     }
     Ok(EmbeddingConfig {
         provider: s.config.embedding_provider.clone(),
-        endpoint: s.config.embedding_endpoint.trim().trim_end_matches('/').to_string(),
+        endpoint: s
+            .config
+            .embedding_endpoint
+            .trim()
+            .trim_end_matches('/')
+            .to_string(),
         model: s.config.embedding_model.clone(),
         api_key: s.config.embedding_api_key.clone(),
     })
@@ -95,9 +100,10 @@ async fn embed_texts(
         if let Some(key) = config.api_key.as_deref().filter(|k| !k.trim().is_empty()) {
             request = request.header("Authorization", format!("Bearer {key}"));
         }
-        let response = request.send().await.map_err(|e| {
-            AppError::Analysis(format!("嵌入请求失败: {e}"))
-        })?;
+        let response = request
+            .send()
+            .await
+            .map_err(|e| AppError::Analysis(format!("嵌入请求失败: {e}")))?;
         if !response.status().is_success() {
             let status = response.status();
             let body: String = response
@@ -171,7 +177,9 @@ async fn embed_texts(
                 .map_err(|e| AppError::Analysis(format!("Ollama 嵌入响应解析失败: {e}")))?;
             let vector: Vec<f32> = payload["embedding"]
                 .as_array()
-                .ok_or_else(|| AppError::Analysis("Ollama 嵌入响应缺少 embedding 字段".to_string()))?
+                .ok_or_else(|| {
+                    AppError::Analysis("Ollama 嵌入响应缺少 embedding 字段".to_string())
+                })?
                 .iter()
                 .filter_map(|v| v.as_f64().map(|f| f as f32))
                 .collect();
@@ -195,7 +203,11 @@ pub(crate) struct ChunkDraft {
 
 fn local_date_of_timestamp(ts: i64) -> String {
     chrono::DateTime::from_timestamp(ts, 0)
-        .map(|t| t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string())
+        .map(|t| {
+            t.with_timezone(&chrono::Local)
+                .format("%Y-%m-%d")
+                .to_string()
+        })
         .unwrap_or_else(|| "unknown".to_string())
 }
 
@@ -307,13 +319,21 @@ pub async fn index_semantic_memory(
 
     // ① 消费活动游标之后的记录，聚合成记忆块
     let (database, drafts, processed, done) = {
-        let s = state_arc.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+        let s = state_arc
+            .lock()
+            .map_err(|e| AppError::Unknown(e.to_string()))?;
         let cursor = s.database.semantic_memory_stats()?.last_indexed_activity_id;
-        let activities = s.database.get_activities_after_id(cursor, INDEX_ACTIVITY_BATCH)?;
+        let activities = s
+            .database
+            .get_activities_after_id(cursor, INDEX_ACTIVITY_BATCH)?;
         let processed = activities.len();
         let done = processed < INDEX_ACTIVITY_BATCH;
         // 游标推进基准：本批最大活动 id（在隐私过滤前取，避免整批被过滤时死循环）
-        let max_id = activities.iter().filter_map(|a| a.id).max().unwrap_or(cursor);
+        let max_id = activities
+            .iter()
+            .filter_map(|a| a.id)
+            .max()
+            .unwrap_or(cursor);
         // 隐私过滤：被忽略应用/排除域名的记录不进入语义索引
         let (ignored_apps, excluded_domains) = collect_privacy_filters(&s);
         let activities = filter_activities_by_privacy(activities, &ignored_apps, &excluded_domains);
@@ -417,8 +437,6 @@ pub async fn semantic_memory_status(
     s.database.semantic_memory_stats()
 }
 
-
-
 /// 内部实现：也供助手 semantic_search 工具桥接调用。
 pub(crate) async fn search_semantic_memory_inner(
     state_arc: &Arc<Mutex<AppState>>,
@@ -427,7 +445,9 @@ pub(crate) async fn search_semantic_memory_inner(
 ) -> Result<Vec<SemanticMemoryHit>, AppError> {
     let embedding = load_embedding_config(state_arc)?;
     let database = {
-        let s = state_arc.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
+        let s = state_arc
+            .lock()
+            .map_err(|e| AppError::Unknown(e.to_string()))?;
         s.database.clone()
     };
 
@@ -458,10 +478,9 @@ pub(crate) async fn search_semantic_memory_inner(
             continue;
         }
         let key = format!("{}|{}|{}", hit.date, hit.app_name, hit.title);
-        let entry = fused.entry(key).or_insert_with(|| SemanticMemoryHit {
-            score: 0.0,
-            ..hit
-        });
+        let entry = fused
+            .entry(key)
+            .or_insert_with(|| SemanticMemoryHit { score: 0.0, ..hit });
         entry.score += 1.0 / (RRF_K + rank as f64 + 1.0);
     }
     for (rank, item) in fts_hits.into_iter().enumerate() {
@@ -480,7 +499,11 @@ pub(crate) async fn search_semantic_memory_inner(
     }
 
     let mut results: Vec<SemanticMemoryHit> = fused.into_values().collect();
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(limit);
     Ok(results)
 }
@@ -489,7 +512,14 @@ pub(crate) async fn search_semantic_memory_inner(
 mod tests {
     use super::*;
 
-    fn activity(id: i64, ts: i64, app: &str, title: &str, url: Option<&str>, ocr: Option<&str>) -> Activity {
+    fn activity(
+        id: i64,
+        ts: i64,
+        app: &str,
+        title: &str,
+        url: Option<&str>,
+        ocr: Option<&str>,
+    ) -> Activity {
         Activity {
             id: Some(id),
             timestamp: ts,
@@ -511,9 +541,30 @@ mod tests {
     fn 分块应按日期应用域名聚合并保留最长ocr() {
         let ts = 1_753_500_000; // 同一天
         let acts = vec![
-            activity(1, ts, "Chrome", "Rust async 详解 - 博客", Some("https://blog.example.com/rust-async"), Some("短 OCR")),
-            activity(2, ts + 60, "Chrome", "Rust async 详解 - 博客", Some("https://blog.example.com/rust-async?p=2"), Some("这是一段更长的 OCR 文本内容示例")),
-            activity(3, ts + 120, "Xcode", "main.rs — work-review", None, Some("fn main() {}")),
+            activity(
+                1,
+                ts,
+                "Chrome",
+                "Rust async 详解 - 博客",
+                Some("https://blog.example.com/rust-async"),
+                Some("短 OCR"),
+            ),
+            activity(
+                2,
+                ts + 60,
+                "Chrome",
+                "Rust async 详解 - 博客",
+                Some("https://blog.example.com/rust-async?p=2"),
+                Some("这是一段更长的 OCR 文本内容示例"),
+            ),
+            activity(
+                3,
+                ts + 120,
+                "Xcode",
+                "main.rs — work-review",
+                None,
+                Some("fn main() {}"),
+            ),
         ];
         let drafts = build_chunk_drafts(&acts);
         assert_eq!(drafts.len(), 2, "同域名网页应合并，Xcode 单独一块");

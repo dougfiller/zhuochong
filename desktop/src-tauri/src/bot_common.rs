@@ -147,11 +147,7 @@ pub fn status_payload(status: &str, reason: &str, detail: Option<&str>) -> serde
 
 /// GET 设备 API。token 走 `Authorization: Bearer` 头而非 `?token=` 查询串——
 /// 查询串会进代理与访问日志;服务端两种都支持,改为与 `/reports/generate` POST 一致。
-pub async fn api_get(
-    client: &Client,
-    url: &str,
-    token: Option<&str>,
-) -> Option<serde_json::Value> {
+pub async fn api_get(client: &Client, url: &str, token: Option<&str>) -> Option<serde_json::Value> {
     let mut request = client.get(url).timeout(Duration::from_secs(10));
     if let Some(token) = token {
         request = request.header("Authorization", format!("Bearer {token}"));

@@ -87,23 +87,38 @@ pub(crate) struct SingleTurnTextRequest {
 
 impl SingleTurnTextRequest {
     pub(crate) fn new(system_prompt: impl Into<String>, user_prompt: impl Into<String>) -> Self {
-        Self { system_prompt: system_prompt.into(), user_prompt: user_prompt.into() }
+        Self {
+            system_prompt: system_prompt.into(),
+            user_prompt: user_prompt.into(),
+        }
     }
 
-    pub(crate) fn system_prompt(&self) -> &str { &self.system_prompt }
-    pub(crate) fn user_prompt(&self) -> &str { &self.user_prompt }
+    pub(crate) fn system_prompt(&self) -> &str {
+        &self.system_prompt
+    }
+    pub(crate) fn user_prompt(&self) -> &str {
+        &self.user_prompt
+    }
 }
 
 #[async_trait]
 pub(crate) trait SingleTurnTextTransport: Send + Sync {
-    async fn complete(&self, model: &ModelConfig, request: SingleTurnTextRequest) -> Result<String, AppError>;
+    async fn complete(
+        &self,
+        model: &ModelConfig,
+        request: SingleTurnTextRequest,
+    ) -> Result<String, AppError>;
 }
 
 pub(crate) struct ProviderSingleTurnTextTransport;
 
 #[async_trait]
 impl SingleTurnTextTransport for ProviderSingleTurnTextTransport {
-    async fn complete(&self, model: &ModelConfig, request: SingleTurnTextRequest) -> Result<String, AppError> {
+    async fn complete(
+        &self,
+        model: &ModelConfig,
+        request: SingleTurnTextRequest,
+    ) -> Result<String, AppError> {
         complete_single_turn_text(model, request).await
     }
 }
@@ -259,7 +274,9 @@ fn single_turn_messages(request: &SingleTurnTextRequest) -> Vec<Value> {
 
 fn single_turn_request_body(model: &ModelConfig, request: &SingleTurnTextRequest) -> Value {
     match model.provider {
-        AiProvider::Ollama => json!({ "model": model.model, "messages": single_turn_messages(request), "stream": false }),
+        AiProvider::Ollama => {
+            json!({ "model": model.model, "messages": single_turn_messages(request), "stream": false })
+        }
         AiProvider::Claude => json!({
             "model": model.model, "max_tokens": 1600, "system": request.system_prompt,
             "messages": [{ "role": "user", "content": request.user_prompt }],
@@ -282,15 +299,26 @@ async fn single_turn_openai_compatible(
     request: &SingleTurnTextRequest,
 ) -> Result<LlmResponse, AppError> {
     let endpoint = model_config.endpoint.trim().trim_end_matches('/');
-    let url = if endpoint.ends_with("/chat/completions") { endpoint.to_string() } else { format!("{endpoint}/chat/completions") };
+    let url = if endpoint.ends_with("/chat/completions") {
+        endpoint.to_string()
+    } else {
+        format!("{endpoint}/chat/completions")
+    };
     let body = single_turn_request_body(model_config, request);
     let mut http = client.post(url).json(&body);
-    if let Some(api_key) = model_config.api_key.as_deref().filter(|key| !key.is_empty()) {
+    if let Some(api_key) = model_config
+        .api_key
+        .as_deref()
+        .filter(|key| !key.is_empty())
+    {
         http = http.header("Authorization", format!("Bearer {api_key}"));
     }
     let response = http.send().await?;
     if !response.status().is_success() {
-        return Err(AppError::Analysis(format!("LLM 调用失败: {}", response.status())));
+        return Err(AppError::Analysis(format!(
+            "LLM 调用失败: {}",
+            response.status()
+        )));
     }
     parse_openai_response(&response.json().await?)
 }
@@ -301,11 +329,18 @@ async fn single_turn_ollama(
     request: &SingleTurnTextRequest,
 ) -> Result<LlmResponse, AppError> {
     let endpoint = model_config.endpoint.trim().trim_end_matches('/');
-    let url = if endpoint.ends_with("/api/chat") { endpoint.to_string() } else { format!("{endpoint}/api/chat") };
+    let url = if endpoint.ends_with("/api/chat") {
+        endpoint.to_string()
+    } else {
+        format!("{endpoint}/api/chat")
+    };
     let body = single_turn_request_body(model_config, request);
     let response = client.post(url).json(&body).send().await?;
     if !response.status().is_success() {
-        return Err(AppError::Analysis(format!("Ollama 调用失败: {}", response.status())));
+        return Err(AppError::Analysis(format!(
+            "Ollama 调用失败: {}",
+            response.status()
+        )));
     }
     parse_ollama_response(&response.json().await?)
 }
@@ -315,16 +350,31 @@ async fn single_turn_claude(
     model_config: &ModelConfig,
     request: &SingleTurnTextRequest,
 ) -> Result<LlmResponse, AppError> {
-    let api_key = model_config.api_key.as_deref().filter(|key| !key.is_empty())
+    let api_key = model_config
+        .api_key
+        .as_deref()
+        .filter(|key| !key.is_empty())
         .ok_or_else(|| AppError::Analysis("Claude API Key 未配置".to_string()))?;
     let endpoint = model_config.endpoint.trim().trim_end_matches('/');
-    let url = if endpoint.ends_with("/messages") { endpoint.to_string() } else { format!("{endpoint}/messages") };
+    let url = if endpoint.ends_with("/messages") {
+        endpoint.to_string()
+    } else {
+        format!("{endpoint}/messages")
+    };
     let body = single_turn_request_body(model_config, request);
-    let response = client.post(url).header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01").header("content-type", "application/json")
-        .json(&body).send().await?;
+    let response = client
+        .post(url)
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await?;
     if !response.status().is_success() {
-        return Err(AppError::Analysis(format!("Claude 调用失败: {}", response.status())));
+        return Err(AppError::Analysis(format!(
+            "Claude 调用失败: {}",
+            response.status()
+        )));
     }
     parse_claude_response(&response.json().await?)
 }
@@ -334,14 +384,25 @@ async fn single_turn_gemini(
     model_config: &ModelConfig,
     request: &SingleTurnTextRequest,
 ) -> Result<LlmResponse, AppError> {
-    let api_key = model_config.api_key.as_deref().filter(|key| !key.is_empty())
+    let api_key = model_config
+        .api_key
+        .as_deref()
+        .filter(|key| !key.is_empty())
         .ok_or_else(|| AppError::Analysis("Gemini API Key 未配置".to_string()))?;
     let endpoint = model_config.endpoint.trim().trim_end_matches('/');
     let url = format!("{endpoint}/models/{}:generateContent", model_config.model);
     let body = single_turn_request_body(model_config, request);
-    let response = client.post(url).header("x-goog-api-key", api_key).json(&body).send().await?;
+    let response = client
+        .post(url)
+        .header("x-goog-api-key", api_key)
+        .json(&body)
+        .send()
+        .await?;
     if !response.status().is_success() {
-        return Err(AppError::Analysis(format!("Gemini 调用失败: {}", response.status())));
+        return Err(AppError::Analysis(format!(
+            "Gemini 调用失败: {}",
+            response.status()
+        )));
     }
     parse_gemini_response(&response.json().await?)
 }
@@ -748,13 +809,22 @@ fn parse_openai_response(result: &Value) -> Result<LlmResponse, AppError> {
 
 fn parse_ollama_response(result: &Value) -> Result<LlmResponse, AppError> {
     let message = &result["message"];
-    let tool_calls = message["tool_calls"].as_array().map(|calls| {
-        calls.iter().map(|call| ToolCall {
-            id: call["id"].as_str().unwrap_or_default().to_owned(),
-            name: call["function"]["name"].as_str().unwrap_or_default().to_owned(),
-            arguments: call["function"]["arguments"].clone(),
-        }).collect::<Vec<_>>()
-    }).filter(|calls| !calls.is_empty());
+    let tool_calls = message["tool_calls"]
+        .as_array()
+        .map(|calls| {
+            calls
+                .iter()
+                .map(|call| ToolCall {
+                    id: call["id"].as_str().unwrap_or_default().to_owned(),
+                    name: call["function"]["name"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_owned(),
+                    arguments: call["function"]["arguments"].clone(),
+                })
+                .collect::<Vec<_>>()
+        })
+        .filter(|calls| !calls.is_empty());
     let stop_reason = if result["done_reason"].as_str() == Some("length") {
         StopReason::MaxTokens
     } else if tool_calls.is_some() {
@@ -1030,7 +1100,9 @@ impl OpenAiStreamAssembler {
         let delta = &choice["delta"];
         if let Some(tcs) = delta["tool_calls"].as_array() {
             for tc in tcs {
-                let idx = tc["index"].as_u64().unwrap_or(self.partial_calls.len() as u64) as usize;
+                let idx = tc["index"]
+                    .as_u64()
+                    .unwrap_or(self.partial_calls.len() as u64) as usize;
                 while self.partial_calls.len() <= idx {
                     self.partial_calls
                         .push((String::new(), String::new(), String::new()));
@@ -1252,7 +1324,8 @@ async fn chat_ollama_streaming(
         body["tools"] = json!(tools);
     }
 
-    let response = ensure_stream_status(client.post(&url).json(&body).send().await?, "Ollama").await?;
+    let response =
+        ensure_stream_status(client.post(&url).json(&body).send().await?, "Ollama").await?;
 
     let mut assembler = OllamaStreamAssembler::default();
     drive_stream(response, |line| {
@@ -1314,7 +1387,8 @@ impl ClaudeStreamAssembler {
                     Some("input_json_delta") => {
                         let index = payload["index"].as_u64().unwrap_or(0);
                         if let Some(slot) = self.tools.get_mut(&index) {
-                            slot.2.push_str(delta["partial_json"].as_str().unwrap_or(""));
+                            slot.2
+                                .push_str(delta["partial_json"].as_str().unwrap_or(""));
                         }
                         None
                     }
@@ -1395,7 +1469,8 @@ async fn chat_claude_streaming(
         format!("{endpoint}/messages")
     };
 
-    let (claude_messages, system_content, claude_tools) = build_claude_request_parts(messages, tools);
+    let (claude_messages, system_content, claude_tools) =
+        build_claude_request_parts(messages, tools);
 
     let mut body = json!({
         "model": model_config.model,
@@ -1505,11 +1580,7 @@ impl GeminiStreamAssembler {
             } else {
                 Some(self.text)
             },
-            tool_calls: if has_tools {
-                Some(tool_calls)
-            } else {
-                None
-            },
+            tool_calls: if has_tools { Some(tool_calls) } else { None },
             stop_reason,
         }
     }
@@ -1571,14 +1642,21 @@ mod tests {
     use super::*;
 
     fn model(provider: AiProvider) -> ModelConfig {
-        ModelConfig { provider, endpoint: "https://example.invalid/v1".into(), api_key: Some("fixture".into()), model: "fixture".into() }
+        ModelConfig {
+            provider,
+            endpoint: "https://example.invalid/v1".into(),
+            api_key: Some("fixture".into()),
+            model: "fixture".into(),
+        }
     }
 
     fn has_forbidden_tool_key(value: &Value) -> bool {
         match value {
             Value::Object(object) => object.iter().any(|(key, value)| {
-                matches!(key.as_str(), "tools" | "tool_choice" | "function" | "functionCall" | "history")
-                    || has_forbidden_tool_key(value)
+                matches!(
+                    key.as_str(),
+                    "tools" | "tool_choice" | "function" | "functionCall" | "history"
+                ) || has_forbidden_tool_key(value)
             }),
             Value::Array(values) => values.iter().any(has_forbidden_tool_key),
             _ => false,
@@ -1588,7 +1666,12 @@ mod tests {
     #[test]
     fn single_turn_bodies_have_exactly_one_system_and_one_user_without_tools() {
         let request = SingleTurnTextRequest::new("system", "user");
-        for provider in [AiProvider::Ollama, AiProvider::Claude, AiProvider::Gemini, AiProvider::OpenAI] {
+        for provider in [
+            AiProvider::Ollama,
+            AiProvider::Claude,
+            AiProvider::Gemini,
+            AiProvider::OpenAI,
+        ] {
             let body = single_turn_request_body(&model(provider), &request);
             assert!(!has_forbidden_tool_key(&body));
             match provider {
@@ -1613,9 +1696,21 @@ mod tests {
     #[test]
     fn single_turn_rejects_tools_max_tokens_and_blank_text() {
         for response in [
-            LlmResponse { content: Some("partial".into()), tool_calls: None, stop_reason: StopReason::MaxTokens },
-            LlmResponse { content: Some("partial".into()), tool_calls: Some(vec![]), stop_reason: StopReason::ToolCall },
-            LlmResponse { content: Some("  ".into()), tool_calls: None, stop_reason: StopReason::Stop },
+            LlmResponse {
+                content: Some("partial".into()),
+                tool_calls: None,
+                stop_reason: StopReason::MaxTokens,
+            },
+            LlmResponse {
+                content: Some("partial".into()),
+                tool_calls: Some(vec![]),
+                stop_reason: StopReason::ToolCall,
+            },
+            LlmResponse {
+                content: Some("  ".into()),
+                tool_calls: None,
+                stop_reason: StopReason::Stop,
+            },
         ] {
             assert!(single_turn_text(response).is_err());
         }

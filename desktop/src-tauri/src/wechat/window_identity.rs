@@ -1,4 +1,6 @@
-use super::profiles::{CompatibilityCatalog, CompatibilityProfile, NormalizedRoi, OcrFallbackAudit};
+use super::profiles::{
+    CompatibilityCatalog, CompatibilityProfile, NormalizedRoi, OcrFallbackAudit,
+};
 use super::types::ContractError;
 use crate::monitor::WindowBounds;
 
@@ -12,7 +14,11 @@ pub(crate) struct WindowInstanceToken {
 
 impl WindowInstanceToken {
     pub(crate) fn new(hwnd: usize, pid: u32, process_started_at: Option<u64>) -> Self {
-        Self { hwnd, pid, process_started_at }
+        Self {
+            hwnd,
+            pid,
+            process_started_at,
+        }
     }
 }
 
@@ -32,7 +38,12 @@ impl ExecutableEvidence {
         sha256: String,
         product_version: String,
     ) -> Self {
-        Self { normalized_path, file_name, sha256, product_version }
+        Self {
+            normalized_path,
+            file_name,
+            sha256,
+            product_version,
+        }
     }
 }
 
@@ -184,20 +195,37 @@ fn profile_matches(profile: &CompatibilityProfile, evidence: &ForegroundWindowEv
         && profile.display_topology.monitors == evidence.display.monitors
         && profile.display_topology.target_monitor == evidence.display.target_monitor
         && profile.dpi == evidence.dpi
-        && profile.executable.file_name.eq_ignore_ascii_case(&evidence.executable.file_name)
+        && profile
+            .executable
+            .file_name
+            .eq_ignore_ascii_case(&evidence.executable.file_name)
         && profile
             .executable
             .normalized_paths
             .iter()
             .any(|path| normalized_path_eq(path, &evidence.executable.normalized_path))
-        && profile.executable.sha256.eq_ignore_ascii_case(&evidence.executable.sha256)
+        && profile
+            .executable
+            .sha256
+            .eq_ignore_ascii_case(&evidence.executable.sha256)
         && profile.executable.product_version == evidence.executable.product_version
-        && within_tolerance(profile.window_size_px.width, evidence.bounds_px.width, profile.window_size_px.tolerance_px)
-        && within_tolerance(profile.window_size_px.height, evidence.bounds_px.height, profile.window_size_px.tolerance_px)
+        && within_tolerance(
+            profile.window_size_px.width,
+            evidence.bounds_px.width,
+            profile.window_size_px.tolerance_px,
+        )
+        && within_tolerance(
+            profile.window_size_px.height,
+            evidence.bounds_px.height,
+            profile.window_size_px.tolerance_px,
+        )
 }
 
 fn normalized_path_eq(expected: &str, actual: &str) -> bool {
-    expected.trim().replace('/', "\\").eq_ignore_ascii_case(&actual.trim().replace('/', "\\"))
+    expected
+        .trim()
+        .replace('/', "\\")
+        .eq_ignore_ascii_case(&actual.trim().replace('/', "\\"))
 }
 
 fn within_tolerance(expected: u32, actual: u32, tolerance: u32) -> bool {
@@ -245,10 +273,18 @@ mod tests {
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 "4.0.1.26".into(),
             ),
-            bounds_px: WindowBounds { x: -100, y: 0, width: 1281, height: 899 },
+            bounds_px: WindowBounds {
+                x: -100,
+                y: 0,
+                width: 1281,
+                height: 899,
+            },
             dpi: 96,
             is_minimized: false,
-            display: DisplayEvidence { monitors: 1, target_monitor: "primary".into() },
+            display: DisplayEvidence {
+                monitors: 1,
+                target_monitor: "primary".into(),
+            },
             windows_build: "22631".into(),
             theme: Some("light".into()),
             title_hint: "测试\u{0000}聊天".into(),
@@ -268,12 +304,19 @@ mod tests {
     fn title_cannot_rescue_untrusted_executable_or_layout() {
         let catalog = CompatibilityCatalog::parse(PROFILE).unwrap();
         let mut wrong_executable = evidence();
-        wrong_executable.executable.sha256 = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into();
-        assert_eq!(validate_foreground(&catalog, wrong_executable), Err(ContractError::WxProfileUnsupported));
+        wrong_executable.executable.sha256 =
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into();
+        assert_eq!(
+            validate_foreground(&catalog, wrong_executable),
+            Err(ContractError::WxProfileUnsupported)
+        );
 
         let mut wrong_dpi = evidence();
         wrong_dpi.dpi = 144;
-        assert_eq!(validate_foreground(&catalog, wrong_dpi), Err(ContractError::WxProfileUnsupported));
+        assert_eq!(
+            validate_foreground(&catalog, wrong_dpi),
+            Err(ContractError::WxProfileUnsupported)
+        );
     }
 
     #[test]
@@ -282,11 +325,17 @@ mod tests {
         let identity = validate_foreground(&catalog, evidence()).unwrap();
         let mut changed = evidence();
         changed.instance = WindowInstanceToken::new(43, 7, Some(99));
-        assert_eq!(revalidate_foreground(&catalog, &identity, changed), Err(ContractError::WxRequestStale));
+        assert_eq!(
+            revalidate_foreground(&catalog, &identity, changed),
+            Err(ContractError::WxRequestStale)
+        );
 
         let mut resized = evidence();
         resized.bounds_px.width = 1283;
-        assert_eq!(revalidate_foreground(&catalog, &identity, resized), Err(ContractError::WxRequestStale));
+        assert_eq!(
+            revalidate_foreground(&catalog, &identity, resized),
+            Err(ContractError::WxRequestStale)
+        );
     }
 
     #[test]
@@ -294,10 +343,16 @@ mod tests {
         let catalog = CompatibilityCatalog::parse(PROFILE).unwrap();
         let mut minimized = evidence();
         minimized.is_minimized = true;
-        assert_eq!(validate_foreground(&catalog, minimized), Err(ContractError::WxNotForeground));
+        assert_eq!(
+            validate_foreground(&catalog, minimized),
+            Err(ContractError::WxNotForeground)
+        );
 
         let mut invalid_bounds = evidence();
         invalid_bounds.bounds_px.width = 0;
-        assert_eq!(validate_foreground(&catalog, invalid_bounds), Err(ContractError::WxWindowUnsupported));
+        assert_eq!(
+            validate_foreground(&catalog, invalid_bounds),
+            Err(ContractError::WxWindowUnsupported)
+        );
     }
 }

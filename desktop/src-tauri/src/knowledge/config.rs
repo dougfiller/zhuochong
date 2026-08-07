@@ -65,7 +65,10 @@ mod tests {
             "http://localhost#fragment",
         ] {
             config.endpoint = endpoint.into();
-            assert_eq!(validate_local_embedding(&config), Err("KB_EMBEDDING_ENDPOINT_NOT_LOOPBACK"));
+            assert_eq!(
+                validate_local_embedding(&config),
+                Err("KB_EMBEDDING_ENDPOINT_NOT_LOOPBACK")
+            );
         }
     }
 }

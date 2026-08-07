@@ -3,8 +3,8 @@
   "feature": "步骤 11：实现 M1 手动微信回复后端编排闭环；dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-11",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-06T06:46:46+00:00",
-  "updated_at": "2026-08-06T07:26:54+00:00",
-  "status": "active",
+  "updated_at": "2026-08-06T07:32:37+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd5f6-fc88-7cb0-9005-db127fa46597",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "blocked"
+    "5": "done"
   },
   "notes": [
     "2026-08-06T06:54:04+00:00 phase 2 gate failed: done file is missing",

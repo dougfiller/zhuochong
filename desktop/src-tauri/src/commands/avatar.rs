@@ -3,11 +3,13 @@
 use crate::config::AvatarFollowupItem;
 use crate::error::AppError;
 #[cfg(target_os = "linux")]
-use crate::linux_session::{current_linux_desktop_environment, current_linux_desktop_session, LinuxDesktopSession};
-#[cfg(target_os = "linux")]
-use std::path::PathBuf;
+use crate::linux_session::{
+    current_linux_desktop_environment, current_linux_desktop_session, LinuxDesktopSession,
+};
 use crate::AppState;
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, State};
 
@@ -17,12 +19,14 @@ use super::shared::persist_app_config;
 const GNOME_AVATAR_EXTENSION_UUID: &str = "work-review-avatar-input@workreview.app";
 
 #[cfg(target_os = "linux")]
-const GNOME_AVATAR_EXTENSION_METADATA: &str =
-    include_str!("../../../scripts/gnome-shell/work-review-avatar-input@workreview.app/metadata.json");
+const GNOME_AVATAR_EXTENSION_METADATA: &str = include_str!(
+    "../../../scripts/gnome-shell/work-review-avatar-input@workreview.app/metadata.json"
+);
 
 #[cfg(target_os = "linux")]
-const GNOME_AVATAR_EXTENSION_SOURCE: &str =
-    include_str!("../../../scripts/gnome-shell/work-review-avatar-input@workreview.app/extension.js");
+const GNOME_AVATAR_EXTENSION_SOURCE: &str = include_str!(
+    "../../../scripts/gnome-shell/work-review-avatar-input@workreview.app/extension.js"
+);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -303,4 +307,3 @@ pub async fn install_gnome_avatar_extension() -> Result<GnomeAvatarExtensionInst
         ))
     }
 }
-

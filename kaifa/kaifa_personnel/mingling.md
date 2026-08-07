@@ -261,3 +261,28 @@ git diff --check -- desktop/src-tauri/src/knowledge desktop/src-tauri/src/main.r
 - `python3 -B kaifa/kaifa_test/verify_knowledge_source_management.py`：只读静态门禁，核对知识源 Store 门面、维护状态、Tauri command、单次目录选择与截短 opaque ID 渲染；不读取用户 dataDir、真实导出或网络。
 - `node --test desktop/src/routes/settings/SettingsWechatKnowledge.test.js`：检查知识设置使用 camelCase command payload，目录选择与来源清单不回写旧 `config.knowledge.knowledgeSources`。
 - `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'`：编译知识源 command/Store 与现有 archive 边界，不启动应用或访问真实微信数据。
+
+# 2026-08-07：步骤 20 冻结候选索引代际、会话内分块与隔离 FTS5
+
+```bash
+# 仅读取本步骤源码和 migration 的静态边界门禁；不打开用户数据库、导出包或网络。
+python3 -B kaifa/kaifa_test/verify_knowledge_candidate_chunks_fts.py --project-root .
+
+# 使用系统临时目录和完全虚构消息运行 bundled rusqlite 行为回归。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# 编译 M2 feature 组合，不启动 Tauri、不连接模型或读取真实微信数据。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+
+# 复验步骤 16、17、19 的静态知识库边界。
+python3 -B kaifa/kaifa_test/verify_knowledge_store.py --project-root .
+python3 -B kaifa/kaifa_test/verify_knowledge_lineage_generations.py --project-root .
+python3 -B kaifa/kaifa_test/verify_knowledge_source_management.py --project-root .
+
+# 仅检查本步骤 Rust 文件格式和范围内空白。
+rustfmt --edition 2021 --check desktop/src-tauri/src/knowledge/mod.rs desktop/src-tauri/src/knowledge/migrations.rs desktop/src-tauri/src/knowledge/store.rs desktop/src-tauri/src/knowledge/chunk.rs
+git diff --check -- desktop/src-tauri/src/knowledge/mod.rs desktop/src-tauri/src/knowledge/migrations.rs desktop/src-tauri/src/knowledge/store.rs desktop/src-tauri/src/knowledge/chunk.rs desktop/src-tauri/src/knowledge/migrations/knowledge/0004_candidate_index_chunks_fts.sql kaifa/kaifa_test/verify_knowledge_candidate_chunks_fts.py kaifa/kaifa_test/verify_knowledge_lineage_generations.py kaifa/kaifa_personnel/mingling.md kaifa/kaifa_test/test.md kaifa/kaifa_log/2026年08月07日16时12分-冻结候选索引代际并实现会话内分块与隔离FTS5.md
+```
+
+- 新静态脚本确认 v4 migration、纯分块模块、building-only 生产 builder、catalog/ready/stable-scope/time/topK SQL 过滤和无 `LIKE` 回退；脚本不会执行数据库或读取用户内容。
+- Rust 行为测试使用 `rusqlite = 0.30` 的 bundled SQLite/FTS5，固定版本为 `chunk-v1`、`token-counter-v1`、`fts-pretoken-v1`；macOS 结果不替代 Windows 真机验收。

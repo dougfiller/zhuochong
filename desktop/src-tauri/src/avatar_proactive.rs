@@ -5,7 +5,9 @@
 //! 没配模型时整条链路由主循环短路，本模块不会被调用。
 
 use crate::agent::model::{chat_with_tools, Message};
-use crate::avatar_engine::{emit_avatar_bubble, AvatarBubblePayload};
+use crate::avatar_engine::{
+    emit_avatar_bubble, AvatarBubbleActions, AvatarBubbleKind, AvatarBubblePayload,
+};
 use crate::config::ModelConfig;
 use tauri::AppHandle;
 
@@ -108,6 +110,11 @@ pub async fn decide_and_speak(
             persistent: false,
             duration_ms: Some(BUBBLE_DURATION_MS),
             clear: false,
+            kind: AvatarBubbleKind::Standard,
+            request_id: None,
+            suggestion_generation: None,
+            binding_generation: None,
+            actions: AvatarBubbleActions::default(),
         },
     );
 

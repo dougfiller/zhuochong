@@ -3,8 +3,8 @@
   "feature": "步骤 1：冻结 Work Review 来源并建立正式产品源码副本（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-01）",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-05T14:21:07+00:00",
-  "updated_at": "2026-08-05T15:04:54+00:00",
-  "status": "active",
+  "updated_at": "2026-08-05T15:41:12+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd274-8646-7782-9f1a-585c359690bf",
   "next_poll_at": "",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-05T14:40:07+00:00 phase 4 gate failed: done file is missing",

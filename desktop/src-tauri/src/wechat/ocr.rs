@@ -1,6 +1,8 @@
 use super::capture::WechatCaptureSlices;
 use super::profiles::OcrFallbackAudit;
-use super::types::{CapturedWechat, ContractError, NormalizedOcrText, OcrBackendResult, OcrReadyReply};
+use super::types::{
+    CapturedWechat, ContractError, NormalizedOcrText, OcrBackendResult, OcrReadyReply,
+};
 use super::window_identity::WechatWindowIdentity;
 use crate::ocr::{OcrService, WindowsMemoryOcrResult};
 use image::RgbaImage;
@@ -68,20 +70,36 @@ where
         captured: CapturedWechat,
         audit_sink: &mut S,
     ) -> Result<OcrReadyReply, ContractError> {
-        if slices.request_id != captured.request_id || slices.capture_version != captured.capture_version {
-            return self.finish(slices, captured, audit_sink, OcrBackendResult::Failed, "WindowsOCR");
+        if slices.request_id != captured.request_id
+            || slices.capture_version != captured.capture_version
+        {
+            return self.finish(
+                slices,
+                captured,
+                audit_sink,
+                OcrBackendResult::Failed,
+                "WindowsOCR",
+            );
         }
         if !captured.is_single_chat {
             return Err(ContractError::WxGroupChatUnsupported);
         }
         if !valid_chat_image(&slices.chat_rgba) {
-            return self.finish(slices, captured, audit_sink, OcrBackendResult::Failed, "WindowsOCR");
+            return self.finish(
+                slices,
+                captured,
+                audit_sink,
+                OcrBackendResult::Failed,
+                "WindowsOCR",
+            );
         }
 
         let primary = normalize_result(self.primary.recognize(&slices.chat_rgba));
         match primary {
             OcrBackendResult::Unavailable | OcrBackendResult::Failed
-                if identity.ocr_fallback_audit().is_some_and(fallback_is_approved) =>
+                if identity
+                    .ocr_fallback_audit()
+                    .is_some_and(fallback_is_approved) =>
             {
                 let fallback = normalize_result(self.fallback.recognize(&slices.chat_rgba));
                 self.finish(slices, captured, audit_sink, fallback, "LocalFallback")
@@ -123,7 +141,11 @@ fn valid_chat_image(image: &RgbaImage) -> bool {
             .is_some_and(|pixels| pixels <= MAX_CHAT_PIXELS)
         && usize::try_from(image.width())
             .ok()
-            .and_then(|width| usize::try_from(image.height()).ok().and_then(|height| width.checked_mul(height)))
+            .and_then(|width| {
+                usize::try_from(image.height())
+                    .ok()
+                    .and_then(|height| width.checked_mul(height))
+            })
             .and_then(|pixels| pixels.checked_mul(4))
             == Some(image.as_raw().len())
 }
@@ -150,11 +172,12 @@ fn fallback_is_approved(audit: &OcrFallbackAudit) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::monitor::WindowBounds;
     use crate::wechat::profiles::CompatibilityCatalog;
     use crate::wechat::window_identity::{
-        validate_foreground, DisplayEvidence, ExecutableEvidence, ForegroundWindowEvidence, WindowInstanceToken,
+        validate_foreground, DisplayEvidence, ExecutableEvidence, ForegroundWindowEvidence,
+        WindowInstanceToken,
     };
-    use crate::monitor::WindowBounds;
 
     #[derive(Default)]
     struct SpyProvider {
@@ -164,7 +187,10 @@ mod tests {
 
     impl SpyProvider {
         fn one(result: WindowsMemoryOcrResult) -> Self {
-            Self { results: vec![result], calls: 0 }
+            Self {
+                results: vec![result],
+                calls: 0,
+            }
         }
     }
 
@@ -205,7 +231,12 @@ mod tests {
     }
 
     fn identity(with_audit: bool) -> WechatWindowIdentity {
-        let catalog = CompatibilityCatalog::parse(if with_audit { PROFILE_WITH_AUDIT } else { PROFILE }).unwrap();
+        let catalog = CompatibilityCatalog::parse(if with_audit {
+            PROFILE_WITH_AUDIT
+        } else {
+            PROFILE
+        })
+        .unwrap();
         validate_foreground(
             &catalog,
             ForegroundWindowEvidence {
@@ -217,10 +248,18 @@ mod tests {
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                     "4.0.1.26".into(),
                 ),
-                bounds_px: WindowBounds { x: 0, y: 0, width: 1280, height: 900 },
+                bounds_px: WindowBounds {
+                    x: 0,
+                    y: 0,
+                    width: 1280,
+                    height: 900,
+                },
                 dpi: 96,
                 is_minimized: false,
-                display: DisplayEvidence { monitors: 1, target_monitor: "primary".into() },
+                display: DisplayEvidence {
+                    monitors: 1,
+                    target_monitor: "primary".into(),
+                },
                 windows_build: "22631".into(),
                 theme: Some("light".into()),
                 title_hint: "fixture".into(),
@@ -260,11 +299,15 @@ mod tests {
     fn text_is_normalized_and_header_pixels_are_not_an_ocr_input() {
         let (slices, captured) = slices();
         let mut dispatcher = WechatOcrDispatcher::new(
-            SpyProvider::one(WindowsMemoryOcrResult::Text("  第一行\r\n\0第二行  ".into())),
+            SpyProvider::one(WindowsMemoryOcrResult::Text(
+                "  第一行\r\n\0第二行  ".into(),
+            )),
             SpyProvider::default(),
         );
         let mut events = Events::default();
-        let reply = dispatcher.recognize(&slices, &identity(false), captured, &mut events).unwrap();
+        let reply = dispatcher
+            .recognize(&slices, &identity(false), captured, &mut events)
+            .unwrap();
         assert_eq!(reply.text(), "第一行\n第二行");
         assert_eq!(events.0[0].outcome, "text");
         assert_eq!(events.0[0].provider, "WindowsOCR");
@@ -273,14 +316,30 @@ mod tests {
     #[test]
     fn empty_never_runs_a_fallback_and_all_non_text_results_end_before_downstream() {
         for (primary, error, outcome) in [
-            (WindowsMemoryOcrResult::Empty, ContractError::WxOcrEmpty, "empty"),
-            (WindowsMemoryOcrResult::Unavailable, ContractError::WxOcrUnavailable, "unavailable"),
-            (WindowsMemoryOcrResult::Failed, ContractError::WxOcrFailed, "failed"),
+            (
+                WindowsMemoryOcrResult::Empty,
+                ContractError::WxOcrEmpty,
+                "empty",
+            ),
+            (
+                WindowsMemoryOcrResult::Unavailable,
+                ContractError::WxOcrUnavailable,
+                "unavailable",
+            ),
+            (
+                WindowsMemoryOcrResult::Failed,
+                ContractError::WxOcrFailed,
+                "failed",
+            ),
         ] {
             let (slices, captured) = slices();
-            let mut dispatcher = WechatOcrDispatcher::new(SpyProvider::one(primary), SpyProvider::default());
+            let mut dispatcher =
+                WechatOcrDispatcher::new(SpyProvider::one(primary), SpyProvider::default());
             let mut events = Events::default();
-            assert_eq!(dispatcher.recognize(&slices, &identity(false), captured, &mut events), Err(error));
+            assert_eq!(
+                dispatcher.recognize(&slices, &identity(false), captured, &mut events),
+                Err(error)
+            );
             assert_eq!(dispatcher.primary.calls, 1);
             assert_eq!(dispatcher.fallback.calls, 0);
             assert_eq!(events.0[0].outcome, outcome);
@@ -295,7 +354,13 @@ mod tests {
             SpyProvider::one(WindowsMemoryOcrResult::Text("fallback text".into())),
         );
         let mut events = Events::default();
-        assert_eq!(dispatcher.recognize(&slices, &identity(true), captured, &mut events).unwrap().text(), "fallback text");
+        assert_eq!(
+            dispatcher
+                .recognize(&slices, &identity(true), captured, &mut events)
+                .unwrap()
+                .text(),
+            "fallback text"
+        );
         assert_eq!(dispatcher.primary.calls, 1);
         assert_eq!(dispatcher.fallback.calls, 1);
         assert_eq!(events.0[0].provider, "LocalFallback");

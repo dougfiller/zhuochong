@@ -5,8 +5,6 @@ use crate::AppState;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, State};
 
-
-
 /// 暂停录制
 #[tauri::command]
 pub async fn pause_recording(
@@ -44,9 +42,3 @@ pub async fn get_recording_state(
     let state = state.lock().map_err(|e| AppError::Unknown(e.to_string()))?;
     Ok((state.is_recording, state.is_paused))
 }
-
-
-
-
-
-

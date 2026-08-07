@@ -109,14 +109,24 @@ pub(crate) struct RetrievedReply {
 }
 
 impl RetrievedReply {
-    pub(crate) fn request_id(&self) -> &RequestId { &self.request_id }
-    pub(crate) fn query(&self) -> &str { &self.query }
-    pub(crate) fn is_no_hit(&self) -> bool { self.status == RetrievalStatus::NoHit }
-    pub(crate) fn excerpts(&self) -> Vec<String> { self.excerpts.clone() }
+    pub(crate) fn request_id(&self) -> &RequestId {
+        &self.request_id
+    }
+    pub(crate) fn query(&self) -> &str {
+        &self.query
+    }
+    pub(crate) fn is_no_hit(&self) -> bool {
+        self.status == RetrievalStatus::NoHit
+    }
+    pub(crate) fn excerpts(&self) -> Vec<String> {
+        self.excerpts.clone()
+    }
 }
 
 // Future retrieval code may create this envelope only after a successful query.
-pub(in crate::knowledge) fn knowledge_retrieve(result: KnowledgeRetrieveResult) -> Result<RetrievedReply, ContractError> {
+pub(in crate::knowledge) fn knowledge_retrieve(
+    result: KnowledgeRetrieveResult,
+) -> Result<RetrievedReply, ContractError> {
     match result.outcome {
         RetrievalOutcome::Retrieved(status) => {
             let mut remaining_tokens = result.token_budget;
@@ -166,10 +176,28 @@ mod tests {
 
     #[test]
     fn scope_wire_shape_is_explicit_and_empty_selection_is_rejected() {
-        assert_eq!(serde_json::to_string(&KnowledgeScope::Conversation { id: "conversation-stable-id".into() }).unwrap(), "{\"kind\":\"conversation\",\"id\":\"conversation-stable-id\"}");
-        assert_eq!(serde_json::to_string(&KnowledgeScope::SelectedConversations { ids: vec!["conversation-a".into(), "conversation-b".into()] }).unwrap(), "{\"kind\":\"selected_conversations\",\"ids\":[\"conversation-a\",\"conversation-b\"]}");
-        assert_eq!(serde_json::to_string(&KnowledgeScope::GlobalUserSelected).unwrap(), "{\"kind\":\"global_user_selected\"}");
-        assert_eq!(KnowledgeScope::SelectedConversations { ids: vec![] }.validate(), Err(ContractError::KbScopeUnresolved));
+        assert_eq!(
+            serde_json::to_string(&KnowledgeScope::Conversation {
+                id: "conversation-stable-id".into()
+            })
+            .unwrap(),
+            "{\"kind\":\"conversation\",\"id\":\"conversation-stable-id\"}"
+        );
+        assert_eq!(
+            serde_json::to_string(&KnowledgeScope::SelectedConversations {
+                ids: vec!["conversation-a".into(), "conversation-b".into()]
+            })
+            .unwrap(),
+            "{\"kind\":\"selected_conversations\",\"ids\":[\"conversation-a\",\"conversation-b\"]}"
+        );
+        assert_eq!(
+            serde_json::to_string(&KnowledgeScope::GlobalUserSelected).unwrap(),
+            "{\"kind\":\"global_user_selected\"}"
+        );
+        assert_eq!(
+            KnowledgeScope::SelectedConversations { ids: vec![] }.validate(),
+            Err(ContractError::KbScopeUnresolved)
+        );
     }
 
     #[test]
@@ -180,7 +208,8 @@ mod tests {
             RetrievalOutcome::Retrieved(RetrievalStatus::NoHit),
             &[],
             0,
-        )).unwrap();
+        ))
+        .unwrap();
         assert!(reply.is_no_hit());
         assert!(reply.excerpts().is_empty());
     }
@@ -193,7 +222,8 @@ mod tests {
             RetrievalOutcome::Retrieved(RetrievalStatus::Success),
             &[("预算内摘要", 3), ("超预算摘要", 2)],
             4,
-        )).unwrap();
+        ))
+        .unwrap();
 
         assert_eq!(reply.excerpts(), vec!["预算内摘要"]);
     }

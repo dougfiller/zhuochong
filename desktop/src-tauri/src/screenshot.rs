@@ -343,13 +343,10 @@ impl ScreenshotService {
         active_window: &crate::monitor::ActiveWindow,
     ) -> Result<CapturedMonitorFrame> {
         match self.capture_with_gdi(Some(active_window)) {
-            Ok((pixels_rgba, width_px, height_px, origin_px)) => CapturedMonitorFrame::new(
-                pixels_rgba,
-                width_px,
-                height_px,
-                origin_px,
-            )
-            .ok_or_else(|| AppError::Screenshot("无效的内存截图帧".to_string())),
+            Ok((pixels_rgba, width_px, height_px, origin_px)) => {
+                CapturedMonitorFrame::new(pixels_rgba, width_px, height_px, origin_px)
+                    .ok_or_else(|| AppError::Screenshot("无效的内存截图帧".to_string()))
+            }
             // `windows-capture` 1.5 exposes this application's WGC frame only through
             // `save_as_image`. Do not route this private path through its PNG API.
             Err(error) => Err(error),

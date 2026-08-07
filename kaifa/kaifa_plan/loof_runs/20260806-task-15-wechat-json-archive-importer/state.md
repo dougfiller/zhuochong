@@ -5,15 +5,15 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fd706-6d67-7a21-a5f4-119853528e63
-- next_poll_at:
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月06日19点18分-冻结微信聊天导出Schema只读规则和脱敏导入夹具.md
 - phase_2: 2026年08月06日19点26分-微信聊天导出Schema只读导入夹具.md
 - phase_3: 2026年08月06日19点35分-微信聊天导出Schema审查阻断问题.md
-- phase_4:
-- phase_5:
+- phase_4: 
+- phase_5: 
 
 ## Threads
 - phase_1: 019fd6ca-c786-7641-9136-8f098cbcfc59

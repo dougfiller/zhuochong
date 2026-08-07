@@ -3,11 +3,11 @@
   "feature": "步骤 9：实现单请求运行时、阶段追踪和内容留存；dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-09",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-06T04:36:44+00:00",
-  "updated_at": "2026-08-06T05:17:30+00:00",
-  "status": "active",
+  "updated_at": "2026-08-06T05:24:03+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fd581-42a9-7ed3-b637-b9438c8054e4",
-  "next_poll_at": "2026-08-06T05:20:30+00:00",
+  "next_poll_at": "",
   "threads": {
     "1": "019fd55c-6b94-7202-96fa-5b39ce7276e3",
     "2": "019fd562-9b8f-7ca1-86aa-dbb0e7005fc3",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-06T04:50:03+00:00 phase 2 gate failed: done file is missing"

@@ -104,7 +104,8 @@ impl CompatibilityCatalog {
     }
 
     pub(crate) fn parse(source: &str) -> Result<Self, CatalogError> {
-        let raw: RawCatalog = serde_json::from_str(source).map_err(|_| CatalogError::InvalidCatalog)?;
+        let raw: RawCatalog =
+            serde_json::from_str(source).map_err(|_| CatalogError::InvalidCatalog)?;
         if raw.schema_version != 1 || raw.catalog_version != SUPPORTED_CATALOG_VERSION {
             return Err(CatalogError::InvalidCatalog);
         }
@@ -119,7 +120,10 @@ impl CompatibilityCatalog {
             profiles.push(profile);
         }
 
-        Ok(Self { catalog_version: raw.catalog_version, profiles })
+        Ok(Self {
+            catalog_version: raw.catalog_version,
+            profiles,
+        })
     }
 
     pub(crate) fn enabled_profiles(&self) -> impl Iterator<Item = &CompatibilityProfile> {
@@ -236,7 +240,11 @@ impl TryFrom<RawProfile> for CompatibilityProfile {
             || blank(&raw.display_topology.target_monitor)
             || blank(&raw.executable.file_name)
             || raw.executable.normalized_paths.is_empty()
-            || raw.executable.normalized_paths.iter().any(|path| blank(path))
+            || raw
+                .executable
+                .normalized_paths
+                .iter()
+                .any(|path| blank(path))
             || !is_sha256(&raw.executable.sha256)
             || blank(&raw.executable.product_version)
             || raw.dpi == 0
@@ -388,24 +396,42 @@ mod tests {
 
     #[test]
     fn disabled_profile_is_preserved_but_not_enabled() {
-        let catalog = CompatibilityCatalog::parse(&VALID_PROFILE.replace("\"enabled\": true", "\"enabled\": false")).unwrap();
+        let catalog = CompatibilityCatalog::parse(
+            &VALID_PROFILE.replace("\"enabled\": true", "\"enabled\": false"),
+        )
+        .unwrap();
         assert_eq!(catalog.enabled_profiles().count(), 0);
     }
 
     #[test]
     fn unknown_catalog_or_profile_version_is_rejected() {
-        assert_eq!(CompatibilityCatalog::parse(&VALID_PROFILE.replace("windows-wechat-v1", "windows-wechat-v2")), Err(CatalogError::InvalidCatalog));
-        assert_eq!(CompatibilityCatalog::parse(&VALID_PROFILE.replace("\"profile_version\": \"1\"", "\"profile_version\": \"2\"")), Err(CatalogError::InvalidCatalog));
+        assert_eq!(
+            CompatibilityCatalog::parse(
+                &VALID_PROFILE.replace("windows-wechat-v1", "windows-wechat-v2")
+            ),
+            Err(CatalogError::InvalidCatalog)
+        );
+        assert_eq!(
+            CompatibilityCatalog::parse(
+                &VALID_PROFILE.replace("\"profile_version\": \"1\"", "\"profile_version\": \"2\"")
+            ),
+            Err(CatalogError::InvalidCatalog)
+        );
     }
 
     #[test]
     fn mixed_enabled_and_disabled_profiles_only_exposes_enabled_entries() {
         let disabled = VALID_PROFILE
-            .replace("\"id\": \"wechat-windows-4.0.1-light-96-primary\"", "\"id\": \"wechat-windows-4.0.1-dark-96-primary\"")
+            .replace(
+                "\"id\": \"wechat-windows-4.0.1-light-96-primary\"",
+                "\"id\": \"wechat-windows-4.0.1-dark-96-primary\"",
+            )
             .replace("\"enabled\": true", "\"enabled\": false")
             .replace("\"theme\": \"light\"", "\"theme\": \"dark\"");
-        let profiles = serde_json::from_str::<serde_json::Value>(VALID_PROFILE).unwrap()["profiles"].clone();
-        let disabled_profiles = serde_json::from_str::<serde_json::Value>(&disabled).unwrap()["profiles"].clone();
+        let profiles =
+            serde_json::from_str::<serde_json::Value>(VALID_PROFILE).unwrap()["profiles"].clone();
+        let disabled_profiles =
+            serde_json::from_str::<serde_json::Value>(&disabled).unwrap()["profiles"].clone();
         let mixed = serde_json::json!({
             "schema_version": 1,
             "catalog_version": "windows-wechat-v1",
@@ -417,7 +443,12 @@ mod tests {
 
     #[test]
     fn invalid_roi_profile_is_rejected() {
-        assert_eq!(CompatibilityCatalog::parse(&VALID_PROFILE.replace("\"right\": 0.98", "\"right\": 0.2")), Err(CatalogError::InvalidCatalog));
+        assert_eq!(
+            CompatibilityCatalog::parse(
+                &VALID_PROFILE.replace("\"right\": 0.98", "\"right\": 0.2")
+            ),
+            Err(CatalogError::InvalidCatalog)
+        );
     }
 
     #[test]
@@ -450,7 +481,10 @@ mod tests {
             Err(CatalogError::InvalidCatalog),
         );
         assert_eq!(
-            CompatibilityCatalog::parse(&profile.replace("\"probe_outcome\": \"unavailable\"", "\"probe_outcome\": \"empty\"")),
+            CompatibilityCatalog::parse(&profile.replace(
+                "\"probe_outcome\": \"unavailable\"",
+                "\"probe_outcome\": \"empty\""
+            )),
             Err(CatalogError::InvalidCatalog),
         );
     }

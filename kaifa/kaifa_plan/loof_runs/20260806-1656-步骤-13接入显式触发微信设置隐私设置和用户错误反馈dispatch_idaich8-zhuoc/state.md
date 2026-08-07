@@ -5,15 +5,15 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fd674-c524-7b23-b4c6-7736f8e6d9fa
-- next_poll_at:
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月06日16点58分-接入显式触发微信设置隐私设置和用户错误反馈.md
 - phase_2: 2026年08月06日17点08分-接入显式触发微信设置隐私设置和用户错误反馈.md
 - phase_3: 2026年08月06日17点15分-Windows路径未验证阻断.md
-- phase_4:
-- phase_5:
+- phase_4: 
+- phase_5: 
 
 ## Threads
 - phase_1: 019fd64a-7a37-7aa0-81af-13dc140b3647

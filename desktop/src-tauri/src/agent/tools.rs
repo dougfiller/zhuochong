@@ -205,10 +205,20 @@ pub fn requires_confirmation(tool: &str) -> bool {
 
 /// 确认卡片上展示的操作摘要（人话描述模型想做什么）。
 pub fn action_confirm_summary(tool: &str, args: &Value) -> String {
-    let s = |key: &str| args.get(key).and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let s = |key: &str| {
+        args.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string()
+    };
     match tool {
         "create_todo" => format!("新建待办：{}", s("text")),
-        "set_app_category" => format!("把应用「{}」的分类改为「{}」并同步历史记录", s("app_name"), s("category")),
+        "set_app_category" => format!(
+            "把应用「{}」的分类改为「{}」并同步历史记录",
+            s("app_name"),
+            s("category")
+        ),
         "pause_recording" => "暂停屏幕活动记录".to_string(),
         "resume_recording" => "恢复屏幕活动记录".to_string(),
         "open_timeline" => {
@@ -1013,14 +1023,14 @@ fn html_to_text(html: &str) -> String {
                 };
                 let search_from = pos + offset + tag.len();
                 let end = if tag == "<!--" {
-                    lower[search_from..].find("-->").map(|i| search_from + i + 3)
-                } else {
                     lower[search_from..]
-                        .find(close_tag)
-                        .and_then(|i| {
-                            let after = search_from + i;
-                            lower[after..].find('>').map(|j| after + j + 1)
-                        })
+                        .find("-->")
+                        .map(|i| search_from + i + 3)
+                } else {
+                    lower[search_from..].find(close_tag).and_then(|i| {
+                        let after = search_from + i;
+                        lower[after..].find('>').map(|j| after + j + 1)
+                    })
                 };
                 let _ = close;
                 match end {
@@ -1078,7 +1088,6 @@ fn html_to_text(html: &str) -> String {
     }
 }
 
-
 /// 构造联网工具共用的 HTTP 客户端（重定向逐跳过 SSRF 校验）。
 fn web_client(total_timeout_secs: u64) -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
@@ -1104,7 +1113,11 @@ fn web_client(total_timeout_secs: u64) -> Result<reqwest::Client, String> {
 /// 做 2 次指数退避重试（1s、2s），把瞬态抖动消化掉。HTTP 业务错误（4xx/5xx）
 /// 不重试——那是确定性失败。返回结果 HTML 文本，由调用方解析。
 /// 同时被「测试搜索」和实际 web_search 复用，保证两者行为一致。
-pub(crate) async fn bing_search_html(client: &reqwest::Client, query: &str, count: u32) -> Result<String, String> {
+pub(crate) async fn bing_search_html(
+    client: &reqwest::Client,
+    query: &str,
+    count: u32,
+) -> Result<String, String> {
     // 重试只针对“连接/超时”这类瞬态错误：is_connect() || is_timeout()
     let mut last_err = String::new();
     let mut backoff_secs = 1u64;
@@ -1127,10 +1140,7 @@ pub(crate) async fn bing_search_html(client: &reqwest::Client, query: &str, coun
                     // HTTP 业务错误：不重试，直接返回
                     return Err(format!("搜索服务返回 HTTP {status}"));
                 }
-                return r
-                    .text()
-                    .await
-                    .map_err(|e| format!("搜索响应读取失败: {e}"));
+                return r.text().await.map_err(|e| format!("搜索响应读取失败: {e}"));
             }
             Err(e) => {
                 // 只重试连接/超时类错误；其他（如 DNS、SSL）也一并重试，反正最后一次会返回
@@ -1404,7 +1414,9 @@ fn parse_bing_html(html: &str) -> Vec<(String, String, String)> {
             Some(p) => tag_end + p,
             None => continue,
         };
-        let title = strip_html_tags(&after_href[tag_end..close_a]).trim().to_string();
+        let title = strip_html_tags(&after_href[tag_end..close_a])
+            .trim()
+            .to_string();
 
         if title.is_empty() || url.is_empty() {
             continue;
@@ -1439,7 +1451,10 @@ fn format_search_results(query: &str, results: &[(String, String, String)]) -> S
     let mut out = format!("「{query}」的搜索结果（{} 条）：\n", results.len());
     for (i, (title, url, snippet)) in results.iter().enumerate() {
         let snippet: String = snippet.chars().take(300).collect();
-        out.push_str(&format!("{}. {title}\n   {snippet}\n   来源: {url}\n", i + 1));
+        out.push_str(&format!(
+            "{}. {title}\n   {snippet}\n   来源: {url}\n",
+            i + 1
+        ));
     }
     out
 }
@@ -1477,7 +1492,9 @@ fn get_work_sessions_execute(ctx: &ToolContext, args: Value) -> Result<String, S
 
     let sessions = work_intelligence::build_work_sessions(&activities);
     if sessions.is_empty() {
-        return Ok(format!("在 {date_from} ~ {date_to} 范围内未识别出连续工作时段。"));
+        return Ok(format!(
+            "在 {date_from} ~ {date_to} 范围内未识别出连续工作时段。"
+        ));
     }
 
     let mut lines = vec![format!(
@@ -1488,7 +1505,11 @@ fn get_work_sessions_execute(ctx: &ToolContext, args: Value) -> Result<String, S
     )];
     for s in sessions.iter().take(12) {
         let start = chrono::DateTime::from_timestamp(s.start_timestamp, 0)
-            .map(|t| t.with_timezone(&chrono::Local).format("%m-%d %H:%M").to_string())
+            .map(|t| {
+                t.with_timezone(&chrono::Local)
+                    .format("%m-%d %H:%M")
+                    .to_string()
+            })
             .unwrap_or_default();
         lines.push(format!(
             "  - {start} 起 {} | 意图: {} | 主应用: {} | {}个活动",
@@ -1583,7 +1604,10 @@ fn extract_todos_execute(ctx: &ToolContext, args: Value) -> Result<String, Strin
     }
     let mut lines = vec![format!("待跟进事项（{} 条）：", merged.items.len())];
     for item in merged.items.iter().take(15) {
-        lines.push(format!("  - {}（{}，来源: {}）", item.title, item.date, item.source_title));
+        lines.push(format!(
+            "  - {}（{}，来源: {}）",
+            item.title, item.date, item.source_title
+        ));
     }
     Ok(lines.join("\n"))
 }
@@ -1670,7 +1694,10 @@ async fn open_timeline_action(ctx: &ToolContext<'_>, args: Value) -> Result<Stri
     run_action(ctx, AssistantAction::OpenTimeline { date }).await
 }
 
-async fn generate_daily_report_action(ctx: &ToolContext<'_>, args: Value) -> Result<String, String> {
+async fn generate_daily_report_action(
+    ctx: &ToolContext<'_>,
+    args: Value,
+) -> Result<String, String> {
     let date = required_str_arg(&args, "date")?;
     let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
     run_action(ctx, AssistantAction::GenerateDailyReport { date, force }).await
@@ -1680,7 +1707,11 @@ async fn generate_daily_report_action(ctx: &ToolContext<'_>, args: Value) -> Res
 /// 结果含 OCR 摘要（源自任意网页），按不可信内容包裹防注入。
 async fn semantic_search_tool(ctx: &ToolContext<'_>, args: Value) -> Result<String, String> {
     let query = required_str_arg(&args, "query")?;
-    let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(8).clamp(1, 20) as usize;
+    let limit = args
+        .get("limit")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(8)
+        .clamp(1, 20) as usize;
     let bridge = ctx
         .runtime
         .semantic_search
@@ -2011,9 +2042,18 @@ mod tests {
         let registry = ToolRegistry::new();
         let json_str = serde_json::to_string(&registry.to_openai_tools()).unwrap();
         assert!(json_str.contains("search_memory"), "应包含 search_memory");
-        assert!(json_str.contains("analyze_intents"), "应包含 analyze_intents");
-        assert!(json_str.contains("aggregate_stats"), "应包含 aggregate_stats");
-        assert!(json_str.contains("category_search"), "应包含 category_search");
+        assert!(
+            json_str.contains("analyze_intents"),
+            "应包含 analyze_intents"
+        );
+        assert!(
+            json_str.contains("aggregate_stats"),
+            "应包含 aggregate_stats"
+        );
+        assert!(
+            json_str.contains("category_search"),
+            "应包含 category_search"
+        );
         assert!(
             json_str.contains("trend_comparison"),
             "应包含 trend_comparison"
@@ -2186,7 +2226,10 @@ mod tests {
         let names = tool_names(&base);
         assert_eq!(names.len(), 12);
         assert!(!names.iter().any(|n| n == "fetch_url"));
-        assert!(!names.iter().any(|n| n == "create_todo"), "行动工具默认不注册");
+        assert!(
+            !names.iter().any(|n| n == "create_todo"),
+            "行动工具默认不注册"
+        );
 
         // 开联网、无搜索 Key：+fetch_url，无 web_search
         let no_key = ToolRegistry::with_web_tools(&WebToolsConfig {
@@ -2223,7 +2266,9 @@ mod tests {
         // 语义检索按开关独立注册
         let with_semantic = ToolRegistry::for_assistant(None, false, true);
         assert_eq!(tool_names(&with_semantic).len(), 13);
-        assert!(tool_names(&with_semantic).iter().any(|n| n == "semantic_search"));
+        assert!(tool_names(&with_semantic)
+            .iter()
+            .any(|n| n == "semantic_search"));
 
         let with = ToolRegistry::for_assistant(None, true, false);
         let names = tool_names(&with);
@@ -2246,8 +2291,10 @@ mod tests {
         // 确认摘要应是人话
         let summary = action_confirm_summary("create_todo", &json!({"text": "整理周报"}));
         assert!(summary.contains("整理周报"));
-        let summary =
-            action_confirm_summary("set_app_category", &json!({"app_name": "Xcode", "category": "开发"}));
+        let summary = action_confirm_summary(
+            "set_app_category",
+            &json!({"app_name": "Xcode", "category": "开发"}),
+        );
         assert!(summary.contains("Xcode") && summary.contains("开发"));
     }
 
@@ -2276,9 +2323,7 @@ mod tests {
         assert!(ensure_public_http_url("http://user@127.0.0.1/").is_err());
 
         // 内网/特殊用途 TLD
-        assert!(
-            ensure_public_http_url("http://metadata.google.internal/computeMetadata").is_err()
-        );
+        assert!(ensure_public_http_url("http://metadata.google.internal/computeMetadata").is_err());
         assert!(ensure_public_http_url("http://router.lan/").is_err());
         assert!(ensure_public_http_url("http://nas.home/").is_err());
         assert!(ensure_public_http_url("http://1.0.0.10.in-addr.arpa/").is_err());
