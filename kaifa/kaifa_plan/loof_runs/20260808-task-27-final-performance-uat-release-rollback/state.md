@@ -5,8 +5,8 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fdd8d-5546-7791-b2db-17c6a6eee5f4
-- next_poll_at: 2026-08-07T18:50:40+00:00
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月08日01点50分-全量性能业务UAT签名发布与阶段感知回滚.md
