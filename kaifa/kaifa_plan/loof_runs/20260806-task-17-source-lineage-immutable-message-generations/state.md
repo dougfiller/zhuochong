@@ -1,0 +1,66 @@
+# LOOF Run 20260806-task-17-source-lineage-immutable-message-generations
+
+- project_root: `/Users/sky/aich8-zhuochong`
+- feature: 步骤 17：实现源 lineage、不可变消息版本和导入代际（dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-17）。多个完整、筛选或增量导出可确定性合并，候选正文不污染当前活动知识视图。
+- current_phase: 5
+- current_phase_name: 推送同步
+- current_thread_id: 019fd9b2-715e-7ed0-958e-4a9451751750
+- next_poll_at:
+- status: active
+
+## Artifacts
+- phase_1: 2026年08月06日22点09分-实现源lineage不可变消息版本和导入代际.md
+- phase_2: 2026年08月06日22点20分-实现源lineage不可变消息版本和导入代际.md
+- phase_3: 2026年08月06日22点26分-源lineage代际合并审查.md
+- phase_4:
+- phase_5:
+
+## Threads
+- phase_1: 019fd767-26c4-7943-8607-9cfcb8b1a18b
+- phase_2: 019fd76c-b43d-7c51-8c15-44bb6404b9cc
+- phase_3: 019fd776-4a78-7852-8a5a-1754360d7bc0
+- phase_4: 019fd9ab-e43b-7713-bc09-6c3e32d379ce
+- phase_5: 019fd9b2-715e-7ed0-958e-4a9451751750
+
+## Notes
+- 2026-08-06T14:10:21+00:00 phase 1 gate failed: done file is missing
+- 2026-08-06T14:10:27+00:00 phase 1 gate failed: done file is missing
+- 2026-08-06T14:17:20+00:00 phase 2 gate failed: done file is missing
+- 2026-08-06T14:20:53+00:00 phase 2 gate failed: done file is missing
+- 2026-08-06T22:42:20+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T22:44:56+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T22:48:21+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T22:51:49+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T22:55:22+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T22:58:51+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:02:22+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:05:21+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:08:53+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:11:55+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:15:22+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:18:21+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:21:21+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:24:52+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:28:24+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:31:54+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:34:57+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:38:25+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:41:51+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:45:23+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:48:52+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:52:22+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:55:51+00:00 phase 4 gate failed: done file is missing
+- 2026-08-06T23:59:24+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:02:54+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:05:51+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:08:53+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:12:25+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:15:24+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:18:55+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:22:24+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:25:24+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:28:54+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:32:23+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:35:52+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:38:53+00:00 phase 4 gate failed: done file is missing
+- 2026-08-07T00:42:23+00:00 phase 4 gate failed: done file is missing

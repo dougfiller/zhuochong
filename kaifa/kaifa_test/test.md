@@ -235,3 +235,13 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 | JSON archive 回归 | 同一 `knowledge::` 定向测试 | 通过；导入器仅将脱敏 DTO 交给 Store，原路径和内容不写库，重复导入命中 member audit fast-verify。 | 通过 |
 | M2 feature 编译 | `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'` | 通过；仅输出仓库未接线模块的 dead-code 警告和 `block v0.1.6` future-incompat 提示。 | 通过 |
 | Windows/OCR/UAT | 受控 Windows 11 x64 | 本步骤没有修改 Windows OCR 或前台微信流程；macOS SQLite 单测不替代 Windows 证据。 | not-run |
+
+## 源 lineage、不可变消息版本和导入代际（2026-08-06）
+
+检测脚本：`kaifa/kaifa_test/verify_knowledge_lineage_generations.py`。脚本只读取本步骤 Rust 源码与 migration，不打开用户 SQLite、导出包、网络或 Tauri。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| 静态 lineage/代际边界 | `python3 -B kaifa/kaifa_test/verify_knowledge_lineage_generations.py --project-root .` | 输出 `KNOWLEDGE_LINEAGE_GATE: pass`；确认 v2 migration、不可变 content hash 唯一索引、batch staging、source audit、多会话 ready index 与一次性 activation；导入器仍无写源包/SQLite 能力。 | 通过 |
+| Rust 定向单测 | `cargo test --manifest-path desktop/src-tauri/Cargo.toml knowledge:: --no-default-features --features 'wechat-contract-check,wechat-m2'` | 覆盖 v2 migration、candidate 隔离、激活、失败不污染 active view、只读 archive 与同 message 的版本复用。 | 通过（24/24） |
+| Windows/OCR/UAT | 受控 Windows 11 x64 | 本步骤未改 OCR、前台窗口或自动发送；macOS SQLite 单测不替代 Windows 证据。 | not-run |

@@ -239,3 +239,6 @@ git diff --check -- desktop/src-tauri/src/knowledge desktop/src-tauri/src/main.r
 
 - `verify_knowledge_store.py` 是纯静态门禁：检查独立 migration 资源、Store 的唯一连接入口、读写 API、WAL/外键/FTS5/版本验证、active/candidate/denial 边界、导入器没有 `Connection`，以及启动时以现有 `data_dir` 管理 Store。它不读取或创建任何真实聊天数据。
 - Rust 测试只在系统临时目录创建虚构 SQLite 文件，覆盖新库、candidate 不可见直到原子 activate、未来版本 fail-closed、archive 导入只读与脱敏；不会访问 Work Review `workreview.db`。
+# 2026-08-06：步骤 17 源 lineage 与不可变消息版本
+
+- `python3 -B kaifa/kaifa_test/verify_knowledge_lineage_generations.py --project-root .`：只读静态门禁，检查 knowledge schema v2、流式 staging、不可变版本与原子 activation 的必要源码边界；不读取用户导出或数据库。

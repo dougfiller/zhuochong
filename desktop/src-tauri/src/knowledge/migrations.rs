@@ -2,8 +2,10 @@ use crate::wechat::types::ContractError;
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use std::path::Path;
 
-pub(crate) const SCHEMA_HEAD: i32 = 1;
+pub(crate) const SCHEMA_HEAD: i32 = 2;
 const INITIAL: &str = include_str!("migrations/knowledge/0001_initial.sql");
+const SOURCE_LINEAGE_MESSAGE_GENERATIONS: &str =
+    include_str!("migrations/knowledge/0002_source_lineage_message_generations.sql");
 
 pub(crate) fn open_writer(path: &Path) -> Result<Connection, ContractError> {
     let connection = Connection::open(path).map_err(|_| ContractError::KbNotReady)?;
@@ -76,7 +78,17 @@ fn migrate_and_validate(connection: &Connection) -> Result<(), ContractError> {
     if version == 0 {
         connection
             .execute_batch(&format!(
-                "BEGIN IMMEDIATE; {INITIAL}; PRAGMA user_version={SCHEMA_HEAD}; COMMIT;"
+                "BEGIN IMMEDIATE; {INITIAL}; PRAGMA user_version=1; COMMIT;"
+            ))
+            .map_err(|_| ContractError::KbNotReady)?;
+    }
+    let version: i32 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(|_| ContractError::KbNotReady)?;
+    if version == 1 {
+        connection
+            .execute_batch(&format!(
+                "BEGIN IMMEDIATE; {SOURCE_LINEAGE_MESSAGE_GENERATIONS}; PRAGMA user_version={SCHEMA_HEAD}; COMMIT;"
             ))
             .map_err(|_| ContractError::KbNotReady)?;
     }
@@ -120,6 +132,9 @@ pub(crate) fn validate_schema(
     }
     for (table, column) in [
         ("knowledge_sources", "id"),
+        ("knowledge_sources", "exported_at_ms"),
+        ("knowledge_sources", "coverage_kind"),
+        ("knowledge_message_versions", "content_hash"),
         ("knowledge_conversations", "active_import_generation_id"),
         ("knowledge_import_generations", "status"),
         ("knowledge_index_generations", "status"),
@@ -137,6 +152,17 @@ pub(crate) fn validate_schema(
         if exists.is_none() {
             return Err(ContractError::KbNotReady);
         }
+    }
+    let incomplete_source: Option<i64> = connection
+        .query_row(
+            "SELECT 1 FROM knowledge_sources WHERE exported_at_ms IS NULL OR coverage_kind IS NULL LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| ContractError::KbNotReady)?;
+    if incomplete_source.is_some() {
+        return Err(ContractError::KbNotReady);
     }
     let foreign_errors: Option<String> = connection
         .query_row("PRAGMA foreign_key_check", [], |row| row.get(0))

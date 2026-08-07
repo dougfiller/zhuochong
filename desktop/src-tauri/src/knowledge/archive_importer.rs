@@ -5,10 +5,11 @@ use super::archive_schema::{
 use super::archive_store::{
     coverage_signature, member_path_token, CompletenessVerdict, ImportFingerprint, MemberAudit,
 };
-use super::store::KnowledgeStore;
+use super::store::{CandidateChecks, IncomingMessage, KnowledgeStore, NewSource, StagingImport};
 use crate::wechat::types::ContractError;
 use serde::de::{DeserializeSeed, Error as DeError, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::{self, File};
@@ -268,6 +269,7 @@ impl<'a> WechatJsonArchiveImporter<'a> {
             return Err(ContractError::KbSourceUnsupported);
         }
         let coverage = manifest.coverage();
+        let exported_at_ms = manifest.exported_at_ms()?;
         let before = self.member_audits(&manifest)?;
         let fingerprint = ImportFingerprint {
             account_stable_id: manifest.account.stable_id.clone(),
@@ -295,10 +297,20 @@ impl<'a> WechatJsonArchiveImporter<'a> {
             });
         }
 
+        let source = NewSource {
+            account_stable_id: manifest.account.stable_id.clone(),
+            conversation_stable_id: String::new(),
+            export_id: manifest.export_id.clone(),
+            schema_version: manifest.schema_version.clone(),
+            manifest_hash: fingerprint.manifest_content_hash.clone(),
+            coverage_hash: fingerprint.coverage_signature.clone(),
+            exported_at_ms,
+            coverage_kind: coverage,
+        };
+        let mut staged: Vec<(StagingImport, u64)> = Vec::new();
         let mut conversation_count = 0;
         let mut message_count = 0;
         let mut stable_ids = HashSet::new();
-        let mut message_ids = HashSet::new();
         for conversation in manifest.declared_conversations() {
             if !stable_ids.insert(conversation.stable_id.clone()) {
                 return Err(ContractError::KbSourceUnsupported);
@@ -311,36 +323,113 @@ impl<'a> WechatJsonArchiveImporter<'a> {
             {
                 return Err(ContractError::KbSourceUnsupported);
             }
-            let count = stream_messages(
+            let staging = match self.store.begin_staging_source(NewSource {
+                conversation_stable_id: conversation.stable_id.clone(),
+                ..source.clone()
+            }) {
+                Ok(staging) => staging,
+                Err(error) => {
+                    self.discard_staged(&staged)?;
+                    return Err(error);
+                }
+            };
+            staged.push((staging.clone(), 0));
+            let mut imported_text_count = 0;
+            let mut batch = Vec::with_capacity(256);
+            let source_member_token = member_path_token(&conversation.messages_path);
+            let mut message_ids = HashSet::new();
+            let count = match stream_messages(
                 self.guard.open_messages_stream(conversation)?,
                 &manifest,
                 conversation,
                 &mut message_ids,
-            )?;
+                |message| {
+                    if let Some(incoming) = incoming_text_message(message, &source_member_token)? {
+                        batch.push(incoming);
+                        imported_text_count += 1;
+                        if batch.len() == 256 {
+                            self.store.append_staging_messages(&staging, &batch)?;
+                            batch.clear();
+                        }
+                    }
+                    Ok(())
+                },
+            ) {
+                Ok(count) => count,
+                Err(error) => {
+                    self.discard_staged(&staged)?;
+                    return Err(error);
+                }
+            };
+            if !batch.is_empty() {
+                if let Err(error) = self.store.append_staging_messages(&staging, &batch) {
+                    self.discard_staged(&staged)?;
+                    return Err(error);
+                }
+            }
             if count != meta.message_count {
+                self.discard_staged(&staged)?;
                 return Err(ContractError::KbSourceUnsupported);
             }
             conversation_count += 1;
             message_count += count;
+            staged.last_mut().expect("staging was recorded").1 = imported_text_count;
         }
         if conversation_count != manifest.stats.conversation_count
             || message_count != manifest.stats.message_count
         {
+            self.discard_staged(&staged)?;
             return Err(ContractError::KbSourceUnsupported);
         }
-        let after = self.member_audits(&manifest)?;
+        let after = match self.member_audits(&manifest) {
+            Ok(after) => after,
+            Err(error) => {
+                self.discard_staged(&staged)?;
+                return Err(error);
+            }
+        };
         if before != after {
+            self.discard_staged(&staged)?;
             return Err(ContractError::KbSourceUnsupported);
         }
         let verdict = usable_verdict(coverage, &report);
-        let import_id = self.store.record_archive_import(
-            &fingerprint,
-            coverage,
-            verdict,
-            &safe_scope_filters_json(&manifest),
-            &safe_integrity_json(&manifest),
-            &after,
-        )?;
+        for (staging, _) in &staged {
+            if let Err(error) = self.store.record_source_audits(staging, verdict, &after) {
+                self.discard_staged(&staged)?;
+                return Err(error);
+            }
+        }
+        let candidates: Result<Vec<_>, _> = staged
+            .iter()
+            .cloned()
+            .map(|(staging, expected_message_count)| {
+                self.store.mark_ready_candidate(
+                    staging,
+                    CandidateChecks {
+                        expected_message_count,
+                    },
+                )
+            })
+            .collect();
+        let candidates = match candidates {
+            Ok(candidates) => candidates,
+            Err(error) => {
+                self.discard_staged(&staged)?;
+                return Err(error);
+            }
+        };
+        let index = match self.store.register_ready_index_set(&candidates) {
+            Ok(index) => index,
+            Err(error) => {
+                self.discard_staged(&staged)?;
+                return Err(error);
+            }
+        };
+        if let Err(error) = self.store.activate_candidates(candidates, index) {
+            self.discard_staged(&staged)?;
+            return Err(error);
+        }
+        let import_id = fingerprint.manifest_content_hash.clone();
         Ok(ArchiveImportSummary {
             import_id,
             schema,
@@ -385,6 +474,15 @@ impl<'a> WechatJsonArchiveImporter<'a> {
             );
         }
         Ok(audits)
+    }
+
+    fn discard_staged(&self, staged: &[(StagingImport, u64)]) -> Result<(), ContractError> {
+        self.store.discard_stagings(
+            &staged
+                .iter()
+                .map(|(staging, _)| staging.clone())
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
@@ -448,6 +546,7 @@ fn stream_messages<R: Read>(
     manifest: &ManifestProbeV1,
     conversation: &DeclaredConversationV1,
     message_ids: &mut HashSet<String>,
+    mut on_text_message: impl FnMut(MessageV1) -> Result<(), ContractError>,
 ) -> Result<u64, ContractError> {
     let mut count = 0;
     let mut on_message = |message: MessageV1| -> Result<(), serde_json::Error> {
@@ -466,17 +565,12 @@ fn stream_messages<R: Read>(
                 | "system"
                 | "recall"
                 | "unknown"
-        ) || !message_ids.insert(message.id)
+        ) || !message_ids.insert(message.id.clone())
         {
             return Err(serde_json::Error::custom("unsupported message contract"));
         }
-        // Fields are intentionally read only to enforce the v1 shape, never logged or retained.
-        let _ = (
-            message.sender,
-            message.created_at,
-            message.text,
-            message.media,
-        );
+        on_text_message(message)
+            .map_err(|_| serde_json::Error::custom("store rejected message"))?;
         count += 1;
         Ok(())
     };
@@ -493,6 +587,46 @@ fn stream_messages<R: Read>(
         return Err(ContractError::KbSourceUnsupported);
     }
     Ok(count)
+}
+
+fn incoming_text_message(
+    message: MessageV1,
+    source_member_token: &str,
+) -> Result<Option<IncomingMessage>, ContractError> {
+    if message.kind != "text" {
+        return Ok(None);
+    }
+    let Some(content) = message.text else {
+        return Ok(None);
+    };
+    let normalized_content = content.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized_content.is_empty() {
+        return Ok(None);
+    }
+    let stable_id = (!message.id.is_empty()).then_some(message.id);
+    let fallback_key = match stable_id {
+        Some(_) => None,
+        None => Some(format!(
+            "{:x}",
+            Sha256::digest(
+                format!(
+                    "{}|{}|{}|{}",
+                    message.sender, message.created_at, message.kind, normalized_content
+                )
+                .as_bytes()
+            )
+        )),
+    };
+    let content_hash = format!("{:x}", Sha256::digest(normalized_content.as_bytes()));
+    let _ = message.media;
+    Ok(Some(IncomingMessage {
+        stable_id,
+        fallback_key,
+        content,
+        normalized_content,
+        content_hash,
+        source_member_token: source_member_token.to_owned(),
+    }))
 }
 
 struct JsonStringLimitReader<R> {
@@ -735,6 +869,31 @@ mod tests {
             usable_verdict(CoverageKind::Full, &report),
             CompletenessVerdict::Incomplete
         );
+    }
+
+    #[test]
+    fn message_ids_are_deduplicated_within_each_conversation_only() {
+        let envelope = |conversation: &str| {
+            format!(
+                r#"{{"schemaVersion":"wechat_archive_v1","exportId":"export","account":{{"stableId":"account"}},"conversation":{{"stableId":"{conversation}"}},"filters":{{}},"messages":[{{"id":"shared","type":"text","sender":"sender","createdAt":"2026-01-01T00:00:00Z","text":"body"}}]}}"#
+            )
+        };
+        let manifest: ManifestProbeV1 = serde_json::from_str(
+            r#"{"schemaVersion":"wechat_archive_v1","exportedAt":"2026-01-01T00:00:00Z","exportId":"export","account":{"stableId":"account"},"source":{"kind":"user_selected"},"format":{"manifestContentHash":"hash"},"scope":{"kind":"selected","conversations":[{"stableId":"one","metaPath":"one-meta","messagesPath":"one-messages"},{"stableId":"two","metaPath":"two-meta","messagesPath":"two-messages"}]},"filters":{},"options":{"includeMedia":false},"stats":{"conversationCount":2,"messageCount":2},"accountsAvailable":[],"integrityFiles":[]}"#,
+        )
+        .unwrap();
+        for conversation in manifest.declared_conversations() {
+            let mut ids = HashSet::new();
+            let count = stream_messages(
+                BufReader::new(envelope(&conversation.stable_id).as_bytes()),
+                &manifest,
+                conversation,
+                &mut ids,
+                |_| Ok(()),
+            )
+            .unwrap();
+            assert_eq!(count, 1);
+        }
     }
 
     #[test]

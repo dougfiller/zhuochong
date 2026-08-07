@@ -37,6 +37,12 @@ pub(crate) struct ManifestProbeV1 {
 }
 
 impl ManifestProbeV1 {
+    pub(crate) fn exported_at_ms(&self) -> Result<i64, ContractError> {
+        chrono::DateTime::parse_from_rfc3339(&self.exported_at)
+            .map(|value| value.timestamp_millis())
+            .map_err(|_| ContractError::KbSourceUnsupported)
+    }
+
     pub(crate) fn declared_manifest_hash(&self) -> Option<&str> {
         self.format.manifest_content_hash.as_deref()
     }
