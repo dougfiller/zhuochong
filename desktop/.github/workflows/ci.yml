@@ -11,6 +11,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  m2-contract:
+    name: M2 可观测性与能力隔离门禁
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - name: 严格 evidence schema 正向 fixture
+        run: python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --allow-synthetic-fixture --evidence kaifa/kaifa_test/fixtures/m2_observability/pass.json
+      - name: synthetic fixture 不得冒充生产证据
+        run: |
+          set +e
+          python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --evidence kaifa/kaifa_test/fixtures/m2_observability/pass.json
+          code=$?
+          test "$code" -eq 1
+      - name: 缺证据必须 blocked
+        run: |
+          set +e
+          python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --evidence kaifa/kaifa_test/fixtures/m2_observability/blocked-missing-evidence.json
+          code=$?
+          test "$code" -eq 2
+      - name: 禁止能力与 default-pass 必须 fail
+        run: |
+          set +e
+          python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --allow-synthetic-fixture --evidence kaifa/kaifa_test/fixtures/m2_observability/fail-capability.json
+          capability_code=$?
+          python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --allow-synthetic-fixture --evidence kaifa/kaifa_test/fixtures/m2_observability/fail-default-pass.json
+          default_code=$?
+          test "$capability_code" -eq 1
+          test "$default_code" -eq 1
+      - name: evidence 语义、文件与批次错配必须关闭门禁
+        run: |
+          set +e
+          for fixture in blocked-single-success fail-hash-mismatch fail-cross-batch fail-candidate-identity fail-missing-file fail-path-escape fail-duplicate-reference fail-symlink; do
+            python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --allow-synthetic-fixture --evidence "kaifa/kaifa_test/fixtures/m2_observability/${fixture}.json"
+            code=$?
+            test "$code" -ne 0 || exit 1
+          done
+      - name: M2 metadata/transport 行为测试
+        run: cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::' --no-default-features --features 'wechat-contract-check,wechat-m2' -- --test-threads=1
+
   frontend:
     name: 前端测试
     runs-on: ubuntu-latest

@@ -1,0 +1,14 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "events": [
+    {
+      "error_code": "WX_REQUEST_STALE",
+      "kind": "terminal",
+      "outcome": "failed",
+      "request_id": "c05078ea-859c-5780-bee8-8bdff223568d",
+      "stage_seq": 2
+    }
+  ],
+  "request_id": "c05078ea-859c-5780-bee8-8bdff223568d",
+  "schema_version": 1
+}

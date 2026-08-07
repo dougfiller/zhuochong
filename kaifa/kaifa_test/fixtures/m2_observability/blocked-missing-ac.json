@@ -1,0 +1,5681 @@
+{
+  "ac_matrix": [
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-01"
+      ],
+      "id": "AC-BASE-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-02"
+      ],
+      "id": "AC-BASE-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-03"
+      ],
+      "id": "AC-BASE-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-04"
+      ],
+      "id": "AC-BASE-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-05"
+      ],
+      "id": "AC-BASE-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-06"
+      ],
+      "id": "AC-BASE-06",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-07"
+      ],
+      "id": "AC-BASE-07",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-08"
+      ],
+      "id": "AC-BASE-08",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-09"
+      ],
+      "id": "AC-BASE-09",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-BASE-10"
+      ],
+      "id": "AC-BASE-10",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-KB-01"
+      ],
+      "id": "AC-KB-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-KB-02"
+      ],
+      "id": "AC-KB-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-KB-03"
+      ],
+      "id": "AC-KB-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-KB-04"
+      ],
+      "id": "AC-KB-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-KB-05"
+      ],
+      "id": "AC-KB-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-KB-06"
+      ],
+      "id": "AC-KB-06",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-KB-07"
+      ],
+      "id": "AC-KB-07",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-KB-08"
+      ],
+      "id": "AC-KB-08",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-PET-01"
+      ],
+      "id": "AC-PET-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-PET-02"
+      ],
+      "id": "AC-PET-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-PET-03"
+      ],
+      "id": "AC-PET-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-PET-04"
+      ],
+      "id": "AC-PET-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-PET-05"
+      ],
+      "id": "AC-PET-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-01"
+      ],
+      "id": "AC-RAG-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-02"
+      ],
+      "id": "AC-RAG-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-03"
+      ],
+      "id": "AC-RAG-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-04"
+      ],
+      "id": "AC-RAG-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-05"
+      ],
+      "id": "AC-RAG-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-06"
+      ],
+      "id": "AC-RAG-06",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-07"
+      ],
+      "id": "AC-RAG-07",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-08"
+      ],
+      "id": "AC-RAG-08",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-09"
+      ],
+      "id": "AC-RAG-09",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-10"
+      ],
+      "id": "AC-RAG-10",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-RAG-11"
+      ],
+      "id": "AC-RAG-11",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-WX-01"
+      ],
+      "id": "AC-WX-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-WX-02"
+      ],
+      "id": "AC-WX-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-WX-03"
+      ],
+      "id": "AC-WX-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-WX-04"
+      ],
+      "id": "AC-WX-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-WX-05"
+      ],
+      "id": "AC-WX-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-WX-06"
+      ],
+      "id": "AC-WX-06",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-WX-07"
+      ],
+      "id": "AC-WX-07",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-WX-08"
+      ],
+      "id": "AC-WX-08",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-AC-WX-09"
+      ],
+      "id": "AC-WX-09",
+      "status": "pass"
+    }
+  ],
+  "blockers": [
+    "one AC row is missing"
+  ],
+  "candidate": {
+    "batch_id": "fixture-batch-v2",
+    "git_commit": "4444444444444444444444444444444444444444",
+    "nsis_sha256": "a756b9d0a307f327add5eb089c6af2c12ef3e361cb9f099726a7c88c0376fb6d",
+    "source_tree_sha256": "33ea3a4d37ed4bcb866cba36d61a99c0fa12ffe47f34f53ac2398d0d4950ff23"
+  },
+  "credentials_mock_matrix": [
+    {
+      "evidence_sha256": "52619ff6fc6ca04870425a0980123d05b466c79576628c44f5ca5894bdc85bef",
+      "id": "MOCK-CREDENTIALS",
+      "status": "pass"
+    }
+  ],
+  "environment": {
+    "evidence_type": "synthetic",
+    "os_build": "Windows 11 synthetic fixture",
+    "real_embedding_model": true,
+    "real_reply_model": true,
+    "wechat_profile_fingerprint": "fixture-profile",
+    "windows_host": "fixture-host"
+  },
+  "evidence_manifest": {
+    "batch_id": "fixture-batch-v2",
+    "collector": "m2-fixture-collector-v1",
+    "evidence_type": "synthetic",
+    "files": [
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-CAP-01",
+        "kind": "request_trace",
+        "path": "artifacts/m2-cap-01-trace.json",
+        "request_evidence_id": "E-M2-CAP-01",
+        "sha256": "de630b3f27f90dc61501954eccd59894f276b90b4b03402f9c5d9b3da9853572"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-CAP-01",
+        "kind": "request_audit",
+        "path": "artifacts/m2-cap-01-audit.json",
+        "request_evidence_id": "E-M2-CAP-01",
+        "sha256": "98bbf09ef00966f77f3407bf15146ad571ddcb22badb75830643dc688eddd5f7"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-CAP-02",
+        "kind": "request_trace",
+        "path": "artifacts/m2-cap-02-trace.json",
+        "request_evidence_id": "E-M2-CAP-02",
+        "sha256": "1442907ec2e932dec80bd7566f6ec037937269bbc0d10cef11df030974e4933c"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-CAP-02",
+        "kind": "request_audit",
+        "path": "artifacts/m2-cap-02-audit.json",
+        "request_evidence_id": "E-M2-CAP-02",
+        "sha256": "4ec02d650b09660c1d4a8182e3e3da98fe5698057a141b884d0012fe11f1da42"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-CAP-03",
+        "kind": "request_trace",
+        "path": "artifacts/m2-cap-03-trace.json",
+        "request_evidence_id": "E-M2-CAP-03",
+        "sha256": "a067734e42f6102f42fbcd2deef65f17294f9855ad7d3c262d658714532dbba2"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-CAP-03",
+        "kind": "request_audit",
+        "path": "artifacts/m2-cap-03-audit.json",
+        "request_evidence_id": "E-M2-CAP-03",
+        "sha256": "ec5dda871e1ca0f30040ab4b7cf3242e67bc50df63d8b3ba21071b1cb67f85f1"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-MOD-01",
+        "kind": "request_trace",
+        "path": "artifacts/m2-mod-01-trace.json",
+        "request_evidence_id": "E-M2-MOD-01",
+        "sha256": "8926d10d1054e0dcfca8488e971136c12408ccca30e5dea7081c94cba59de448"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-MOD-01",
+        "kind": "request_audit",
+        "path": "artifacts/m2-mod-01-audit.json",
+        "request_evidence_id": "E-M2-MOD-01",
+        "sha256": "9dd228856eae3b9da1f782f2b08f6ef02a772843e45fa9fcdeb0468e6b8c8e60"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-MOD-02",
+        "kind": "request_trace",
+        "path": "artifacts/m2-mod-02-trace.json",
+        "request_evidence_id": "E-M2-MOD-02",
+        "sha256": "eda2cf0f5157e5193b174591e7701f23950fbc59777e2b1e92ffba5a874caf8f"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-MOD-02",
+        "kind": "request_audit",
+        "path": "artifacts/m2-mod-02-audit.json",
+        "request_evidence_id": "E-M2-MOD-02",
+        "sha256": "0bd1ada1fc3b16803207c89329d22cbaa42332fc678446cc22904ba1740b2444"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-MOD-03",
+        "kind": "request_trace",
+        "path": "artifacts/m2-mod-03-trace.json",
+        "request_evidence_id": "E-M2-MOD-03",
+        "sha256": "0009ff3c846dd34bc1206d7d780f62c43d4dfd1c30095cd4fe4cba05e183288a"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-MOD-03",
+        "kind": "request_audit",
+        "path": "artifacts/m2-mod-03-audit.json",
+        "request_evidence_id": "E-M2-MOD-03",
+        "sha256": "3718545e0e88d479ce22159bcf7d2065e552fa6de9f8770a562329025f80600a"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-MOD-04",
+        "kind": "request_trace",
+        "path": "artifacts/m2-mod-04-trace.json",
+        "request_evidence_id": "E-M2-MOD-04",
+        "sha256": "8a6b11b5111589fc28ba5cb7d2c227a407cf46750df3af6a08a7278bfcb647d6"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-MOD-04",
+        "kind": "request_audit",
+        "path": "artifacts/m2-mod-04-audit.json",
+        "request_evidence_id": "E-M2-MOD-04",
+        "sha256": "cf93231e1d967a7f54bf2bda01651b24a5280c28cd145c6bf11e611b943d2f1d"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-MOD-05",
+        "kind": "request_trace",
+        "path": "artifacts/m2-mod-05-trace.json",
+        "request_evidence_id": "E-M2-MOD-05",
+        "sha256": "4fcbcb388126ad7bd12879dd032aaaadf8813be6224f9a5a21581faaf3cdc5e9"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-MOD-05",
+        "kind": "request_audit",
+        "path": "artifacts/m2-mod-05-audit.json",
+        "request_evidence_id": "E-M2-MOD-05",
+        "sha256": "0fa7d7cee375974e96ef03c10f0f6d5ba09140fa34c0f90f6d750624bef577cf"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-MOD-06",
+        "kind": "request_trace",
+        "path": "artifacts/m2-mod-06-trace.json",
+        "request_evidence_id": "E-M2-MOD-06",
+        "sha256": "3fb696acf8193b975e0ea831ae7085253700b0dea135c93d50ca6c57b3e370fc"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-MOD-06",
+        "kind": "request_audit",
+        "path": "artifacts/m2-mod-06-audit.json",
+        "request_evidence_id": "E-M2-MOD-06",
+        "sha256": "530a6189fe0a2ff1ddb2e0dc449794d88cf766dae785b073598a29911b9af8e3"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-MOD-07",
+        "kind": "request_trace",
+        "path": "artifacts/m2-mod-07-trace.json",
+        "request_evidence_id": "E-M2-MOD-07",
+        "sha256": "82d029b986895112db69b23f3c682565df6f147b20fb13a220d46a2dcfb67273"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-MOD-07",
+        "kind": "request_audit",
+        "path": "artifacts/m2-mod-07-audit.json",
+        "request_evidence_id": "E-M2-MOD-07",
+        "sha256": "6b559f05d6b6e5484e5d3ee67eaf0f5235ac06e3cc196b426a93f60f86ad3067"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-OBS-01",
+        "kind": "request_trace",
+        "path": "artifacts/m2-obs-01-trace.json",
+        "request_evidence_id": "E-M2-OBS-01",
+        "sha256": "aec4c63aaac7d3bfe5137e431796bcea00d30a19d616e3f42a75b5482e215819"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-OBS-01",
+        "kind": "request_audit",
+        "path": "artifacts/m2-obs-01-audit.json",
+        "request_evidence_id": "E-M2-OBS-01",
+        "sha256": "9931714e154d71ca904b54149ada5971aa79287b037454042cb420d8dc90a063"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-OBS-02",
+        "kind": "request_trace",
+        "path": "artifacts/m2-obs-02-trace.json",
+        "request_evidence_id": "E-M2-OBS-02",
+        "sha256": "9fa1cecf0acc51b32f569f74bbdea0e82289a2b267edd2814fc2e96db1f0a6dd"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-OBS-02",
+        "kind": "request_audit",
+        "path": "artifacts/m2-obs-02-audit.json",
+        "request_evidence_id": "E-M2-OBS-02",
+        "sha256": "46cf92f7039b548a2018987e198d670b0f860401f4b0ffcac204bbe57d1564a5"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-OBS-03",
+        "kind": "request_trace",
+        "path": "artifacts/m2-obs-03-trace.json",
+        "request_evidence_id": "E-M2-OBS-03",
+        "sha256": "ff3fe05dc6d58c067a0ae80c33b36d61a5eca1abdc9510e835b9c53d5100d5cd"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-OBS-03",
+        "kind": "request_audit",
+        "path": "artifacts/m2-obs-03-audit.json",
+        "request_evidence_id": "E-M2-OBS-03",
+        "sha256": "3849c9d4ded2e45a4dbcbadd114e7619feb3e2c6a53d349ba7dbb8efe8f4843e"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-OBS-04",
+        "kind": "request_trace",
+        "path": "artifacts/m2-obs-04-trace.json",
+        "request_evidence_id": "E-M2-OBS-04",
+        "sha256": "3734b5feed337bf424a1bc32902b5e9db83fb0c1c2dcbac8391d0a68e0c3cc69"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-OBS-04",
+        "kind": "request_audit",
+        "path": "artifacts/m2-obs-04-audit.json",
+        "request_evidence_id": "E-M2-OBS-04",
+        "sha256": "309aac1911685c85148f25b686c9e282294c17756af2becfa7bd2225e45f67f5"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-OBS-05",
+        "kind": "request_trace",
+        "path": "artifacts/m2-obs-05-trace.json",
+        "request_evidence_id": "E-M2-OBS-05",
+        "sha256": "15a0652080d6f1cd1ebfdea6d3f990430708797a9bfcd473a112b8f1e6750884"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-OBS-05",
+        "kind": "request_audit",
+        "path": "artifacts/m2-obs-05-audit.json",
+        "request_evidence_id": "E-M2-OBS-05",
+        "sha256": "8be41da274e77063e594ccf0dffb8e359b0d581fce5ee8cfdec4ec7ad600a58d"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-OBS-06",
+        "kind": "request_trace",
+        "path": "artifacts/m2-obs-06-trace.json",
+        "request_evidence_id": "E-M2-OBS-06",
+        "sha256": "f7fa530ecc915b002eed6bb3a40e0ad5201af6b19b69cdcabd19787929d01a7d"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-OBS-06",
+        "kind": "request_audit",
+        "path": "artifacts/m2-obs-06-audit.json",
+        "request_evidence_id": "E-M2-OBS-06",
+        "sha256": "8d2e89f0418d5fa6d263d8b32c22a8d99e3ecd20c01668ca31017aef9b5db554"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-01",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-01-trace.json",
+        "request_evidence_id": "E-M2-RET-01",
+        "sha256": "2cd7660d061951e0d7fd9af66ca709cbee0ab1886360660a189f7f4d5e1c6108"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-01",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-01-audit.json",
+        "request_evidence_id": "E-M2-RET-01",
+        "sha256": "5e732cdb410ebb642b5f6c2aa3d71c8155ee22a8f4b330e040a067d5c6b392d8"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-02",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-02-trace.json",
+        "request_evidence_id": "E-M2-RET-02",
+        "sha256": "d70e023b760a3f5872cfe1e1cfd6ee3aa24aa1c4de964d854f3c2bad68c7602c"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-02",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-02-audit.json",
+        "request_evidence_id": "E-M2-RET-02",
+        "sha256": "f8a0ef4a16960c926b01ebf3d9b86571a4081e683420fda191f3fc44134ca095"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-03",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-03-trace.json",
+        "request_evidence_id": "E-M2-RET-03",
+        "sha256": "68dc5c538c1719508ebd540828a485519f1a2b732719ab2aedd2a2d439b6b3a1"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-03",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-03-audit.json",
+        "request_evidence_id": "E-M2-RET-03",
+        "sha256": "34f2666091d92bade16056302872c288925d9b6dfa240e8af5b7b30840ab53f2"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-04",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-04-trace.json",
+        "request_evidence_id": "E-M2-RET-04",
+        "sha256": "9256843c853168bee275ddbd5a657df2625e8d539442b471144e1ebcdfce627a"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-04",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-04-audit.json",
+        "request_evidence_id": "E-M2-RET-04",
+        "sha256": "ab569c9f4534bd9b4a4c5cb9bd564107a08983315b292da8ae83601ef3825106"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-05",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-05-trace.json",
+        "request_evidence_id": "E-M2-RET-05",
+        "sha256": "cc30b06d641903b23e5972887af00aec510d0f594af10691e52a1c8836f6b642"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-05",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-05-audit.json",
+        "request_evidence_id": "E-M2-RET-05",
+        "sha256": "1c805bf2775d579517fbc0261021090a05df51d2962b929a653422f0666e51df"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-06",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-06-trace.json",
+        "request_evidence_id": "E-M2-RET-06",
+        "sha256": "7c03be6ac1f5c4e7ecedd30f1dade5592be9a662958d348be4a96d7d6d7b4c42"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-06",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-06-audit.json",
+        "request_evidence_id": "E-M2-RET-06",
+        "sha256": "a3e2a800ecc22b814f4d98d35475a4f9d9ac8960331cb8773b2191a8705f391e"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-07",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-07-trace.json",
+        "request_evidence_id": "E-M2-RET-07",
+        "sha256": "1f2367d293dceef9ec0b11773e8d6c42a80425f1d136e77afe008520d1aa5989"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-07",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-07-audit.json",
+        "request_evidence_id": "E-M2-RET-07",
+        "sha256": "4978fce66489243bfca7dd55838e321a989aa231ccc3c1b8306e544022c668ad"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-08",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-08-trace.json",
+        "request_evidence_id": "E-M2-RET-08",
+        "sha256": "6e5e1a557b9d2301074a9e5e3130cbb5a82040ed630897d5638d4dd3985a1290"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-08",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-08-audit.json",
+        "request_evidence_id": "E-M2-RET-08",
+        "sha256": "f05f05b3de34bcd757ad795d6ccad12957cde3b3f1f53d2cda4ed84cb59a3bfd"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-09",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-09-trace.json",
+        "request_evidence_id": "E-M2-RET-09",
+        "sha256": "fd0ef80ec5c45d650356aaad2c37ef7dba032168c919dcc35f3f8ded4b48e664"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-09",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-09-audit.json",
+        "request_evidence_id": "E-M2-RET-09",
+        "sha256": "f1515999ccff0117705b94ea27f8f19f5fd6d8581fe4be7387fcdb1785db9330"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "TRACE-M2-RET-10",
+        "kind": "request_trace",
+        "path": "artifacts/m2-ret-10-trace.json",
+        "request_evidence_id": "E-M2-RET-10",
+        "sha256": "00ca500bfbb29003222afe18ba44bdc5f9fb6ec66043689801f388084bba7296"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "AUDIT-M2-RET-10",
+        "kind": "request_audit",
+        "path": "artifacts/m2-ret-10-audit.json",
+        "request_evidence_id": "E-M2-RET-10",
+        "sha256": "400dd42f2c1c6ac683615d2e2a7265fb9fe85a6612b9ed7523987b9036af3a93"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "SOURCE",
+        "kind": "source_tree",
+        "path": "artifacts/source-tree.tar.zst",
+        "request_evidence_id": null,
+        "sha256": "33ea3a4d37ed4bcb866cba36d61a99c0fa12ffe47f34f53ac2398d0d4950ff23"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "NSIS",
+        "kind": "nsis_package",
+        "path": "artifacts/candidate-installer.exe",
+        "request_evidence_id": null,
+        "sha256": "a756b9d0a307f327add5eb089c6af2c12ef3e361cb9f099726a7c88c0376fb6d"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "CANDIDATE",
+        "kind": "candidate_identity",
+        "path": "artifacts/candidate-identity.json",
+        "request_evidence_id": null,
+        "sha256": "3b199ba660591af0b083449fd4512ec4cb3f75aef30c950a305a874fbb312552"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "ENVIRONMENT",
+        "kind": "environment_attestation",
+        "path": "artifacts/environment-attestation.json",
+        "request_evidence_id": null,
+        "sha256": "e07d3c0ed9233c7453b7f0cf180bfd5375c580f5c640d0f8d6351f9adac24bb1"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "CREDENTIALS",
+        "kind": "credentials_test",
+        "path": "artifacts/credentials.json",
+        "request_evidence_id": null,
+        "sha256": "52619ff6fc6ca04870425a0980123d05b466c79576628c44f5ca5894bdc85bef"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "PRIVACY",
+        "kind": "privacy_scan",
+        "path": "artifacts/privacy.json",
+        "request_evidence_id": null,
+        "sha256": "e7b8d020ba70620188a1a19abf6a373277fb8ae920ecb435436c59d8cb868b89"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "SENTINEL",
+        "kind": "sentinel_observation",
+        "path": "artifacts/sentinel.json",
+        "request_evidence_id": null,
+        "sha256": "5bec8bc4c4c2d9446fa2ababca5e78df5ad66f50c70c476e8563521bbbe5b018"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "ASSETS",
+        "kind": "assets_review",
+        "path": "artifacts/assets.json",
+        "request_evidence_id": null,
+        "sha256": "226c6c14ac584cf2f05121ceeca8754942c5a949f93c377d1a767474995e8ec0"
+      },
+      {
+        "batch_id": "fixture-batch-v2",
+        "id": "SCENARIOS",
+        "kind": "scenario_contracts",
+        "path": "artifacts/scenario-contracts.json",
+        "request_evidence_id": null,
+        "sha256": "c0185a33e9f1705e33f4fd437a980ab59caeaccce80da473a093e6d946bcf10b"
+      }
+    ],
+    "scenarios": [
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-06",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-06",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-07",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-07",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-08",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-08",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_09",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-09",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_09",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-09",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_10",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-BASE-10",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_base_10",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-BASE-10",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-KB-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-KB-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-KB-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-KB-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-KB-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-KB-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-KB-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-KB-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-KB-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-KB-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-KB-06",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-KB-06",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-KB-07",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-KB-07",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-KB-08",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_kb_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-KB-08",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-PET-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-PET-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-PET-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-PET-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-PET-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-PET-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-PET-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-PET-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-PET-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_pet_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-PET-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-06",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-06",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-07",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-07",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-08",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-08",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_09",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-09",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_09",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-09",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_10",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-10",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_10",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-10",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_11",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-RAG-11",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_rag_11",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-RAG-11",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-06",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-06",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-07",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-07",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-08",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-08",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_09",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-09",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_09",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-09",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_10",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-AC-WX-10",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "acceptance_ac_wx_10",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "AC-WX-10",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "all_global_capabilities_enabled",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-CAP-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "all_global_capabilities_enabled",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-CAP-01"
+        ],
+        "scenario_id": "M2-CAP-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "approved_local_ocr_fallback",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 1,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-CAP-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "approved_local_ocr_fallback",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 1,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-CAP-02"
+        ],
+        "scenario_id": "M2-CAP-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 1,
+          "error_code": null,
+          "fault_injection": "non_loopback_embedding",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "fts_fallback",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-CAP-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 1,
+          "error_code": null,
+          "fault_injection": "non_loopback_embedding",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "fts_fallback",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-CAP-03"
+        ],
+        "scenario_id": "M2-CAP-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-KB-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-KB-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-KB-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-KB-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-KB-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-KB-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-KB-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-KB-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-KB-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-KB-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-KB-06",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-KB-06",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-KB-07",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-KB-07",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-KB-08",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "knowledge_generation_08",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-KB-08",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "timeout_then_success",
+          "forbidden_capability_total": 0,
+          "model_attempts": 2,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-MOD-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "timeout_then_success",
+          "forbidden_capability_total": 0,
+          "model_attempts": 2,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-MOD-01"
+        ],
+        "scenario_id": "M2-MOD-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "LLM_FAILED",
+          "fault_injection": "two_timeouts",
+          "forbidden_capability_total": 0,
+          "model_attempts": 2,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-MOD-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "LLM_FAILED",
+          "fault_injection": "two_timeouts",
+          "forbidden_capability_total": 0,
+          "model_attempts": 2,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-MOD-02"
+        ],
+        "scenario_id": "M2-MOD-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "retryable_provider_then_success",
+          "forbidden_capability_total": 0,
+          "model_attempts": 2,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-MOD-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "retryable_provider_then_success",
+          "forbidden_capability_total": 0,
+          "model_attempts": 2,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-MOD-03"
+        ],
+        "scenario_id": "M2-MOD-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "LLM_FAILED",
+          "fault_injection": "non_retryable_provider_error",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-MOD-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "LLM_FAILED",
+          "fault_injection": "non_retryable_provider_error",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-MOD-04"
+        ],
+        "scenario_id": "M2-MOD-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "LLM_FAILED",
+          "fault_injection": "invalid_model_output",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-MOD-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "LLM_FAILED",
+          "fault_injection": "invalid_model_output",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-MOD-05"
+        ],
+        "scenario_id": "M2-MOD-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "LLM_FAILED",
+          "fault_injection": "tool_call_response",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-MOD-06",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "LLM_FAILED",
+          "fault_injection": "tool_call_response",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-MOD-06"
+        ],
+        "scenario_id": "M2-MOD-06",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_REQUEST_CANCELLED",
+          "fault_injection": "late_model_result",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "cancelled",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-MOD-07",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_REQUEST_CANCELLED",
+          "fault_injection": "late_model_result",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "cancelled",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-MOD-07"
+        ],
+        "scenario_id": "M2-MOD-07",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "normal_success",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-OBS-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "normal_success",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-OBS-01"
+        ],
+        "scenario_id": "M2-OBS-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "no_hit",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "no_hit",
+          "selected_hit_count": 0,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-OBS-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "no_hit",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "no_hit",
+          "selected_hit_count": 0,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-OBS-02"
+        ],
+        "scenario_id": "M2-OBS-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 1,
+          "error_code": null,
+          "fault_injection": "embedding_unavailable_fts",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "fts_fallback",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-OBS-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 1,
+          "error_code": null,
+          "fault_injection": "embedding_unavailable_fts",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "fts_fallback",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-OBS-03"
+        ],
+        "scenario_id": "M2-OBS-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "model_timeout_then_success",
+          "forbidden_capability_total": 0,
+          "model_attempts": 2,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-OBS-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "model_timeout_then_success",
+          "forbidden_capability_total": 0,
+          "model_attempts": 2,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-OBS-04"
+        ],
+        "scenario_id": "M2-OBS-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_BUSY",
+          "fault_injection": "concurrent_trigger",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-OBS-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_BUSY",
+          "fault_injection": "concurrent_trigger",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-OBS-05"
+        ],
+        "scenario_id": "M2-OBS-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_REQUEST_CANCELLED",
+          "fault_injection": "cancel_late_result",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "cancelled",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-OBS-06",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_REQUEST_CANCELLED",
+          "fault_injection": "cancel_late_result",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "cancelled",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-OBS-06"
+        ],
+        "scenario_id": "M2-OBS-06",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "pet_resource_sentinel_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PET-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "pet_resource_sentinel_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PET-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "pet_resource_sentinel_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PET-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "pet_resource_sentinel_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PET-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "pet_resource_sentinel_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PET-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "pet_resource_sentinel_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PET-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "pet_resource_sentinel_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PET-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "pet_resource_sentinel_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PET-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PRIV-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_01",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PRIV-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PRIV-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_02",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PRIV-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PRIV-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_03",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PRIV-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PRIV-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_04",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PRIV-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PRIV-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_05",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PRIV-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PRIV-06",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_06",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PRIV-06",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-PRIV-07",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": null,
+          "fault_injection": "privacy_retention_07",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "not_applicable",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [],
+        "scenario_id": "M2-PRIV-07",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_NOT_READY",
+          "fault_injection": "kb_not_ready",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-01",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_NOT_READY",
+          "fault_injection": "kb_not_ready",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-01"
+        ],
+        "scenario_id": "M2-RET-01",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_SCOPE_UNRESOLVED",
+          "fault_injection": "scope_unresolved",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-02",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_SCOPE_UNRESOLVED",
+          "fault_injection": "scope_unresolved",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-02"
+        ],
+        "scenario_id": "M2-RET-02",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 1,
+          "error_code": null,
+          "fault_injection": "embedding_unavailable_fts",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "fts_fallback",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-03",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 1,
+          "error_code": null,
+          "fault_injection": "embedding_unavailable_fts",
+          "forbidden_capability_total": 0,
+          "model_attempts": 1,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "fts_fallback",
+          "selected_hit_count": 1,
+          "terminal": "reply_ready",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-03"
+        ],
+        "scenario_id": "M2-RET-03",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "sqlite_initial_busy",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-04",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "sqlite_initial_busy",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-04"
+        ],
+        "scenario_id": "M2-RET-04",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "sqlite_mid_retrieval_busy",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-05",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "sqlite_mid_retrieval_busy",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-05"
+        ],
+        "scenario_id": "M2-RET-05",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "corrupt_retrieval_payload",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-06",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "corrupt_retrieval_payload",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-06"
+        ],
+        "scenario_id": "M2-RET-06",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "context_assembly_overflow",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-07",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "context_assembly_overflow",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-07"
+        ],
+        "scenario_id": "M2-RET-07",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_REQUEST_STALE",
+          "fault_injection": "binding_invalid_before_retrieval",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-08",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_REQUEST_STALE",
+          "fault_injection": "binding_invalid_before_retrieval",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-08"
+        ],
+        "scenario_id": "M2-RET-08",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_REQUEST_STALE",
+          "fault_injection": "binding_invalid_before_transport",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-09",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "WX_REQUEST_STALE",
+          "fault_injection": "binding_invalid_before_transport",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "success",
+          "selected_hit_count": 1,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-09"
+        ],
+        "scenario_id": "M2-RET-09",
+        "status": "pass"
+      },
+      {
+        "expected": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "generation_switch_during_retrieval",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "id": "SC-M2-RET-10",
+        "observed": {
+          "candidate_batch_id": "fixture-batch-v2",
+          "embedding_attempts": 0,
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "fault_injection": "generation_switch_during_retrieval",
+          "forbidden_capability_total": 0,
+          "model_attempts": 0,
+          "ocr_local_process": 0,
+          "pet_sentinel_total": 0,
+          "retrieval_outcome": "none",
+          "selected_hit_count": null,
+          "terminal": "failed",
+          "upload_attempt_count": 0,
+          "upload_enqueue_count": 0
+        },
+        "request_evidence_ids": [
+          "E-M2-RET-10"
+        ],
+        "scenario_id": "M2-RET-10",
+        "status": "pass"
+      }
+    ],
+    "schema_version": 1
+  },
+  "fault_matrix": [
+    {
+      "evidence_ids": [
+        "SC-M2-CAP-01"
+      ],
+      "id": "M2-CAP-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-CAP-02"
+      ],
+      "id": "M2-CAP-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-CAP-03"
+      ],
+      "id": "M2-CAP-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-KB-01"
+      ],
+      "id": "M2-KB-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-KB-02"
+      ],
+      "id": "M2-KB-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-KB-03"
+      ],
+      "id": "M2-KB-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-KB-04"
+      ],
+      "id": "M2-KB-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-KB-05"
+      ],
+      "id": "M2-KB-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-KB-06"
+      ],
+      "id": "M2-KB-06",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-KB-07"
+      ],
+      "id": "M2-KB-07",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-KB-08"
+      ],
+      "id": "M2-KB-08",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-MOD-01"
+      ],
+      "id": "M2-MOD-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-MOD-02"
+      ],
+      "id": "M2-MOD-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-MOD-03"
+      ],
+      "id": "M2-MOD-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-MOD-04"
+      ],
+      "id": "M2-MOD-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-MOD-05"
+      ],
+      "id": "M2-MOD-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-MOD-06"
+      ],
+      "id": "M2-MOD-06",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-MOD-07"
+      ],
+      "id": "M2-MOD-07",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-OBS-01"
+      ],
+      "id": "M2-OBS-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-OBS-02"
+      ],
+      "id": "M2-OBS-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-OBS-03"
+      ],
+      "id": "M2-OBS-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-OBS-04"
+      ],
+      "id": "M2-OBS-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-OBS-05"
+      ],
+      "id": "M2-OBS-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-OBS-06"
+      ],
+      "id": "M2-OBS-06",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PET-01"
+      ],
+      "id": "M2-PET-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PET-02"
+      ],
+      "id": "M2-PET-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PET-03"
+      ],
+      "id": "M2-PET-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PET-04"
+      ],
+      "id": "M2-PET-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PRIV-01"
+      ],
+      "id": "M2-PRIV-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PRIV-02"
+      ],
+      "id": "M2-PRIV-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PRIV-03"
+      ],
+      "id": "M2-PRIV-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PRIV-04"
+      ],
+      "id": "M2-PRIV-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PRIV-05"
+      ],
+      "id": "M2-PRIV-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PRIV-06"
+      ],
+      "id": "M2-PRIV-06",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-PRIV-07"
+      ],
+      "id": "M2-PRIV-07",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-01"
+      ],
+      "id": "M2-RET-01",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-02"
+      ],
+      "id": "M2-RET-02",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-03"
+      ],
+      "id": "M2-RET-03",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-04"
+      ],
+      "id": "M2-RET-04",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-05"
+      ],
+      "id": "M2-RET-05",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-06"
+      ],
+      "id": "M2-RET-06",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-07"
+      ],
+      "id": "M2-RET-07",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-08"
+      ],
+      "id": "M2-RET-08",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-09"
+      ],
+      "id": "M2-RET-09",
+      "status": "pass"
+    },
+    {
+      "evidence_ids": [
+        "SC-M2-RET-10"
+      ],
+      "id": "M2-RET-10",
+      "status": "pass"
+    }
+  ],
+  "gate_id": "m2-observability-fixture-v2",
+  "generated_at": "2026-08-08T00:00:00Z",
+  "privacy_scan": {
+    "evidence_hits": 0,
+    "evidence_sha256": "e7b8d020ba70620188a1a19abf6a373277fb8ae920ecb435436c59d8cb868b89",
+    "package_hits": 0,
+    "source_hits": 0
+  },
+  "reference_assets_review": {
+    "evidence_sha256": "226c6c14ac584cf2f05121ceeca8754942c5a949f93c377d1a767474995e8ec0",
+    "status": "pass"
+  },
+  "request_evidence": [
+    {
+      "audit_sha256": "98bbf09ef00966f77f3407bf15146ad571ddcb22badb75830643dc688eddd5f7",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "694eebb91971b87281822e4da0042a55ec3a7915b49789070fe5faabd45f0006",
+          "kind": "retrieval_completed",
+          "model_request_id": "438f474ecf35495969bd4b4c710fe7b0",
+          "outcome": "success",
+          "request_id": "9069badd-0775-5353-aa49-98c4b74ac14a",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "694eebb91971b87281822e4da0042a55ec3a7915b49789070fe5faabd45f0006",
+          "kind": "model_transport_started",
+          "model_request_id": "438f474ecf35495969bd4b4c710fe7b0",
+          "request_bytes_sha256": "12d0a930a8abdd5e64adc3c3bda72385362087c497611a81b4c5a7e4914569c8",
+          "request_id": "9069badd-0775-5353-aa49-98c4b74ac14a",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "9069badd-0775-5353-aa49-98c4b74ac14a",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-CAP-01",
+      "logical_model_requests": 1,
+      "request_id": "9069badd-0775-5353-aa49-98c4b74ac14a",
+      "trace_sha256": "de630b3f27f90dc61501954eccd59894f276b90b4b03402f9c5d9b3da9853572",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "4ec02d650b09660c1d4a8182e3e3da98fe5698057a141b884d0012fe11f1da42",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 1,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "091f4ee0e05bc630bb75a0a5b261e3186c22717460013e8bfc404c33a5fc6e59",
+          "kind": "retrieval_completed",
+          "model_request_id": "65208f880320a3a35307020efc566a37",
+          "outcome": "success",
+          "request_id": "6e30f7b8-16a2-589b-96c2-77c9eb257c04",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "091f4ee0e05bc630bb75a0a5b261e3186c22717460013e8bfc404c33a5fc6e59",
+          "kind": "model_transport_started",
+          "model_request_id": "65208f880320a3a35307020efc566a37",
+          "request_bytes_sha256": "c013d47d9c014dfe8b3db741d7103fe17b9ea8f16075e7377fe947f426b17b10",
+          "request_id": "6e30f7b8-16a2-589b-96c2-77c9eb257c04",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "6e30f7b8-16a2-589b-96c2-77c9eb257c04",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-CAP-02",
+      "logical_model_requests": 1,
+      "request_id": "6e30f7b8-16a2-589b-96c2-77c9eb257c04",
+      "trace_sha256": "1442907ec2e932dec80bd7566f6ec037937269bbc0d10cef11df030974e4933c",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "ec5dda871e1ca0f30040ab4b7cf3242e67bc50df63d8b3ba21071b1cb67f85f1",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 1,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "92d588d6cafe406bcfdff2115a34db69ac25a3c683f0d1566127c0a975ceb838",
+          "kind": "retrieval_completed",
+          "model_request_id": "02f733e1b2887825ae8ffdfc60a11fcb",
+          "outcome": "fts_fallback",
+          "request_id": "7a5cb818-aa14-5355-aa48-f6f879f2adae",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "92d588d6cafe406bcfdff2115a34db69ac25a3c683f0d1566127c0a975ceb838",
+          "kind": "model_transport_started",
+          "model_request_id": "02f733e1b2887825ae8ffdfc60a11fcb",
+          "request_bytes_sha256": "29d1cb73a4169508718c9ece3c72464299b3eba92983dc30a25ff1d2d16595ff",
+          "request_id": "7a5cb818-aa14-5355-aa48-f6f879f2adae",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "7a5cb818-aa14-5355-aa48-f6f879f2adae",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-CAP-03",
+      "logical_model_requests": 1,
+      "request_id": "7a5cb818-aa14-5355-aa48-f6f879f2adae",
+      "trace_sha256": "a067734e42f6102f42fbcd2deef65f17294f9855ad7d3c262d658714532dbba2",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "9dd228856eae3b9da1f782f2b08f6ef02a772843e45fa9fcdeb0468e6b8c8e60",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 2,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "d1c0163ef17e920550ac502000b2fdbdf7652b3185be7c1842f227479dec0478",
+          "kind": "retrieval_completed",
+          "model_request_id": "d4cb5a9743cce3ba8015412c3556ea9a",
+          "outcome": "success",
+          "request_id": "20980177-299a-5d82-b8c5-43827378f723",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "d1c0163ef17e920550ac502000b2fdbdf7652b3185be7c1842f227479dec0478",
+          "kind": "model_transport_started",
+          "model_request_id": "d4cb5a9743cce3ba8015412c3556ea9a",
+          "request_bytes_sha256": "dd0c6c1be555e9c4206724709a325275334e7befa5809dc651f1f5c79f547eb4",
+          "request_id": "20980177-299a-5d82-b8c5-43827378f723",
+          "stage_seq": 5
+        },
+        {
+          "attempt": 2,
+          "binding_generation": 7,
+          "context_hash": "d1c0163ef17e920550ac502000b2fdbdf7652b3185be7c1842f227479dec0478",
+          "kind": "model_transport_started",
+          "model_request_id": "d4cb5a9743cce3ba8015412c3556ea9a",
+          "request_bytes_sha256": "dd0c6c1be555e9c4206724709a325275334e7befa5809dc651f1f5c79f547eb4",
+          "request_id": "20980177-299a-5d82-b8c5-43827378f723",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "20980177-299a-5d82-b8c5-43827378f723",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-MOD-01",
+      "logical_model_requests": 1,
+      "request_id": "20980177-299a-5d82-b8c5-43827378f723",
+      "trace_sha256": "8926d10d1054e0dcfca8488e971136c12408ccca30e5dea7081c94cba59de448",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "0bd1ada1fc3b16803207c89329d22cbaa42332fc678446cc22904ba1740b2444",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 2,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "09f7ff40abe0742040a68b324bc5211a0a6c0b9bfb63de5a0bdce0fbc9527d97",
+          "kind": "retrieval_completed",
+          "model_request_id": "9c14b8f6f9557278d52c3bdd5979f176",
+          "outcome": "success",
+          "request_id": "d790afff-b8ca-58d8-8d85-074526e12505",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "09f7ff40abe0742040a68b324bc5211a0a6c0b9bfb63de5a0bdce0fbc9527d97",
+          "kind": "model_transport_started",
+          "model_request_id": "9c14b8f6f9557278d52c3bdd5979f176",
+          "request_bytes_sha256": "e23a68f5949a87cb72a612b09668c1cb3332f09be6e5364a04baa5162a9effe1",
+          "request_id": "d790afff-b8ca-58d8-8d85-074526e12505",
+          "stage_seq": 5
+        },
+        {
+          "attempt": 2,
+          "binding_generation": 7,
+          "context_hash": "09f7ff40abe0742040a68b324bc5211a0a6c0b9bfb63de5a0bdce0fbc9527d97",
+          "kind": "model_transport_started",
+          "model_request_id": "9c14b8f6f9557278d52c3bdd5979f176",
+          "request_bytes_sha256": "e23a68f5949a87cb72a612b09668c1cb3332f09be6e5364a04baa5162a9effe1",
+          "request_id": "d790afff-b8ca-58d8-8d85-074526e12505",
+          "stage_seq": 5
+        },
+        {
+          "error_code": "LLM_FAILED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "d790afff-b8ca-58d8-8d85-074526e12505",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-MOD-02",
+      "logical_model_requests": 1,
+      "request_id": "d790afff-b8ca-58d8-8d85-074526e12505",
+      "trace_sha256": "eda2cf0f5157e5193b174591e7701f23950fbc59777e2b1e92ffba5a874caf8f",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "3718545e0e88d479ce22159bcf7d2065e552fa6de9f8770a562329025f80600a",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 2,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "5962db21a1e4248118996a1575572a99288e9d1b8c0ee056995fa47e19db70fd",
+          "kind": "retrieval_completed",
+          "model_request_id": "bcd94e4d2c68c6824a727f7ac233a7c0",
+          "outcome": "success",
+          "request_id": "450ce992-e36e-542e-b28e-e6872fdee7ac",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "5962db21a1e4248118996a1575572a99288e9d1b8c0ee056995fa47e19db70fd",
+          "kind": "model_transport_started",
+          "model_request_id": "bcd94e4d2c68c6824a727f7ac233a7c0",
+          "request_bytes_sha256": "fa18b3d5093c64d23f44d18325fd2cb36bd95b85f014eb609a1654e8920b9181",
+          "request_id": "450ce992-e36e-542e-b28e-e6872fdee7ac",
+          "stage_seq": 5
+        },
+        {
+          "attempt": 2,
+          "binding_generation": 7,
+          "context_hash": "5962db21a1e4248118996a1575572a99288e9d1b8c0ee056995fa47e19db70fd",
+          "kind": "model_transport_started",
+          "model_request_id": "bcd94e4d2c68c6824a727f7ac233a7c0",
+          "request_bytes_sha256": "fa18b3d5093c64d23f44d18325fd2cb36bd95b85f014eb609a1654e8920b9181",
+          "request_id": "450ce992-e36e-542e-b28e-e6872fdee7ac",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "450ce992-e36e-542e-b28e-e6872fdee7ac",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-MOD-03",
+      "logical_model_requests": 1,
+      "request_id": "450ce992-e36e-542e-b28e-e6872fdee7ac",
+      "trace_sha256": "0009ff3c846dd34bc1206d7d780f62c43d4dfd1c30095cd4fe4cba05e183288a",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "cf93231e1d967a7f54bf2bda01651b24a5280c28cd145c6bf11e611b943d2f1d",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "0e2bfffc9622f46ee67ef5f62b78e83a3ba07f8083ed2c9a0ec6c20687cc7072",
+          "kind": "retrieval_completed",
+          "model_request_id": "ed8f076b36d6b8fe49fade48eb4b6d63",
+          "outcome": "success",
+          "request_id": "0f317163-1e97-5066-85d1-7c16a8e6d184",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "0e2bfffc9622f46ee67ef5f62b78e83a3ba07f8083ed2c9a0ec6c20687cc7072",
+          "kind": "model_transport_started",
+          "model_request_id": "ed8f076b36d6b8fe49fade48eb4b6d63",
+          "request_bytes_sha256": "2960c4bd35f499882a7b846a36fec03456d6289eb3b6bcdef9262f6937216ae9",
+          "request_id": "0f317163-1e97-5066-85d1-7c16a8e6d184",
+          "stage_seq": 5
+        },
+        {
+          "error_code": "LLM_FAILED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "0f317163-1e97-5066-85d1-7c16a8e6d184",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-MOD-04",
+      "logical_model_requests": 1,
+      "request_id": "0f317163-1e97-5066-85d1-7c16a8e6d184",
+      "trace_sha256": "8a6b11b5111589fc28ba5cb7d2c227a407cf46750df3af6a08a7278bfcb647d6",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "0fa7d7cee375974e96ef03c10f0f6d5ba09140fa34c0f90f6d750624bef577cf",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "beae92e3b16e02687047763cd7d30231b4e23423f1936d7962f98b43c18e0e0c",
+          "kind": "retrieval_completed",
+          "model_request_id": "f4c8064c802928be9eca52cfe4c8fa1b",
+          "outcome": "success",
+          "request_id": "9503d7ed-0981-53d5-bfe4-a8a12c8a1eb6",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "beae92e3b16e02687047763cd7d30231b4e23423f1936d7962f98b43c18e0e0c",
+          "kind": "model_transport_started",
+          "model_request_id": "f4c8064c802928be9eca52cfe4c8fa1b",
+          "request_bytes_sha256": "7fca4833df1bb2529d50a57dc506784aec2aaee24171c1c7b07650277bf72df0",
+          "request_id": "9503d7ed-0981-53d5-bfe4-a8a12c8a1eb6",
+          "stage_seq": 5
+        },
+        {
+          "error_code": "LLM_FAILED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "9503d7ed-0981-53d5-bfe4-a8a12c8a1eb6",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-MOD-05",
+      "logical_model_requests": 1,
+      "request_id": "9503d7ed-0981-53d5-bfe4-a8a12c8a1eb6",
+      "trace_sha256": "4fcbcb388126ad7bd12879dd032aaaadf8813be6224f9a5a21581faaf3cdc5e9",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "530a6189fe0a2ff1ddb2e0dc449794d88cf766dae785b073598a29911b9af8e3",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "53062641d71d5675717d8adc0075a76f1bbc5432bc1483803c981fd7061e2412",
+          "kind": "retrieval_completed",
+          "model_request_id": "b2d32ddba15492b3b37b6b60b575ab59",
+          "outcome": "success",
+          "request_id": "28cb4b90-4d89-5dc5-9e45-70d45059b0d7",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "53062641d71d5675717d8adc0075a76f1bbc5432bc1483803c981fd7061e2412",
+          "kind": "model_transport_started",
+          "model_request_id": "b2d32ddba15492b3b37b6b60b575ab59",
+          "request_bytes_sha256": "6cf12bd9fcb5409ae05cabbce75d3102b9eb35335e65310d183ea418ce2f18eb",
+          "request_id": "28cb4b90-4d89-5dc5-9e45-70d45059b0d7",
+          "stage_seq": 5
+        },
+        {
+          "error_code": "LLM_FAILED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "28cb4b90-4d89-5dc5-9e45-70d45059b0d7",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-MOD-06",
+      "logical_model_requests": 1,
+      "request_id": "28cb4b90-4d89-5dc5-9e45-70d45059b0d7",
+      "trace_sha256": "3fb696acf8193b975e0ea831ae7085253700b0dea135c93d50ca6c57b3e370fc",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "6b559f05d6b6e5484e5d3ee67eaf0f5235ac06e3cc196b426a93f60f86ad3067",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "0757ab954ba0efbea55d0d1c83e0dd535073b8a5ff2eb56bdb9635f7beb007ad",
+          "kind": "retrieval_completed",
+          "model_request_id": "b845b7deca09923082c46563e90606a7",
+          "outcome": "success",
+          "request_id": "16fac624-92e7-5b42-9a7c-ccc3f239a55a",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "0757ab954ba0efbea55d0d1c83e0dd535073b8a5ff2eb56bdb9635f7beb007ad",
+          "kind": "model_transport_started",
+          "model_request_id": "b845b7deca09923082c46563e90606a7",
+          "request_bytes_sha256": "48f3a29534cf343d8b9359c12a8b0c06b9bed8149933944c8480f91e2db3a422",
+          "request_id": "16fac624-92e7-5b42-9a7c-ccc3f239a55a",
+          "stage_seq": 5
+        },
+        {
+          "error_code": "WX_REQUEST_CANCELLED",
+          "kind": "terminal",
+          "outcome": "cancelled",
+          "request_id": "16fac624-92e7-5b42-9a7c-ccc3f239a55a",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-MOD-07",
+      "logical_model_requests": 1,
+      "request_id": "16fac624-92e7-5b42-9a7c-ccc3f239a55a",
+      "trace_sha256": "82d029b986895112db69b23f3c682565df6f147b20fb13a220d46a2dcfb67273",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "9931714e154d71ca904b54149ada5971aa79287b037454042cb420d8dc90a063",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "759eda3f98190414304fb9dedcff32612c9b718558c430f75d11fa19eb361867",
+          "kind": "retrieval_completed",
+          "model_request_id": "95592976745db52ae2343eaff15daa1a",
+          "outcome": "success",
+          "request_id": "963213d0-6619-5400-9fd6-28e3687c13db",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "759eda3f98190414304fb9dedcff32612c9b718558c430f75d11fa19eb361867",
+          "kind": "model_transport_started",
+          "model_request_id": "95592976745db52ae2343eaff15daa1a",
+          "request_bytes_sha256": "7cf51ce622046f3f3a204f6e55eadc8392d02ad863a2f75ed2ed8e3f438c4552",
+          "request_id": "963213d0-6619-5400-9fd6-28e3687c13db",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "963213d0-6619-5400-9fd6-28e3687c13db",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-OBS-01",
+      "logical_model_requests": 1,
+      "request_id": "963213d0-6619-5400-9fd6-28e3687c13db",
+      "trace_sha256": "aec4c63aaac7d3bfe5137e431796bcea00d30a19d616e3f42a75b5482e215819",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "46cf92f7039b548a2018987e198d670b0f860401f4b0ffcac204bbe57d1564a5",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "0daa887a248366b6c1af965d0c85f3b209f0becc5469c019c25570c658e7726c",
+          "kind": "retrieval_completed",
+          "model_request_id": "c146540165e20617a1fc3496f6322e76",
+          "outcome": "no_hit",
+          "request_id": "f0192804-93f7-50c3-938d-746d94aba271",
+          "selected_hit_count": 0,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "0daa887a248366b6c1af965d0c85f3b209f0becc5469c019c25570c658e7726c",
+          "kind": "model_transport_started",
+          "model_request_id": "c146540165e20617a1fc3496f6322e76",
+          "request_bytes_sha256": "8d6380c709c58b23e30bc5fe79e6213af144b55eedfa9826dfa7ec1b9729d303",
+          "request_id": "f0192804-93f7-50c3-938d-746d94aba271",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "f0192804-93f7-50c3-938d-746d94aba271",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-OBS-02",
+      "logical_model_requests": 1,
+      "request_id": "f0192804-93f7-50c3-938d-746d94aba271",
+      "trace_sha256": "9fa1cecf0acc51b32f569f74bbdea0e82289a2b267edd2814fc2e96db1f0a6dd",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "3849c9d4ded2e45a4dbcbadd114e7619feb3e2c6a53d349ba7dbb8efe8f4843e",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 1,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "165f3eb0d49f788f35d42349032f836ae40f516ee2f6a3d0cb1dde0f561e2bea",
+          "kind": "retrieval_completed",
+          "model_request_id": "0a14db1b85efd95e0e86d3674d5df37a",
+          "outcome": "fts_fallback",
+          "request_id": "35ed93b8-2ef6-529e-99a7-209ab6a669f5",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "165f3eb0d49f788f35d42349032f836ae40f516ee2f6a3d0cb1dde0f561e2bea",
+          "kind": "model_transport_started",
+          "model_request_id": "0a14db1b85efd95e0e86d3674d5df37a",
+          "request_bytes_sha256": "1ed259dc943fbdf84844d2e0e52c7b74397f7778a2f2cc38f41e3d4c79e1dceb",
+          "request_id": "35ed93b8-2ef6-529e-99a7-209ab6a669f5",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "35ed93b8-2ef6-529e-99a7-209ab6a669f5",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-OBS-03",
+      "logical_model_requests": 1,
+      "request_id": "35ed93b8-2ef6-529e-99a7-209ab6a669f5",
+      "trace_sha256": "ff3fe05dc6d58c067a0ae80c33b36d61a5eca1abdc9510e835b9c53d5100d5cd",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "309aac1911685c85148f25b686c9e282294c17756af2becfa7bd2225e45f67f5",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 2,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "6ddef711fbcd468980b6be1458adbb9c52fa0cc95335700c02582ec42cb8494a",
+          "kind": "retrieval_completed",
+          "model_request_id": "7cd4a98b2babb2f78e0dfa856a88f00a",
+          "outcome": "success",
+          "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "6ddef711fbcd468980b6be1458adbb9c52fa0cc95335700c02582ec42cb8494a",
+          "kind": "model_transport_started",
+          "model_request_id": "7cd4a98b2babb2f78e0dfa856a88f00a",
+          "request_bytes_sha256": "4a95b4333bce5542d655cf837d3675eaba837ca0fe9ddfe39a0c0228dc78ceee",
+          "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+          "stage_seq": 5
+        },
+        {
+          "attempt": 2,
+          "binding_generation": 7,
+          "context_hash": "6ddef711fbcd468980b6be1458adbb9c52fa0cc95335700c02582ec42cb8494a",
+          "kind": "model_transport_started",
+          "model_request_id": "7cd4a98b2babb2f78e0dfa856a88f00a",
+          "request_bytes_sha256": "4a95b4333bce5542d655cf837d3675eaba837ca0fe9ddfe39a0c0228dc78ceee",
+          "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-OBS-04",
+      "logical_model_requests": 1,
+      "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+      "trace_sha256": "3734b5feed337bf424a1bc32902b5e9db83fb0c1c2dcbac8391d0a68e0c3cc69",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "8be41da274e77063e594ccf0dffb8e359b0d581fce5ee8cfdec4ec7ad600a58d",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "error_code": "WX_BUSY",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "119555e4-86d2-573f-8f19-1502907b59be",
+          "stage_seq": 2
+        }
+      ],
+      "id": "E-M2-OBS-05",
+      "logical_model_requests": 0,
+      "request_id": "119555e4-86d2-573f-8f19-1502907b59be",
+      "trace_sha256": "15a0652080d6f1cd1ebfdea6d3f990430708797a9bfcd473a112b8f1e6750884",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "8d2e89f0418d5fa6d263d8b32c22a8d99e3ecd20c01668ca31017aef9b5db554",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "203caef9d62d9d1e51cc6dfe7b62f05431c6631ad3b48d9d373f36ff0f8db0be",
+          "kind": "retrieval_completed",
+          "model_request_id": "fd792d35e3f385160eb51d1b9327b91e",
+          "outcome": "success",
+          "request_id": "d70fbf41-1bc6-59b8-9b5b-5ade13c4b096",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "203caef9d62d9d1e51cc6dfe7b62f05431c6631ad3b48d9d373f36ff0f8db0be",
+          "kind": "model_transport_started",
+          "model_request_id": "fd792d35e3f385160eb51d1b9327b91e",
+          "request_bytes_sha256": "5cb24db48a8728a933190c91e83d9be6a85e7bd88e66f6840949ddc9a94f668b",
+          "request_id": "d70fbf41-1bc6-59b8-9b5b-5ade13c4b096",
+          "stage_seq": 5
+        },
+        {
+          "error_code": "WX_REQUEST_CANCELLED",
+          "kind": "terminal",
+          "outcome": "cancelled",
+          "request_id": "d70fbf41-1bc6-59b8-9b5b-5ade13c4b096",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-OBS-06",
+      "logical_model_requests": 1,
+      "request_id": "d70fbf41-1bc6-59b8-9b5b-5ade13c4b096",
+      "trace_sha256": "f7fa530ecc915b002eed6bb3a40e0ad5201af6b19b69cdcabd19787929d01a7d",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "5e732cdb410ebb642b5f6c2aa3d71c8155ee22a8f4b330e040a067d5c6b392d8",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "error_code": "KB_NOT_READY",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "91aea51f-7745-5613-966d-1ef75567699c",
+          "stage_seq": 2
+        }
+      ],
+      "id": "E-M2-RET-01",
+      "logical_model_requests": 0,
+      "request_id": "91aea51f-7745-5613-966d-1ef75567699c",
+      "trace_sha256": "2cd7660d061951e0d7fd9af66ca709cbee0ab1886360660a189f7f4d5e1c6108",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "f8a0ef4a16960c926b01ebf3d9b86571a4081e683420fda191f3fc44134ca095",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "error_code": "KB_SCOPE_UNRESOLVED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "896ec63d-4b2b-5b59-9c7e-7c4d3bfd962c",
+          "stage_seq": 2
+        }
+      ],
+      "id": "E-M2-RET-02",
+      "logical_model_requests": 0,
+      "request_id": "896ec63d-4b2b-5b59-9c7e-7c4d3bfd962c",
+      "trace_sha256": "d70e023b760a3f5872cfe1e1cfd6ee3aa24aa1c4de964d854f3c2bad68c7602c",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "34f2666091d92bade16056302872c288925d9b6dfa240e8af5b7b30840ab53f2",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 1,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 1,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "be287854b0aad0b53993414aa62dcec6ac6e3acf5a0e10e4ad694963f584d729",
+          "kind": "retrieval_completed",
+          "model_request_id": "0389e004b584321cb6267915a6e739ec",
+          "outcome": "fts_fallback",
+          "request_id": "f0347851-c09c-5dc6-9665-f7110a80313a",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "attempt": 1,
+          "binding_generation": 7,
+          "context_hash": "be287854b0aad0b53993414aa62dcec6ac6e3acf5a0e10e4ad694963f584d729",
+          "kind": "model_transport_started",
+          "model_request_id": "0389e004b584321cb6267915a6e739ec",
+          "request_bytes_sha256": "1acb3003587850dd75100dec1a56800f6f11f3df02279201965106097afece69",
+          "request_id": "f0347851-c09c-5dc6-9665-f7110a80313a",
+          "stage_seq": 5
+        },
+        {
+          "error_code": null,
+          "kind": "terminal",
+          "outcome": "reply_ready",
+          "request_id": "f0347851-c09c-5dc6-9665-f7110a80313a",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-RET-03",
+      "logical_model_requests": 1,
+      "request_id": "f0347851-c09c-5dc6-9665-f7110a80313a",
+      "trace_sha256": "68dc5c538c1719508ebd540828a485519f1a2b732719ab2aedd2a2d439b6b3a1",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "ab569c9f4534bd9b4a4c5cb9bd564107a08983315b292da8ae83601ef3825106",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "167c4d90-b40f-52e1-8421-05bcb059fca1",
+          "stage_seq": 2
+        }
+      ],
+      "id": "E-M2-RET-04",
+      "logical_model_requests": 0,
+      "request_id": "167c4d90-b40f-52e1-8421-05bcb059fca1",
+      "trace_sha256": "9256843c853168bee275ddbd5a657df2625e8d539442b471144e1ebcdfce627a",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "1c805bf2775d579517fbc0261021090a05df51d2962b929a653422f0666e51df",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "35862d3e-ee00-5066-bf12-ad7c17780c54",
+          "stage_seq": 2
+        }
+      ],
+      "id": "E-M2-RET-05",
+      "logical_model_requests": 0,
+      "request_id": "35862d3e-ee00-5066-bf12-ad7c17780c54",
+      "trace_sha256": "cc30b06d641903b23e5972887af00aec510d0f594af10691e52a1c8836f6b642",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "a3e2a800ecc22b814f4d98d35475a4f9d9ac8960331cb8773b2191a8705f391e",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "1fa4bae4-6945-56da-b50a-a580c9894fd1",
+          "stage_seq": 2
+        }
+      ],
+      "id": "E-M2-RET-06",
+      "logical_model_requests": 0,
+      "request_id": "1fa4bae4-6945-56da-b50a-a580c9894fd1",
+      "trace_sha256": "7c03be6ac1f5c4e7ecedd30f1dade5592be9a662958d348be4a96d7d6d7b4c42",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "4978fce66489243bfca7dd55838e321a989aa231ccc3c1b8306e544022c668ad",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "c391b08a-d537-5ad6-b59a-1a47d1c2f3b3",
+          "stage_seq": 2
+        }
+      ],
+      "id": "E-M2-RET-07",
+      "logical_model_requests": 0,
+      "request_id": "c391b08a-d537-5ad6-b59a-1a47d1c2f3b3",
+      "trace_sha256": "1f2367d293dceef9ec0b11773e8d6c42a80425f1d136e77afe008520d1aa5989",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "f05f05b3de34bcd757ad795d6ccad12957cde3b3f1f53d2cda4ed84cb59a3bfd",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "error_code": "WX_REQUEST_STALE",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "c05078ea-859c-5780-bee8-8bdff223568d",
+          "stage_seq": 2
+        }
+      ],
+      "id": "E-M2-RET-08",
+      "logical_model_requests": 0,
+      "request_id": "c05078ea-859c-5780-bee8-8bdff223568d",
+      "trace_sha256": "6e5e1a557b9d2301074a9e5e3130cbb5a82040ed630897d5638d4dd3985a1290",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "f1515999ccff0117705b94ea27f8f19f5fd6d8581fe4be7387fcdb1785db9330",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "binding_generation": 7,
+          "context_hash": "ad32824b04a65bf20e28a7cd7f02df985e94ca027c812e7a561a3e27038c3f8d",
+          "kind": "retrieval_completed",
+          "model_request_id": "4807ac099af8076d7a81dda2ecf3b9ed",
+          "outcome": "success",
+          "request_id": "35ad29aa-cbd1-5ed5-b0a8-8eb6127aaace",
+          "selected_hit_count": 1,
+          "stage_seq": 5
+        },
+        {
+          "error_code": "WX_REQUEST_STALE",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "35ad29aa-cbd1-5ed5-b0a8-8eb6127aaace",
+          "stage_seq": 6
+        }
+      ],
+      "id": "E-M2-RET-09",
+      "logical_model_requests": 0,
+      "request_id": "35ad29aa-cbd1-5ed5-b0a8-8eb6127aaace",
+      "trace_sha256": "fd0ef80ec5c45d650356aaad2c37ef7dba032168c919dcc35f3f8ded4b48e664",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    },
+    {
+      "audit_sha256": "400dd42f2c1c6ac683615d2e2a7265fb9fe85a6612b9ed7523987b9036af3a93",
+      "counts": {
+        "action": 0,
+        "bot": 0,
+        "cloudEmbedding": 0,
+        "knowledgeEmbeddingLoopback": 0,
+        "localhostApi": 0,
+        "mcp": 0,
+        "ocrBackendLocalProcess": 0,
+        "petResourceExternalProcess": 0,
+        "petResourceModuleLoad": 0,
+        "petResourceNetwork": 0,
+        "petResourceSyntheticInput": 0,
+        "remoteUpload": 0,
+        "replyModelNonLoopback": 0,
+        "search": 0
+      },
+      "events": [
+        {
+          "error_code": "KB_RETRIEVAL_FAILED",
+          "kind": "terminal",
+          "outcome": "failed",
+          "request_id": "38b19494-c353-508d-948c-7606d4af477d",
+          "stage_seq": 2
+        }
+      ],
+      "id": "E-M2-RET-10",
+      "logical_model_requests": 0,
+      "request_id": "38b19494-c353-508d-948c-7606d4af477d",
+      "trace_sha256": "00ca500bfbb29003222afe18ba44bdc5f9fb6ec66043689801f388084bba7296",
+      "upload_attempt_count": 0,
+      "upload_enqueue_count": 0
+    }
+  ],
+  "schema_version": 1,
+  "sentinel_counters": {
+    "counts": {
+      "childProcess": 0,
+      "fileAccess": 0,
+      "moduleLoad": 0,
+      "network": 0,
+      "syntheticInput": 0
+    },
+    "evidence_sha256": "5bec8bc4c4c2d9446fa2ababca5e78df5ad66f50c70c476e8563521bbbe5b018",
+    "status": "pass"
+  },
+  "verdict": "blocked"
+}

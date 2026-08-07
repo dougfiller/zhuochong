@@ -2,10 +2,12 @@
 use super::model_client::WechatReplyModelClient;
 #[cfg(feature = "wechat-m2")]
 use super::model_contract::build_model_context;
+#[cfg(feature = "wechat-m2")]
+use super::observability::{AuditOutcomeCode, M2AuditEvent, M2AuditSink};
+#[cfg(any(target_os = "windows", all(test, feature = "wechat-m2")))]
+use super::ocr::{WechatOcrAuditEvent, WechatOcrAuditSink};
 #[cfg(target_os = "windows")]
-use super::ocr::{
-    WechatOcrAuditEvent, WechatOcrAuditSink, WechatOcrDispatcher, WindowsMemoryPrimary,
-};
+use super::ocr::{WechatOcrDispatcher, WindowsMemoryPrimary};
 use super::runtime::{BeginReplySnapshot, CaptureCoordinator, ReplyLease, WechatReplyRuntime};
 use super::state_machine::ReplyMode;
 use super::state_machine::ReplyState;
@@ -34,6 +36,32 @@ struct DiscardOcrAudit;
 #[cfg(target_os = "windows")]
 impl WechatOcrAuditSink for DiscardOcrAudit {
     fn record(&mut self, _event: WechatOcrAuditEvent) {}
+}
+
+#[cfg(all(feature = "wechat-m2", any(target_os = "windows", test)))]
+struct M2OcrAudit<'a> {
+    request_id: &'a super::types::RequestId,
+    sink: &'a dyn M2AuditSink,
+    error: Option<ContractError>,
+}
+
+#[cfg(all(feature = "wechat-m2", any(target_os = "windows", test)))]
+impl WechatOcrAuditSink for M2OcrAudit<'_> {
+    fn record(&mut self, event: WechatOcrAuditEvent) {
+        let observed = if event.provider == "LocalFallback" {
+            M2AuditEvent::ocr_local_process_started(self.request_id)
+        } else {
+            M2AuditEvent::capability_observed(
+                self.request_id,
+                super::observability::CapabilityKind::OcrBackendLocalProcess,
+                0,
+            )
+        }
+        .and_then(|event| self.sink.record(event));
+        if let Err(error) = observed {
+            self.error = Some(error);
+        }
+    }
 }
 
 #[cfg(feature = "wechat-m1")]
@@ -259,6 +287,7 @@ fn retrieval_error(error: crate::knowledge::KnowledgeError) -> ContractError {
         crate::knowledge::KnowledgeError::NotReady => ContractError::KbNotReady,
         crate::knowledge::KnowledgeError::ScopeUnresolved => ContractError::KbScopeUnresolved,
         crate::knowledge::KnowledgeError::RetrievalFailed => ContractError::KbRetrievalFailed,
+        crate::knowledge::KnowledgeError::AuditPersistFailed => ContractError::WxAuditPersistFailed,
     }
 }
 
@@ -281,6 +310,7 @@ trait M2ReplyTailPort {
     async fn retrieve(
         &mut self,
         request: crate::knowledge::KnowledgeRetrieveRequest,
+        audit: &dyn M2AuditSink,
     ) -> Result<crate::knowledge::types::RetrievedReply, crate::knowledge::KnowledgeError>;
 }
 
@@ -294,6 +324,7 @@ async fn finish_captured_m2_reply(
     profiles: Vec<crate::config::TextModelProfile>,
     port: &mut dyn M2ReplyTailPort,
     client: &WechatReplyModelClient,
+    terminal_stage: &mut u64,
 ) -> Result<GeneratedReply, ContractError> {
     complete_m2_revalidation(
         runtime,
@@ -304,17 +335,20 @@ async fn finish_captured_m2_reply(
     )?;
     let (binding_generation, bound_conversation_id, scope) = port.retrieval_scope();
     let retrieval = port
-        .retrieve(crate::knowledge::KnowledgeRetrieveRequest {
-            request_id: lease.request_id().clone(),
-            query_text: query,
-            binding_generation,
-            bound_conversation_id,
-            scope,
-            top_k: knowledge.top_k,
-            token_budget: knowledge.token_budget,
-            token_counter_version: "v1".into(),
-            same_conversation_boost: knowledge.same_conversation_boost,
-        })
+        .retrieve(
+            crate::knowledge::KnowledgeRetrieveRequest {
+                request_id: lease.request_id().clone(),
+                query_text: query,
+                binding_generation,
+                bound_conversation_id,
+                scope,
+                top_k: knowledge.top_k,
+                token_budget: knowledge.token_budget,
+                token_counter_version: "v1".into(),
+                same_conversation_boost: knowledge.same_conversation_boost,
+            },
+            client.m2_audit_sink(),
+        )
         .await;
     let retrieval = match retrieval {
         Ok(reply) => reply,
@@ -336,6 +370,29 @@ async fn finish_captured_m2_reply(
     let trace_metadata =
         super::trace::M2TraceMetadata::from_audit(&built.audit, model_request_id.clone())?;
     runtime.complete_retrieval(lease, &built.context, trace_metadata)?;
+    *terminal_stage = 6;
+    let retrieval_outcome = if built.audit.status == crate::knowledge::types::RetrievalStatus::NoHit
+    {
+        AuditOutcomeCode::RetrievalNoHit
+    } else if built.audit.retrieval_mode == crate::knowledge::types::RetrievalMode::FtsFallback {
+        AuditOutcomeCode::RetrievalFtsFallback
+    } else {
+        AuditOutcomeCode::RetrievalSuccess
+    };
+    if let Err(error) = client
+        .m2_audit_sink()
+        .record(M2AuditEvent::retrieval_completed(
+            lease.request_id(),
+            built.audit.binding_generation,
+            built.audit.context_hash.as_str().to_owned(),
+            model_request_id.clone(),
+            built.audit.selected_hits.len() as u8,
+            retrieval_outcome,
+        )?)
+    {
+        finish_failed(runtime, lease.clone(), ReplyState::Generating, error);
+        return Err(error);
+    }
     complete_m2_revalidation(
         runtime,
         lease,
@@ -399,8 +456,11 @@ impl M2ReplyTailPort for WindowsM2ReplyTailPort<'_> {
     async fn retrieve(
         &mut self,
         request: crate::knowledge::KnowledgeRetrieveRequest,
+        audit: &dyn M2AuditSink,
     ) -> Result<crate::knowledge::types::RetrievedReply, crate::knowledge::KnowledgeError> {
-        self.store.knowledge_retrieve(request).await
+        self.store
+            .knowledge_retrieve_with_audit(request, Some(audit))
+            .await
     }
 }
 
@@ -429,93 +489,130 @@ pub(crate) async fn generate_m2_wechat_reply(
         super::commands::begin_m2_binding_request(&app, store, runtime, coordinator, binding)?;
     let lease = runtime.begin_reply(
         m2_snapshot(&binding_request),
-        ReplyTraceStore::new(data_dir),
+        ReplyTraceStore::new(&data_dir),
     )?;
-    let cancel = runtime.cancellation_receiver(&lease)?;
-    let identity = match runtime.validate_foreground_wechat() {
-        Ok(identity) => identity,
-        Err(error) => {
-            finish_failed(runtime, lease, ReplyState::Validating, error);
+    let client = WechatReplyModelClient::new_with_m2_audit(&data_dir);
+    let request_id = lease.request_id().clone();
+    let mut terminal_stage = 2;
+    let result = async {
+        let cancel = runtime.cancellation_receiver(&lease)?;
+        let identity = match runtime.validate_foreground_wechat() {
+            Ok(identity) => identity,
+            Err(error) => {
+                finish_failed(runtime, lease.clone(), ReplyState::Validating, error);
+                return Err(error);
+            }
+        };
+        runtime.transition(
+            &lease,
+            ReplyState::Validating,
+            ReplyState::Capturing,
+            None,
+            None,
+        )?;
+        terminal_stage = 3;
+        let (slices, identity) = match runtime
+            .capture_foreground_wechat(
+                app.clone(),
+                coordinator,
+                screenshot_service.clone(),
+                identity,
+                request_id.clone(),
+                CAPTURE_TIMEOUT,
+                Some(cancel),
+            )
+            .await
+        {
+            Ok(result) => result,
+            Err(error) => {
+                finish_failed(runtime, lease.clone(), ReplyState::Capturing, error);
+                return Err(error);
+            }
+        };
+        let captured = CapturedWechat {
+            request_id: request_id.clone(),
+            capture_version: slices.capture_version,
+            stable_message_id: "m2-capture".into(),
+            is_single_chat: true,
+        };
+        let mut dispatcher =
+            WechatOcrDispatcher::new(WindowsMemoryPrimary, super::ocr::DisabledLocalFallback);
+        let mut audit_sink = M2OcrAudit {
+            request_id: &request_id,
+            sink: client.m2_audit_sink(),
+            error: None,
+        };
+        let ocr = dispatcher.recognize(&slices, &identity, captured, &mut audit_sink);
+        if let Some(error) = audit_sink.error {
+            finish_failed(runtime, lease.clone(), ReplyState::Capturing, error);
             return Err(error);
         }
-    };
-    runtime.transition(
-        &lease,
-        ReplyState::Validating,
-        ReplyState::Capturing,
-        None,
-        None,
-    )?;
-    let (slices, identity) = match runtime
-        .capture_foreground_wechat(
-            app.clone(),
-            coordinator,
-            screenshot_service.clone(),
-            identity,
-            lease.request_id().clone(),
-            CAPTURE_TIMEOUT,
-            Some(cancel),
-        )
-        .await
-    {
-        Ok(result) => result,
-        Err(error) => {
-            finish_failed(runtime, lease, ReplyState::Capturing, error);
-            return Err(error);
+        runtime.enter_ocr_after_capture(&lease, slices.capture_version)?;
+        terminal_stage = 4;
+        let ocr = match ocr {
+            Ok(ocr) => ocr,
+            Err(error) => {
+                finish_failed(runtime, lease.clone(), ReplyState::Ocr, error);
+                return Err(error);
+            }
+        };
+        if !coordinator.is_current_capture(slices.capture_version) {
+            finish_failed(
+                runtime,
+                lease.clone(),
+                ReplyState::Ocr,
+                ContractError::WxRequestStale,
+            );
+            return Err(ContractError::WxRequestStale);
         }
-    };
-    let captured = CapturedWechat {
-        request_id: lease.request_id().clone(),
-        capture_version: slices.capture_version,
-        stable_message_id: "m2-capture".into(),
-        is_single_chat: true,
-    };
-    let mut dispatcher =
-        WechatOcrDispatcher::new(WindowsMemoryPrimary, super::ocr::DisabledLocalFallback);
-    let mut audit_sink = DiscardOcrAudit;
-    let ocr = dispatcher.recognize(&slices, &identity, captured, &mut audit_sink);
-    runtime.enter_ocr_after_capture(&lease, slices.capture_version)?;
-    let ocr = match ocr {
-        Ok(ocr) => ocr,
-        Err(error) => {
-            finish_failed(runtime, lease, ReplyState::Ocr, error);
-            return Err(error);
-        }
-    };
-    if !coordinator.is_current_capture(slices.capture_version) {
-        finish_failed(
+        runtime.transition(&lease, ReplyState::Ocr, ReplyState::Retrieving, None, None)?;
+        terminal_stage = 5;
+        let mut port = WindowsM2ReplyTailPort {
+            app: &app,
+            screenshot_service,
+            store,
             runtime,
-            lease,
-            ReplyState::Ocr,
-            ContractError::WxRequestStale,
-        );
-        return Err(ContractError::WxRequestStale);
+            coordinator,
+            binding,
+            binding_request: &mut binding_request,
+        };
+        let reply = finish_captured_m2_reply(
+            runtime,
+            &lease,
+            ocr.text().to_owned(),
+            knowledge,
+            config,
+            profiles,
+            &mut port,
+            &client,
+            &mut terminal_stage,
+        )
+        .await?;
+        publish_reply_and_finish(runtime, lease.clone(), &reply, |payload| {
+            avatar_engine::emit_avatar_bubble(&app, payload);
+        })
     }
-    runtime.transition(&lease, ReplyState::Ocr, ReplyState::Retrieving, None, None)?;
-    let mut port = WindowsM2ReplyTailPort {
-        app: &app,
-        screenshot_service,
-        store,
-        runtime,
-        coordinator,
-        binding,
-        binding_request: &mut binding_request,
+    .await;
+    client
+        .m2_audit_sink()
+        .record(M2AuditEvent::upload_queue_observed_zero(&request_id)?)?;
+    let (outcome, error) = match result {
+        Ok(()) => (AuditOutcomeCode::TerminalSuccess, None),
+        Err(ContractError::WxRequestCancelled) => (
+            AuditOutcomeCode::TerminalCancelled,
+            Some(ContractError::WxRequestCancelled),
+        ),
+        Err(error) => (AuditOutcomeCode::TerminalFailed, Some(error)),
     };
-    let client = WechatReplyModelClient::new();
-    let reply = finish_captured_m2_reply(
-        runtime,
-        &lease,
-        ocr.text().to_owned(),
-        knowledge,
-        config,
-        profiles,
-        &mut port,
-        &client,
-    )
-    .await?;
-    publish_reply_and_finish(runtime, lease, &reply, |payload| {
-        avatar_engine::emit_avatar_bubble(&app, payload);
-    })
+    client
+        .m2_audit_sink()
+        .record(M2AuditEvent::terminal_observed(
+            &request_id,
+            terminal_stage,
+            outcome,
+            error,
+        )?)?;
+    result
 }
 
 #[cfg(all(feature = "wechat-m2", not(target_os = "windows")))]
@@ -918,6 +1015,7 @@ mod m2_tests {
         async fn retrieve(
             &mut self,
             _request: crate::knowledge::KnowledgeRetrieveRequest,
+            _audit: &dyn M2AuditSink,
         ) -> Result<crate::knowledge::types::RetrievedReply, crate::knowledge::KnowledgeError>
         {
             self.retrieval_calls += 1;
@@ -976,6 +1074,37 @@ mod m2_tests {
         )
     }
 
+    #[test]
+    fn m2_ocr_adapter_records_explicit_zero_or_local_process_start() {
+        use crate::wechat::observability::{M2AuditKind, SpyM2AuditSink};
+
+        let request_id = crate::wechat::types::RequestId::new();
+        let sink = SpyM2AuditSink::default();
+        let mut adapter = M2OcrAudit {
+            request_id: &request_id,
+            sink: &sink,
+            error: None,
+        };
+        adapter.record(WechatOcrAuditEvent {
+            request_id_hash: request_id.audit_tag(),
+            capture_version: 1,
+            stage: "ocr",
+            outcome: "text",
+            provider: "WindowsOCR",
+        });
+        adapter.record(WechatOcrAuditEvent {
+            request_id_hash: request_id.audit_tag(),
+            capture_version: 1,
+            stage: "ocr",
+            outcome: "text",
+            provider: "LocalFallback",
+        });
+        assert!(adapter.error.is_none());
+        let events = sink.snapshot();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[1].kind(), M2AuditKind::OcrLocalProcessStarted);
+    }
+
     #[tokio::test]
     async fn m2_tail_revalidation_failures_stop_transport_and_release_the_lease() {
         for (revalidations, expected_retrieval_calls, error) in [
@@ -1012,6 +1141,7 @@ mod m2_tests {
                 .unwrap())),
                 retrieval_calls: 0,
             };
+            let mut terminal_stage = 5;
 
             assert_eq!(
                 finish_captured_m2_reply(
@@ -1023,6 +1153,7 @@ mod m2_tests {
                     profiles,
                     &mut port,
                     &client,
+                    &mut terminal_stage,
                 )
                 .await,
                 Err(error)
@@ -1072,6 +1203,7 @@ mod m2_tests {
             .unwrap())),
             retrieval_calls: 0,
         };
+        let mut terminal_stage = 5;
 
         let reply = finish_captured_m2_reply(
             &runtime,
@@ -1082,6 +1214,7 @@ mod m2_tests {
             profiles,
             &mut port,
             &client,
+            &mut terminal_stage,
         )
         .await
         .unwrap();

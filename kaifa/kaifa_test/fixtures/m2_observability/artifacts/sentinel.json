@@ -1,0 +1,6 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "kind": "sentinel_observation",
+  "schema_version": 1,
+  "status": "pass"
+}

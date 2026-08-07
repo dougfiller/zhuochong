@@ -1,0 +1,24 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "events": [
+    {
+      "binding_generation": 7,
+      "context_hash": "ad32824b04a65bf20e28a7cd7f02df985e94ca027c812e7a561a3e27038c3f8d",
+      "kind": "retrieval_completed",
+      "model_request_id": "4807ac099af8076d7a81dda2ecf3b9ed",
+      "outcome": "success",
+      "request_id": "35ad29aa-cbd1-5ed5-b0a8-8eb6127aaace",
+      "selected_hit_count": 1,
+      "stage_seq": 5
+    },
+    {
+      "error_code": "WX_REQUEST_STALE",
+      "kind": "terminal",
+      "outcome": "failed",
+      "request_id": "35ad29aa-cbd1-5ed5-b0a8-8eb6127aaace",
+      "stage_seq": 6
+    }
+  ],
+  "request_id": "35ad29aa-cbd1-5ed5-b0a8-8eb6127aaace",
+  "schema_version": 1
+}

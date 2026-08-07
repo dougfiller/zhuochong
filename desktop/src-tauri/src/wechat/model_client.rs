@@ -1,6 +1,8 @@
 #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
 use super::config::selected_verified_model;
 use super::model_contract::{ModelCallPermit, ModelKnowledgeContext};
+#[cfg(feature = "wechat-m2")]
+use super::observability::{DiscardM2AuditSink, M2AuditEvent, M2AuditSink, M2AuditStore};
 use super::types::ContractError;
 #[cfg(feature = "wechat-m1")]
 use super::types::M1ReplyInput;
@@ -11,6 +13,8 @@ use crate::agent::model::{
 };
 #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]
 use crate::config::{TextModelProfile, WechatConfig};
+#[cfg(feature = "wechat-m2")]
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
 const WECHAT_SYSTEM_PROMPT: &str =
@@ -44,12 +48,19 @@ trait RagSingleTurnTransport: Send + Sync {
         &self,
         model: &crate::config::ModelConfig,
         attempt: RagTransportAttempt,
-    ) -> Result<String, crate::error::AppError>;
+    ) -> Result<String, RagTransportError>;
+}
+
+#[cfg(feature = "wechat-m2")]
+enum RagTransportError {
+    Provider(crate::error::AppError),
+    Audit(ContractError),
 }
 
 #[cfg(feature = "wechat-m2")]
 struct SingleTurnRagTransport {
     inner: Arc<dyn SingleTurnTextTransport>,
+    audit: Arc<dyn M2AuditSink>,
 }
 
 #[cfg(feature = "wechat-m2")]
@@ -59,10 +70,27 @@ impl RagSingleTurnTransport for SingleTurnRagTransport {
         &self,
         model: &crate::config::ModelConfig,
         attempt: RagTransportAttempt,
-    ) -> Result<String, crate::error::AppError> {
+    ) -> Result<String, RagTransportError> {
+        let request_bytes_sha256 =
+            hex::encode(Sha256::digest(attempt.envelope.request_bytes.as_ref()));
+        self.audit
+            .record(
+                M2AuditEvent::model_transport_started(
+                    &attempt.envelope.request_id,
+                    attempt.envelope.binding_generation,
+                    attempt.envelope.stage_seq,
+                    attempt.attempt,
+                    attempt.envelope.context_hash.clone(),
+                    attempt.envelope.model_request_id.clone(),
+                    request_bytes_sha256,
+                )
+                .map_err(RagTransportError::Audit)?,
+            )
+            .map_err(RagTransportError::Audit)?;
         self.inner
             .complete(model, attempt.envelope.request.clone())
             .await
+            .map_err(RagTransportError::Provider)
     }
 }
 
@@ -72,24 +100,69 @@ pub(super) struct WechatReplyModelClient {
     transport: Arc<dyn SingleTurnTextTransport>,
     #[cfg(feature = "wechat-m2")]
     rag_transport: Arc<dyn RagSingleTurnTransport>,
+    #[cfg(feature = "wechat-m2")]
+    audit: Arc<dyn M2AuditSink>,
 }
 
 impl WechatReplyModelClient {
     pub(super) fn new() -> Self {
         let transport: Arc<dyn SingleTurnTextTransport> = Arc::new(ProviderSingleTurnTextTransport);
+        #[cfg(feature = "wechat-m2")]
+        let audit: Arc<dyn M2AuditSink> = Arc::new(DiscardM2AuditSink);
         Self {
             transport: transport.clone(),
             #[cfg(feature = "wechat-m2")]
-            rag_transport: Arc::new(SingleTurnRagTransport { inner: transport }),
+            rag_transport: Arc::new(SingleTurnRagTransport {
+                inner: transport,
+                audit: audit.clone(),
+            }),
+            #[cfg(feature = "wechat-m2")]
+            audit,
+        }
+    }
+
+    #[cfg(feature = "wechat-m2")]
+    pub(super) fn new_with_m2_audit(data_dir: impl AsRef<std::path::Path>) -> Self {
+        let transport: Arc<dyn SingleTurnTextTransport> = Arc::new(ProviderSingleTurnTextTransport);
+        let audit: Arc<dyn M2AuditSink> = Arc::new(M2AuditStore::new(data_dir));
+        Self {
+            transport: transport.clone(),
+            rag_transport: Arc::new(SingleTurnRagTransport {
+                inner: transport,
+                audit: audit.clone(),
+            }),
+            audit,
         }
     }
 
     #[cfg(test)]
     pub(super) fn with_transport(transport: Arc<dyn SingleTurnTextTransport>) -> Self {
+        #[cfg(feature = "wechat-m2")]
+        let audit: Arc<dyn M2AuditSink> = Arc::new(DiscardM2AuditSink);
         Self {
             transport: transport.clone(),
             #[cfg(feature = "wechat-m2")]
-            rag_transport: Arc::new(SingleTurnRagTransport { inner: transport }),
+            rag_transport: Arc::new(SingleTurnRagTransport {
+                inner: transport,
+                audit: audit.clone(),
+            }),
+            #[cfg(feature = "wechat-m2")]
+            audit,
+        }
+    }
+
+    #[cfg(all(test, feature = "wechat-m2"))]
+    fn with_transport_and_audit(
+        transport: Arc<dyn SingleTurnTextTransport>,
+        audit: Arc<dyn M2AuditSink>,
+    ) -> Self {
+        Self {
+            transport: transport.clone(),
+            rag_transport: Arc::new(SingleTurnRagTransport {
+                inner: transport,
+                audit: audit.clone(),
+            }),
+            audit,
         }
     }
 
@@ -98,7 +171,13 @@ impl WechatReplyModelClient {
         Self {
             transport: Arc::new(ProviderSingleTurnTextTransport),
             rag_transport: transport,
+            audit: Arc::new(DiscardM2AuditSink),
         }
+    }
+
+    #[cfg(feature = "wechat-m2")]
+    pub(super) fn m2_audit_sink(&self) -> &dyn M2AuditSink {
+        self.audit.as_ref()
     }
 
     #[cfg(feature = "wechat-m1")]
@@ -184,7 +263,7 @@ impl WechatReplyModelClient {
             .await;
         let text = match first {
             Ok(text) => text,
-            Err(error) if retryable_transport_error(&error) => self
+            Err(RagTransportError::Provider(error)) if retryable_transport_error(&error) => self
                 .rag_transport
                 .complete(
                     model,
@@ -194,8 +273,12 @@ impl WechatReplyModelClient {
                     },
                 )
                 .await
-                .map_err(|_| ContractError::LlmFailed)?,
-            Err(_) => return Err(ContractError::LlmFailed),
+                .map_err(|error| match error {
+                    RagTransportError::Provider(_) => ContractError::LlmFailed,
+                    RagTransportError::Audit(error) => error,
+                })?,
+            Err(RagTransportError::Provider(_)) => return Err(ContractError::LlmFailed),
+            Err(RagTransportError::Audit(error)) => return Err(error),
         };
         validate_reply_text(text)
     }
@@ -238,15 +321,48 @@ mod tests {
     }
 
     #[cfg(feature = "wechat-m2")]
+    struct SequenceSingleTurnTransport {
+        calls: Mutex<Vec<SingleTurnTextRequest>>,
+        responses: Mutex<Vec<Result<String, crate::error::AppError>>>,
+    }
+
+    #[cfg(feature = "wechat-m2")]
+    struct FailingAuditSink;
+
+    #[cfg(feature = "wechat-m2")]
     #[async_trait]
     impl RagSingleTurnTransport for SequenceTransport {
         async fn complete(
             &self,
             _model: &ModelConfig,
             attempt: RagTransportAttempt,
-        ) -> Result<String, crate::error::AppError> {
+        ) -> Result<String, RagTransportError> {
             self.calls.lock().unwrap().push(attempt);
+            self.responses
+                .lock()
+                .unwrap()
+                .remove(0)
+                .map_err(RagTransportError::Provider)
+        }
+    }
+
+    #[cfg(feature = "wechat-m2")]
+    #[async_trait]
+    impl SingleTurnTextTransport for SequenceSingleTurnTransport {
+        async fn complete(
+            &self,
+            _model: &ModelConfig,
+            request: SingleTurnTextRequest,
+        ) -> Result<String, crate::error::AppError> {
+            self.calls.lock().unwrap().push(request);
             self.responses.lock().unwrap().remove(0)
+        }
+    }
+
+    #[cfg(feature = "wechat-m2")]
+    impl M2AuditSink for FailingAuditSink {
+        fn record(&self, _event: M2AuditEvent) -> Result<(), ContractError> {
+            Err(ContractError::WxAuditPersistFailed)
         }
     }
 
@@ -605,5 +721,148 @@ mod tests {
             built.context.canonical_payload()
         );
         assert_eq!(envelope.request, built.context.frozen_request());
+    }
+
+    #[cfg(feature = "wechat-m2")]
+    #[tokio::test]
+    async fn physical_attempt_audit_is_written_before_each_exact_transport_call() {
+        use crate::knowledge::types::{retrieval_fixture, RetrievalOutcome, RetrievalStatus};
+        use crate::wechat::model_contract::{build_model_context, ModelCallPermit};
+        use crate::wechat::observability::{M2AuditKind, SpyM2AuditSink};
+
+        let transport = Arc::new(SequenceSingleTurnTransport {
+            calls: Mutex::new(Vec::new()),
+            responses: Mutex::new(vec![
+                Err(crate::error::AppError::Unknown("connection timeout".into())),
+                Ok("建议回复".into()),
+            ]),
+        });
+        let audit = Arc::new(SpyM2AuditSink::default());
+        let client =
+            WechatReplyModelClient::with_transport_and_audit(transport.clone(), audit.clone());
+        let request_id = super::super::types::RequestId::new();
+        let built = build_model_context(
+            retrieval_fixture(
+                request_id.clone(),
+                "请回复",
+                RetrievalOutcome::Retrieved(RetrievalStatus::Success),
+                &[("固定历史", 12)],
+                1024,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let permit = ModelCallPermit::new_with_model_request_id(
+            request_id.clone(),
+            built.context.binding_generation(),
+            built.context.context_hash().clone(),
+            5,
+            "c".repeat(32),
+        );
+        let mut config = WechatConfig::default();
+        config.text_model_profile_id = Some("selected".into());
+        let profile = TextModelProfile {
+            id: "selected".into(),
+            name: "fixture".into(),
+            test_status: "success".into(),
+            last_tested_at: None,
+            last_test_message: None,
+            model_config: ModelConfig {
+                provider: AiProvider::Ollama,
+                endpoint: "http://fixture".into(),
+                api_key: None,
+                model: "fixture".into(),
+            },
+        };
+
+        client
+            .generate_rag_reply(
+                &config,
+                &[profile],
+                &built.context,
+                &permit,
+                SuggestionGeneration::new(10),
+            )
+            .await
+            .unwrap();
+
+        let events = audit.snapshot();
+        assert_eq!(events.len(), 2);
+        assert!(events
+            .iter()
+            .all(|event| event.kind() == M2AuditKind::ModelTransportStarted));
+        assert_eq!(
+            (events[0].attempt(), events[1].attempt()),
+            (Some(1), Some(2))
+        );
+        assert_eq!(events[0].request_id(), request_id.to_string());
+        assert_eq!(
+            events[0].request_bytes_sha256(),
+            events[1].request_bytes_sha256()
+        );
+        assert_eq!(transport.calls.lock().unwrap().len(), 2);
+    }
+
+    #[cfg(feature = "wechat-m2")]
+    #[tokio::test]
+    async fn audit_failure_before_transport_is_fail_closed_and_not_retried() {
+        use crate::knowledge::types::{retrieval_fixture, RetrievalOutcome, RetrievalStatus};
+        use crate::wechat::model_contract::{build_model_context, ModelCallPermit};
+
+        let transport = Arc::new(SequenceSingleTurnTransport {
+            calls: Mutex::new(Vec::new()),
+            responses: Mutex::new(vec![Ok("建议回复".into())]),
+        });
+        let client = WechatReplyModelClient::with_transport_and_audit(
+            transport.clone(),
+            Arc::new(FailingAuditSink),
+        );
+        let request_id = super::super::types::RequestId::new();
+        let built = build_model_context(
+            retrieval_fixture(
+                request_id.clone(),
+                "请回复",
+                RetrievalOutcome::Retrieved(RetrievalStatus::NoHit),
+                &[],
+                512,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let permit = ModelCallPermit::new(
+            request_id,
+            built.context.binding_generation(),
+            built.context.context_hash().clone(),
+            5,
+        );
+        let mut config = WechatConfig::default();
+        config.text_model_profile_id = Some("selected".into());
+        let profile = TextModelProfile {
+            id: "selected".into(),
+            name: "fixture".into(),
+            test_status: "success".into(),
+            last_tested_at: None,
+            last_test_message: None,
+            model_config: ModelConfig {
+                provider: AiProvider::Ollama,
+                endpoint: "http://fixture".into(),
+                api_key: None,
+                model: "fixture".into(),
+            },
+        };
+
+        assert_eq!(
+            client
+                .generate_rag_reply(
+                    &config,
+                    &[profile],
+                    &built.context,
+                    &permit,
+                    SuggestionGeneration::new(11),
+                )
+                .await,
+            Err(ContractError::WxAuditPersistFailed)
+        );
+        assert!(transport.calls.lock().unwrap().is_empty());
     }
 }

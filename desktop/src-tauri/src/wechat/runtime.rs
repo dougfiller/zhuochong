@@ -775,9 +775,9 @@ impl WechatReplyRuntime {
                 self.complete_generated_reply(lease, &reply)?;
                 Ok(reply)
             }
-            Err(_) => {
-                self.fail_model_generation(lease, ContractError::LlmFailed)?;
-                Err(ContractError::LlmFailed)
+            Err(error) => {
+                self.fail_model_generation(lease, error)?;
+                Err(error)
             }
         }
     }

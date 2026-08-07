@@ -1,0 +1,506 @@
+{
+  "schema_version": 1,
+  "gate_id": "work-review-m2-strict-gate-20260808",
+  "generated_at": "2026-08-08T00:44:52+08:00",
+  "candidate": {
+    "git_commit": "e25e6c394fcb4a545d7968fa6d7dd4d8e792a4e1",
+    "source_tree_sha256": null,
+    "nsis_sha256": null,
+    "batch_id": null
+  },
+  "environment": {
+    "os_build": "macOS implementation host; exact build not frozen",
+    "windows_host": null,
+    "wechat_profile_fingerprint": null,
+    "real_reply_model": false,
+    "real_embedding_model": false,
+    "evidence_type": "not-run"
+  },
+  "request_evidence": [],
+  "fault_matrix": [
+    {
+      "id": "M2-OBS-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-OBS-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-OBS-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-OBS-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-OBS-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-OBS-06",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-CAP-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-CAP-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-CAP-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-06",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-07",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-08",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-09",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-RET-10",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-MOD-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-MOD-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-MOD-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-MOD-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-MOD-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-MOD-06",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-MOD-07",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-KB-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-KB-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-KB-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-KB-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-KB-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-KB-06",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-KB-07",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-KB-08",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PRIV-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PRIV-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PRIV-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PRIV-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PRIV-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PRIV-06",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PRIV-07",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PET-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PET-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PET-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "M2-PET-04",
+      "status": "not-run",
+      "evidence_ids": []
+    }
+  ],
+  "ac_matrix": [
+    {
+      "id": "AC-BASE-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-BASE-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-BASE-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-BASE-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-BASE-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-BASE-06",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-BASE-07",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-BASE-08",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-BASE-09",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-BASE-10",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-06",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-07",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-08",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-09",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-WX-10",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-PET-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-PET-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-PET-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-PET-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-PET-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-KB-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-KB-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-KB-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-KB-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-KB-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-KB-06",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-KB-07",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-KB-08",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-01",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-02",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-03",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-04",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-05",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-06",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-07",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-08",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-09",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-10",
+      "status": "not-run",
+      "evidence_ids": []
+    },
+    {
+      "id": "AC-RAG-11",
+      "status": "not-run",
+      "evidence_ids": []
+    }
+  ],
+  "credentials_mock_matrix": [
+    {
+      "id": "work-review-network-mocks",
+      "status": "not-run",
+      "evidence_sha256": null
+    }
+  ],
+  "privacy_scan": {
+    "source_hits": 0,
+    "evidence_hits": 0,
+    "package_hits": null,
+    "evidence_sha256": null
+  },
+  "sentinel_counters": {
+    "status": "not-run",
+    "counts": {
+      "fileAccess": 0,
+      "moduleLoad": 0,
+      "childProcess": 0,
+      "network": 0,
+      "syntheticInput": 0
+    },
+    "evidence_sha256": null
+  },
+  "reference_assets_review": {
+    "status": "blocked",
+    "evidence_sha256": null
+  },
+  "verdict": "blocked",
+  "blockers": [
+    "No frozen Windows 11 host or WeChat profile evidence.",
+    "No candidate NSIS or batch-linked package/privacy scan.",
+    "No real reply-model or embedding-model evidence batch.",
+    "Third-party asset commercial authorization remains pending.",
+    "Fault, AC, sentinel, credentials-mock and privacy evidence has not yet been attached."
+  ]
+}
+

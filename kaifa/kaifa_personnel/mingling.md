@@ -442,3 +442,43 @@ git diff --check -- desktop/src-tauri/src/knowledge desktop/src-tauri/src/wechat
 
 - `verify_task25_m2_rag.py` 检查唯一受信任 `build_model_context`、实际 canonical payload 预算、尾部整 hit 裁减、M2 强制检索顺序、私有 permit、冻结重试、禁止 Agent/tools 和显式来源查看；静态通过不替代 Rust 行为测试。
 - 真实 Windows 前台微信/OCR/窗口切换、真实模型网络请求、真实聊天数据、性能和发布均未运行；macOS/fake transport/SQLite 结果不替代这些证据。
+
+# 2026-08-08：步骤 26 M2 可观测性、能力隔离与严格综合故障门禁
+
+```bash
+# 默认读取正式 after-gate；当前必须 exit 2/blocked，不能当测试失败或发布 pass。
+python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --evidence desktop/docs/baselines/work-review-m2-after-gate.json
+
+# 完全虚构正向 fixture 必须 exit 0。
+python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --evidence kaifa/kaifa_test/fixtures/m2_observability/pass.json
+
+# 以下负向 fixture 的预期退出码依次为 2、1、1、1、2。
+python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --evidence kaifa/kaifa_test/fixtures/m2_observability/blocked-missing-evidence.json
+python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --evidence kaifa/kaifa_test/fixtures/m2_observability/fail-capability.json
+python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --evidence kaifa/kaifa_test/fixtures/m2_observability/fail-default-pass.json
+python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --evidence kaifa/kaifa_test/fixtures/m2_observability/fail-hash-mismatch.json
+python3 -B kaifa/kaifa_test/verify_m2_observability_gate.py --project-root . --evidence kaifa/kaifa_test/fixtures/m2_observability/blocked-missing-ac.json
+
+# metadata schema、physical attempt、重试冻结、audit 写失败零 transport 与 M2 编排回归。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'wechat::' --no-default-features --features 'wechat-contract-check,wechat-m2' -- --test-threads=1
+
+# knowledge/embedding/fault/atomic 全回归。测试 HTTP 只绑定系统分配的本机 loopback 临时端口；
+# 默认沙箱若报 Operation not permitted，须在获准的本机 loopback 环境原命令重跑。
+cargo test --manifest-path desktop/src-tauri/Cargo.toml 'knowledge::' --no-default-features --features 'wechat-contract-check,wechat-m2' -- --test-threads=1
+
+# M2/M1 feature 正向编译和步骤 25 静态边界兼容回归。
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m2'
+cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features 'wechat-contract-check,wechat-m1'
+python3 -B kaifa/kaifa_test/verify_task25_m2_rag.py
+
+# 前端全量、生产构建、Python 语法、Rust 格式和本 run 范围空白。
+(cd desktop && node --test)
+(cd desktop && npm run build)
+PYTHONPYCACHEPREFIX=/tmp/aich8-task26-pycache python3 -m py_compile kaifa/kaifa_test/verify_m2_observability_gate.py
+cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check
+git diff --check -- desktop/.github/workflows/ci.yml desktop/src-tauri/src/knowledge/embedding.rs desktop/src-tauri/src/knowledge/retrieve.rs desktop/src-tauri/src/wechat/mod.rs desktop/src-tauri/src/wechat/model_client.rs desktop/src-tauri/src/wechat/observability.rs desktop/src-tauri/src/wechat/reply_flow.rs desktop/src-tauri/src/wechat/runtime.rs desktop/src-tauri/src/wechat/types.rs desktop/docs/baselines/work-review-m2-after-gate.json desktop/docs/baselines/work-review-m2-after-gate.md kaifa/kaifa_test/verify_m2_observability_gate.py kaifa/kaifa_test/verify_task25_m2_rag.py kaifa/kaifa_test/fixtures/m2_observability kaifa/kaifa_personnel/mingling.md kaifa/kaifa_test/test.md kaifa/kaifa_log/2026年08月08日00时50分-完善M2可观测性能力隔离和严格故障门禁.md
+```
+
+- `verify_m2_observability_gate.py` 仅读指定脱敏 JSON 与固定源码边界，不启动产品、微信、模型、数据库、安装包或网络。退出码固定为 `0=pass`、`1=fail`、`2=blocked`。
+- `request_evidence` 必须用同一 opaque UUID 串联 stageSeq=5 retrieval permit 和真实 physical attempts；attempt 只能 `[1]` 或 `[1,2]`，重试 bytes/context/model/binding 必须冻结一致。
+- 正式 after-gate 当前保持 blocked：没有 Windows/profile、真实模型/embedding、NSIS/batch/package scan、完整 AC/fault/sentinel 和素材商业授权证据。禁止用 M1 历史 `default_pass_requirements` 绕过。

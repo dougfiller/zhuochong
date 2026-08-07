@@ -1,0 +1,31 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "collectors": [
+    "capability",
+    "ocr",
+    "pet_resource",
+    "terminal",
+    "upload_queue"
+  ],
+  "counts": {
+    "action": 0,
+    "bot": 0,
+    "cloudEmbedding": 0,
+    "knowledgeEmbeddingLoopback": 0,
+    "localhostApi": 0,
+    "mcp": 0,
+    "ocrBackendLocalProcess": 0,
+    "petResourceExternalProcess": 0,
+    "petResourceModuleLoad": 0,
+    "petResourceNetwork": 0,
+    "petResourceSyntheticInput": 0,
+    "remoteUpload": 0,
+    "replyModelNonLoopback": 0,
+    "search": 0
+  },
+  "logical_model_requests": 0,
+  "request_id": "119555e4-86d2-573f-8f19-1502907b59be",
+  "schema_version": 1,
+  "upload_attempt_count": 0,
+  "upload_enqueue_count": 0
+}

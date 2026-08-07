@@ -3,11 +3,11 @@
   "feature": "步骤 25：构造最小 ModelKnowledgeContext 并切换为强制 RAG M2；dispatch_id=aich8-zhuochong-desktop-pet-rag-27-steps-20260805-task-25。每次 M2 微信回复必须由同 requestId 的冻结 RetrievedReply 授权。仅受信任私有适配器实现 build_model_context(RetrievedReply)，其他模块不能构造 ModelKnowledgeContext；上下文仅含当前待回复文字、入选 excerpt、必要时间/角色/方向标签、noHit 与数据边界说明，按冻结 tokenCounterVersion 对实际序列化 payload 二次计数并确定性裁减 hits，仍超限则失败。payload 必须排除路径、内部 chunk/message/conversation ID、export/provenance、分数、未入选 hits、完整会话；使用系统产品规则、不可信历史知识、当前微信文字三段结构，历史命令/URL/工具要求仅作资料文本。reply_flow 在 OCR 后 await 返回不透明 RetrievedReply 的 knowledge_retrieve，冻结后构造 context，重验窗口/header/bindingGeneration，再调用 generate_rag_reply；编排层不可见 KnowledgeRetrieveResult 私有构造器。相同 requestId 重试复用 RetrievedReply 与 context hash，不重复检索或改变 hits。success/no_hit 可进入模型；KB_NOT_READY、KB_SCOPE_UNRESOLVED、KB_RETRIEVAL_FAILED 与 context 失败必须终止且模型网络调用为 0。wechat-m2 release feature 删除或不注册 generate_m1_reply，并以编译/静态测试证明入口不可达。transport spy 必须验证实际序列化字段与 stageSeq。实现本地按 requestId/hit ID 从当前 store 重取的本次来源和历史 trace 查看，来源消失明确不可用；路径/内部 ID 不发送模型或桌宠。参考步骤10 plain_text_model.rs/WechatReplyModelClient 与步骤23 knowledge_retrieve；build_model_context、generate_rag_reply、M2 禁用 M1、来源重取需原创，禁止 agent/tools ask 路径。保持仅用户明确选择的前台微信、手动审阅复制粘贴发送；禁止微信注入、协议/数据库读取、UIA 输入、键鼠模拟、自动粘贴/发送、未选聊天及 MCP/Bot/search/upload/Agent 工具调用。原始聊天导出只读，运行时仅独立 knowledge.sqlite；不得伪造真机、性能、素材合规或正式发布证据。",
   "project_root": "/Users/sky/aich8-zhuochong",
   "created_at": "2026-08-07T15:03:20+00:00",
-  "updated_at": "2026-08-07T16:09:38+00:00",
-  "status": "active",
+  "updated_at": "2026-08-07T16:14:58+00:00",
+  "status": "done",
   "current_phase": 5,
   "current_thread_id": "019fdcfc-b7fd-7623-b0f5-8c00afed1085",
-  "next_poll_at": "2026-08-07T16:12:38+00:00",
+  "next_poll_at": "",
   "threads": {
     "1": "019fdcc0-8f49-7233-929f-abfa9c2377d9",
     "2": "019fdccb-3316-75d3-9821-0c48af67c560",
@@ -25,7 +25,7 @@
     "2": "done",
     "3": "done",
     "4": "done",
-    "5": "running"
+    "5": "done"
   },
   "notes": [
     "2026-08-07T16:05:33+00:00 phase 4 gate failed: done status is not done: blocked"

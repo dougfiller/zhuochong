@@ -70,7 +70,11 @@ def main() -> int:
         ),
         "Windows front half does not hand off to the verified M2 tail",
     )
-    require(".knowledge_retrieve(request)" in flow, "production Store retrieval port missing")
+    require(
+        ".knowledge_retrieve(request)" in flow
+        or ".knowledge_retrieve_with_audit(request, Some(audit))" in flow,
+        "production Store retrieval port missing",
+    )
     require("generate_m1_wechat_reply" in flow, "isolated M1 build helper missing")
     require("#[cfg(feature = \"wechat-m1\")]\nuse super::types::M1ReplyInput" in flow, "M1 input is not feature-isolated")
     require("generate_m1_wechat_reply" in module, "M2-to-M1 compile probe missing")

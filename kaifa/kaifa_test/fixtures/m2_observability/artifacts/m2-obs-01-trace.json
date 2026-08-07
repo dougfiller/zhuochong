@@ -1,0 +1,34 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "events": [
+    {
+      "binding_generation": 7,
+      "context_hash": "759eda3f98190414304fb9dedcff32612c9b718558c430f75d11fa19eb361867",
+      "kind": "retrieval_completed",
+      "model_request_id": "95592976745db52ae2343eaff15daa1a",
+      "outcome": "success",
+      "request_id": "963213d0-6619-5400-9fd6-28e3687c13db",
+      "selected_hit_count": 1,
+      "stage_seq": 5
+    },
+    {
+      "attempt": 1,
+      "binding_generation": 7,
+      "context_hash": "759eda3f98190414304fb9dedcff32612c9b718558c430f75d11fa19eb361867",
+      "kind": "model_transport_started",
+      "model_request_id": "95592976745db52ae2343eaff15daa1a",
+      "request_bytes_sha256": "7cf51ce622046f3f3a204f6e55eadc8392d02ad863a2f75ed2ed8e3f438c4552",
+      "request_id": "963213d0-6619-5400-9fd6-28e3687c13db",
+      "stage_seq": 5
+    },
+    {
+      "error_code": null,
+      "kind": "terminal",
+      "outcome": "reply_ready",
+      "request_id": "963213d0-6619-5400-9fd6-28e3687c13db",
+      "stage_seq": 6
+    }
+  ],
+  "request_id": "963213d0-6619-5400-9fd6-28e3687c13db",
+  "schema_version": 1
+}

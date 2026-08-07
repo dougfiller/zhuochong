@@ -1,0 +1,14 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "events": [
+    {
+      "error_code": "KB_RETRIEVAL_FAILED",
+      "kind": "terminal",
+      "outcome": "failed",
+      "request_id": "38b19494-c353-508d-948c-7606d4af477d",
+      "stage_seq": 2
+    }
+  ],
+  "request_id": "38b19494-c353-508d-948c-7606d4af477d",
+  "schema_version": 1
+}

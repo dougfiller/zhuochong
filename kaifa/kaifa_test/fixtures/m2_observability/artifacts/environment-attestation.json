@@ -1,0 +1,13 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "collector": "m2-fixture-collector-v1",
+  "environment": {
+    "evidence_type": "synthetic",
+    "os_build": "Windows 11 synthetic fixture",
+    "real_embedding_model": true,
+    "real_reply_model": true,
+    "wechat_profile_fingerprint": "fixture-profile",
+    "windows_host": "fixture-host"
+  },
+  "schema_version": 1
+}

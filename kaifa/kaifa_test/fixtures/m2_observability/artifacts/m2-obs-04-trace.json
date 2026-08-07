@@ -1,0 +1,44 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "events": [
+    {
+      "binding_generation": 7,
+      "context_hash": "6ddef711fbcd468980b6be1458adbb9c52fa0cc95335700c02582ec42cb8494a",
+      "kind": "retrieval_completed",
+      "model_request_id": "7cd4a98b2babb2f78e0dfa856a88f00a",
+      "outcome": "success",
+      "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+      "selected_hit_count": 1,
+      "stage_seq": 5
+    },
+    {
+      "attempt": 1,
+      "binding_generation": 7,
+      "context_hash": "6ddef711fbcd468980b6be1458adbb9c52fa0cc95335700c02582ec42cb8494a",
+      "kind": "model_transport_started",
+      "model_request_id": "7cd4a98b2babb2f78e0dfa856a88f00a",
+      "request_bytes_sha256": "4a95b4333bce5542d655cf837d3675eaba837ca0fe9ddfe39a0c0228dc78ceee",
+      "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+      "stage_seq": 5
+    },
+    {
+      "attempt": 2,
+      "binding_generation": 7,
+      "context_hash": "6ddef711fbcd468980b6be1458adbb9c52fa0cc95335700c02582ec42cb8494a",
+      "kind": "model_transport_started",
+      "model_request_id": "7cd4a98b2babb2f78e0dfa856a88f00a",
+      "request_bytes_sha256": "4a95b4333bce5542d655cf837d3675eaba837ca0fe9ddfe39a0c0228dc78ceee",
+      "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+      "stage_seq": 5
+    },
+    {
+      "error_code": null,
+      "kind": "terminal",
+      "outcome": "reply_ready",
+      "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+      "stage_seq": 6
+    }
+  ],
+  "request_id": "03e02472-eb94-535f-a141-cd2fa4e2acf3",
+  "schema_version": 1
+}

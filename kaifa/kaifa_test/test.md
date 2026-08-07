@@ -379,3 +379,26 @@ Windows 11 x64 + WebView2 的 BASE-01--05、07--08 记录为 `blocked`，而无�
 - `ModelKnowledgeContext` 不携带路径、内部 chunk/message/conversation ID、provenance、分数、未入选 hits 或整段会话；实际输入由系统规则、不可信历史知识和当前文字三部分构成。
 - 来源详情不存在 trace 正文快照；必须由后端凭内部 receipt 从当前 active Store 重取，来源已消失/被拒绝/代际改变时明确返回不可用。
 - macOS 合成测试不是 Windows 真机、真实模型、素材合规或发布证据。
+
+## 完善 M2 可观测性、能力隔离和综合故障门禁（2026-08-08）
+
+检测脚本：`kaifa/kaifa_test/verify_m2_observability_gate.py`。脚本只读取固定 Rust 源码边界和指定的脱敏 JSON；不会启动微信、应用、模型、数据库、安装包或网络。
+
+| 验收项 | 命令/方法 | 实际结果 | 结果 |
+| --- | --- | --- | --- |
+| strict gate 正向 fixture | `python3 -B ... --evidence .../pass.json` | `status=pass failures=0 blockers=0`，exit 0；同时覆盖检索成功后的 1 次逻辑模型请求，以及检索失败后的逻辑/物理模型请求显式 0。 | 通过 |
+| strict gate 负向 fixture | 缺证据、禁止能力、default-pass、hash mismatch、缺 AC 五类 | 预期 exit 分别为 2/1/1/1/2；禁止能力、策略绕过、permit join 错误均 fail，缺证据/AC 保持 blocked。 | 通过 |
+| 正式 M2 after-gate | `python3 -B ... --evidence desktop/docs/baselines/work-review-m2-after-gate.json` | `status=blocked failures=0 blockers=103`，exit 2；完整列出 45 个 fault 与 44 个 AC 行，不把未运行写成 pass。 | 符合预期 blocked |
+| M2 微信与审计行为 | `cargo test ... 'wechat::' ... -- --test-threads=1` | 82 passed、0 failed；含 metadata-only schema、16 KiB、fixed capability snapshot、physical attempt 1/2、冻结 hash/bytes、audit 失败零 transport、tail 双 gate 与错误释放 lease。 | 通过 |
+| knowledge 综合故障/原子回归 | `cargo test ... 'knowledge::' ... -- --test-threads=1` | 默认沙箱的 loopback bind 被拒；获准本机 loopback 环境原命令为 94 passed、0 failed、1 ignored。ignored 是需显式本地模型的真实中文质量 probe。 | 通过（本机 loopback） |
+| M2/M1 编译 | 两个 `cargo check ... wechat-m2/wechat-m1` | 均 exit 0；只有仓库既有/预留模块 unused/dead-code 与 future-incompat warnings。 | 通过 |
+| 步骤 25 静态兼容 | `python3 -B kaifa/kaifa_test/verify_task25_m2_rag.py` | 输出 `TASK25_M2_RAG_STATIC_OK`；旧门禁接受显式 audit retrieval adapter。 | 通过 |
+| 前端生产构建 | `cd desktop && npm run build` | Vite 5.4.21，247 modules，exit 0。 | 通过 |
+| 前端全量 | `cd desktop && node --test` | 489 passed、1 failed；唯一失败为本 run 开始前已存在的 zh-TW `knowledgeScope.*` 18 个键缺失，来自步骤 24/25 并行 dirty 工作区，本 run 未修改 locale。 | 既有失败，未归因本 run |
+| 冻结 Work Review baseline | `verify_work_review_regression_baseline.py --project-root .` | 报 `desktop frozen source differs`；该冻结源比较器不接受步骤 2—26 的预期产品补丁，不能作为本 run 新回归证据。 | 既有不适用 |
+| Python/Rust 格式 | 指定 `/tmp` pycache 的 `py_compile`；`cargo fmt ... --check` | 均 exit 0。默认 Python cache 目录在沙箱中不可写，改用任务专用 `/tmp` 后通过。 | 通过 |
+| Windows/真实模型/NSIS/素材授权 | 受控真实环境与同批 candidate | 当前未运行；正式 JSON 保持 `blocked/not-run`。 | not-run |
+
+- 新 Rust 测试、fixture 和 gate 全部使用虚构文字、opaque UUID 与固定假 hash；没有读取、复制、哈希真实聊天、用户 `knowledge.sqlite` 或凭据。
+- 允许能力仅计 reply model physical attempt、loopback embedding HTTP attempt 和条件 local OCR process；MCP/Bot/Localhost API/upload/search/action/cloud embedding/pet resource process/network/module/input 必须显式为 0。
+- Windows、candidate package、真实模型、性能和逐素材商业授权仍缺失，因此这里只能判定“阶段 2 实现与自动化完成”，不能判定 M2 发布通过或进入步骤 27。

@@ -5,8 +5,8 @@
 - current_phase: 5
 - current_phase_name: 推送同步
 - current_thread_id: 019fdcfc-b7fd-7623-b0f5-8c00afed1085
-- next_poll_at: 2026-08-07T16:12:38+00:00
-- status: active
+- next_poll_at: 
+- status: done
 
 ## Artifacts
 - phase_1: 2026年08月07日23点06分-构造最小ModelKnowledgeContext并切换强制RAG-M2.md

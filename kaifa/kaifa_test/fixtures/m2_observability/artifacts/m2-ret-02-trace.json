@@ -1,0 +1,14 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "events": [
+    {
+      "error_code": "KB_SCOPE_UNRESOLVED",
+      "kind": "terminal",
+      "outcome": "failed",
+      "request_id": "896ec63d-4b2b-5b59-9c7e-7c4d3bfd962c",
+      "stage_seq": 2
+    }
+  ],
+  "request_id": "896ec63d-4b2b-5b59-9c7e-7c4d3bfd962c",
+  "schema_version": 1
+}

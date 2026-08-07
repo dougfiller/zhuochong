@@ -1,0 +1,14 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "events": [
+    {
+      "error_code": "KB_NOT_READY",
+      "kind": "terminal",
+      "outcome": "failed",
+      "request_id": "91aea51f-7745-5613-966d-1ef75567699c",
+      "stage_seq": 2
+    }
+  ],
+  "request_id": "91aea51f-7745-5613-966d-1ef75567699c",
+  "schema_version": 1
+}

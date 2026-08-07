@@ -274,6 +274,8 @@ pub(crate) enum ContractError {
     WxTracePersistFailed,
     #[serde(rename = "WX_TRACE_INVALID_QUERY")]
     WxTraceInvalidQuery,
+    #[serde(rename = "WX_AUDIT_PERSIST_FAILED")]
+    WxAuditPersistFailed,
     #[serde(rename = "WX_CONTENT_PERSIST_FAILED")]
     WxContentPersistFailed,
 }

@@ -90,6 +90,8 @@ pub(crate) enum KnowledgeError {
     ScopeUnresolved,
     #[serde(rename = "KB_RETRIEVAL_FAILED")]
     RetrievalFailed,
+    #[serde(rename = "WX_AUDIT_PERSIST_FAILED")]
+    AuditPersistFailed,
 }
 
 impl From<ContractError> for KnowledgeError {
@@ -97,6 +99,7 @@ impl From<ContractError> for KnowledgeError {
         match error {
             ContractError::KbNotReady => Self::NotReady,
             ContractError::KbScopeUnresolved => Self::ScopeUnresolved,
+            ContractError::WxAuditPersistFailed => Self::AuditPersistFailed,
             _ => Self::RetrievalFailed,
         }
     }
@@ -375,6 +378,14 @@ impl KnowledgeStore {
         &self,
         request: KnowledgeRetrieveRequest,
     ) -> Result<RetrievedReply, KnowledgeError> {
+        self.knowledge_retrieve_with_audit(request, None).await
+    }
+
+    pub(crate) async fn knowledge_retrieve_with_audit(
+        &self,
+        request: KnowledgeRetrieveRequest,
+        audit: Option<&dyn crate::wechat::observability::M2AuditSink>,
+    ) -> Result<RetrievedReply, KnowledgeError> {
         let started = Instant::now();
         request.scope.validate().map_err(KnowledgeError::from)?;
         let normalized_query = normalize_query(&request.query_text)?;
@@ -400,23 +411,24 @@ impl KnowledgeStore {
         let fts = self
             .search_authorized_fts(&frozen, &normalized_query, candidate_k)
             .map_err(KnowledgeError::from)?;
-        let (mut ranked, retrieval_mode) = match query_active_vector(&frozen, &normalized_query)
-            .await
-            .map_err(KnowledgeError::from)?
-        {
-            QueryVectorAttempt::Available(vector) => {
-                let vectors = self
-                    .search_authorized_vectors(&frozen, &vector, candidate_k)
-                    .map_err(KnowledgeError::from)?
-                    .into_iter()
-                    .filter(|candidate| candidate.score >= MIN_VECTOR_SCORE_V1)
-                    .collect::<Vec<_>>();
-                (fuse_candidates(vectors, fts)?, RetrievalMode::Hybrid)
-            }
-            QueryVectorAttempt::Unavailable => {
-                (rank_fts_fallback(fts)?, RetrievalMode::FtsFallback)
-            }
-        };
+        let (mut ranked, retrieval_mode) =
+            match query_active_vector(&frozen, &normalized_query, &request.request_id, audit)
+                .await
+                .map_err(KnowledgeError::from)?
+            {
+                QueryVectorAttempt::Available(vector) => {
+                    let vectors = self
+                        .search_authorized_vectors(&frozen, &vector, candidate_k)
+                        .map_err(KnowledgeError::from)?
+                        .into_iter()
+                        .filter(|candidate| candidate.score >= MIN_VECTOR_SCORE_V1)
+                        .collect::<Vec<_>>();
+                    (fuse_candidates(vectors, fts)?, RetrievalMode::Hybrid)
+                }
+                QueryVectorAttempt::Unavailable => {
+                    (rank_fts_fallback(fts)?, RetrievalMode::FtsFallback)
+                }
+            };
 
         let chunks_before = ranked
             .iter()
@@ -1502,11 +1514,17 @@ mod tests {
 
     #[tokio::test]
     async fn hybrid_success_binds_active_generations_and_complete_hit() {
+        use crate::wechat::observability::{M2AuditKind, SpyM2AuditSink};
+
         let (address, calls, server) =
             spawn_embedding_fixture([1.0, 0.0], "fixture-fingerprint").await;
         let (data_dir, store) = build_retrieval_fixture(format!("http://{address}"));
         let request = request("虚构项目");
-        let reply = store.knowledge_retrieve(request.clone()).await.unwrap();
+        let audit = SpyM2AuditSink::default();
+        let reply = store
+            .knowledge_retrieve_with_audit(request.clone(), Some(&audit))
+            .await
+            .unwrap();
         server.await.unwrap();
 
         assert_eq!(reply.status, RetrievalStatus::Success);
@@ -1527,6 +1545,14 @@ mod tests {
             calls.lock().unwrap().as_slice(),
             ["/api/tags", "/api/embed"]
         );
+        let events = audit.snapshot();
+        assert_eq!(events.len(), 2);
+        assert!(events
+            .iter()
+            .all(|event| event.kind() == M2AuditKind::EmbeddingTransport));
+        assert!(events
+            .iter()
+            .all(|event| event.request_id() == request.request_id.to_string()));
         let _ = fs::remove_dir_all(data_dir);
     }
 

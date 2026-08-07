@@ -6,6 +6,7 @@ pub(crate) mod content;
 mod fixtures;
 mod model_client;
 mod model_contract;
+pub(crate) mod observability;
 mod ocr;
 pub(crate) mod profiles;
 #[cfg(any(feature = "wechat-m1", feature = "wechat-m2"))]

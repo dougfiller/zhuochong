@@ -1,0 +1,14 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "events": [
+    {
+      "error_code": "WX_BUSY",
+      "kind": "terminal",
+      "outcome": "failed",
+      "request_id": "119555e4-86d2-573f-8f19-1502907b59be",
+      "stage_seq": 2
+    }
+  ],
+  "request_id": "119555e4-86d2-573f-8f19-1502907b59be",
+  "schema_version": 1
+}

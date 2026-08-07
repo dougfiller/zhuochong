@@ -1,0 +1,34 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "events": [
+    {
+      "binding_generation": 7,
+      "context_hash": "beae92e3b16e02687047763cd7d30231b4e23423f1936d7962f98b43c18e0e0c",
+      "kind": "retrieval_completed",
+      "model_request_id": "f4c8064c802928be9eca52cfe4c8fa1b",
+      "outcome": "success",
+      "request_id": "9503d7ed-0981-53d5-bfe4-a8a12c8a1eb6",
+      "selected_hit_count": 1,
+      "stage_seq": 5
+    },
+    {
+      "attempt": 1,
+      "binding_generation": 7,
+      "context_hash": "beae92e3b16e02687047763cd7d30231b4e23423f1936d7962f98b43c18e0e0c",
+      "kind": "model_transport_started",
+      "model_request_id": "f4c8064c802928be9eca52cfe4c8fa1b",
+      "request_bytes_sha256": "7fca4833df1bb2529d50a57dc506784aec2aaee24171c1c7b07650277bf72df0",
+      "request_id": "9503d7ed-0981-53d5-bfe4-a8a12c8a1eb6",
+      "stage_seq": 5
+    },
+    {
+      "error_code": "LLM_FAILED",
+      "kind": "terminal",
+      "outcome": "failed",
+      "request_id": "9503d7ed-0981-53d5-bfe4-a8a12c8a1eb6",
+      "stage_seq": 6
+    }
+  ],
+  "request_id": "9503d7ed-0981-53d5-bfe4-a8a12c8a1eb6",
+  "schema_version": 1
+}

@@ -1,0 +1,7 @@
+{
+  "batch_id": "fixture-batch-v2",
+  "git_commit": "4444444444444444444444444444444444444444",
+  "nsis_file_id": "NSIS",
+  "schema_version": 1,
+  "source_tree_file_id": "SOURCE"
+}

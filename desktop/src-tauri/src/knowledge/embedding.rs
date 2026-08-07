@@ -287,6 +287,8 @@ async fn embed_batch(
 pub(in crate::knowledge) async fn query_active_vector(
     frozen: &FrozenRetrievalRead,
     query: &str,
+    request_id: &crate::wechat::types::RequestId,
+    m2_audit: Option<&dyn crate::wechat::observability::M2AuditSink>,
 ) -> Result<QueryVectorAttempt, ContractError> {
     let endpoint = validate_and_pin_loopback(&frozen.embedding.endpoint, &SystemEndpointResolver)
         .await
@@ -309,19 +311,57 @@ pub(in crate::knowledge) async fn query_active_vector(
                 metadata_started,
                 "METADATA_UNAVAILABLE",
             ));
+            record_m2_embedding(
+                m2_audit,
+                request_id,
+                crate::wechat::observability::AuditOutcomeCode::MetadataUnavailable,
+                metadata_started,
+            )?;
             return Ok(QueryVectorAttempt::Unavailable);
         }
-        Err(_) => return Err(ContractError::KbRetrievalFailed),
+        Err(_) => {
+            record_m2_embedding(
+                m2_audit,
+                request_id,
+                crate::wechat::observability::AuditOutcomeCode::MetadataUnavailable,
+                metadata_started,
+            )?;
+            return Err(ContractError::KbRetrievalFailed);
+        }
     };
     if !metadata_response.status().is_success() || metadata_response.status().is_redirection() {
+        record_m2_embedding(
+            m2_audit,
+            request_id,
+            crate::wechat::observability::AuditOutcomeCode::MetadataUnavailable,
+            metadata_started,
+        )?;
         return Err(ContractError::KbRetrievalFailed);
     }
-    let metadata: Value = metadata_response
-        .json()
-        .await
-        .map_err(|_| ContractError::KbRetrievalFailed)?;
-    let fingerprint = parse_model_fingerprint(&metadata, &frozen.embedding.model)
-        .map_err(|_| ContractError::KbRetrievalFailed)?;
+    let metadata: Value = match metadata_response.json().await {
+        Ok(metadata) => metadata,
+        Err(_) => {
+            record_m2_embedding(
+                m2_audit,
+                request_id,
+                crate::wechat::observability::AuditOutcomeCode::MetadataUnavailable,
+                metadata_started,
+            )?;
+            return Err(ContractError::KbRetrievalFailed);
+        }
+    };
+    let fingerprint = match parse_model_fingerprint(&metadata, &frozen.embedding.model) {
+        Ok(fingerprint) => fingerprint,
+        Err(_) => {
+            record_m2_embedding(
+                m2_audit,
+                request_id,
+                crate::wechat::observability::AuditOutcomeCode::MetadataUnavailable,
+                metadata_started,
+            )?;
+            return Err(ContractError::KbRetrievalFailed);
+        }
+    };
     LogEmbeddingAuditSink.record(audit_call(
         &endpoint,
         EmbeddingOperation::MetadataProbe,
@@ -329,6 +369,12 @@ pub(in crate::knowledge) async fn query_active_vector(
         metadata_started,
         "METADATA_OK",
     ));
+    record_m2_embedding(
+        m2_audit,
+        request_id,
+        crate::wechat::observability::AuditOutcomeCode::MetadataOk,
+        metadata_started,
+    )?;
     if fingerprint != frozen.embedding.fingerprint {
         return Err(ContractError::KbRetrievalFailed);
     }
@@ -356,24 +402,68 @@ pub(in crate::knowledge) async fn query_active_vector(
                 embed_started,
                 "QUERY_UNAVAILABLE",
             ));
+            record_m2_embedding(
+                m2_audit,
+                request_id,
+                crate::wechat::observability::AuditOutcomeCode::QueryUnavailable,
+                embed_started,
+            )?;
             return Ok(QueryVectorAttempt::Unavailable);
         }
-        Err(_) => return Err(ContractError::KbRetrievalFailed),
+        Err(_) => {
+            record_m2_embedding(
+                m2_audit,
+                request_id,
+                crate::wechat::observability::AuditOutcomeCode::QueryUnavailable,
+                embed_started,
+            )?;
+            return Err(ContractError::KbRetrievalFailed);
+        }
     };
     if !embed_response.status().is_success() || embed_response.status().is_redirection() {
+        record_m2_embedding(
+            m2_audit,
+            request_id,
+            crate::wechat::observability::AuditOutcomeCode::QueryUnavailable,
+            embed_started,
+        )?;
         return Err(ContractError::KbRetrievalFailed);
     }
-    let payload = embed_response
-        .json()
-        .await
-        .map_err(|_| ContractError::KbRetrievalFailed)?;
-    let vector = parse_embedding_response(EmbeddingWireFormat::OllamaBatchV1, payload, 1)
-        .map_err(|_| ContractError::KbRetrievalFailed)?
-        .pop()
-        .ok_or(ContractError::KbRetrievalFailed)?;
-    let vector =
-        normalize_embedding_strict(vector).map_err(|_| ContractError::KbRetrievalFailed)?;
+    let payload = match embed_response.json().await {
+        Ok(payload) => payload,
+        Err(_) => {
+            record_m2_embedding(
+                m2_audit,
+                request_id,
+                crate::wechat::observability::AuditOutcomeCode::QueryUnavailable,
+                embed_started,
+            )?;
+            return Err(ContractError::KbRetrievalFailed);
+        }
+    };
+    let vector = match parse_embedding_response(EmbeddingWireFormat::OllamaBatchV1, payload, 1)
+        .ok()
+        .and_then(|mut vectors| vectors.pop())
+        .and_then(|vector| normalize_embedding_strict(vector).ok())
+    {
+        Some(vector) => vector,
+        None => {
+            record_m2_embedding(
+                m2_audit,
+                request_id,
+                crate::wechat::observability::AuditOutcomeCode::QueryUnavailable,
+                embed_started,
+            )?;
+            return Err(ContractError::KbRetrievalFailed);
+        }
+    };
     if vector.len() != frozen.embedding.dimension as usize {
+        record_m2_embedding(
+            m2_audit,
+            request_id,
+            crate::wechat::observability::AuditOutcomeCode::QueryUnavailable,
+            embed_started,
+        )?;
         return Err(ContractError::KbRetrievalFailed);
     }
     LogEmbeddingAuditSink.record(audit_call(
@@ -383,7 +473,30 @@ pub(in crate::knowledge) async fn query_active_vector(
         embed_started,
         "QUERY_OK",
     ));
+    record_m2_embedding(
+        m2_audit,
+        request_id,
+        crate::wechat::observability::AuditOutcomeCode::QueryOk,
+        embed_started,
+    )?;
     Ok(QueryVectorAttempt::Available(vector))
+}
+
+fn record_m2_embedding(
+    audit: Option<&dyn crate::wechat::observability::M2AuditSink>,
+    request_id: &crate::wechat::types::RequestId,
+    outcome: crate::wechat::observability::AuditOutcomeCode,
+    started: Instant,
+) -> Result<(), ContractError> {
+    let Some(audit) = audit else {
+        return Ok(());
+    };
+    let elapsed_ms = started.elapsed().as_millis().try_into().unwrap_or(u64::MAX);
+    audit.record(
+        crate::wechat::observability::M2AuditEvent::embedding_transport(
+            request_id, outcome, elapsed_ms,
+        )?,
+    )
 }
 
 pub(crate) async fn probe_and_freeze_candidate(
